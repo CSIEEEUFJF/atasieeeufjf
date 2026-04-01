@@ -9,6 +9,7 @@
 \RequirePackage[utf8]{inputenc}
 \RequirePackage{geometry}
 \RequirePackage{graphicx}
+\RequirePackage{caption}
 \RequirePackage{booktabs}
 \RequirePackage{array}
 \RequirePackage{setspace}
@@ -68,7 +69,6 @@
     enlarge left by=0pt,
     enlarge right by=0pt,
     fontupper=\sffamily\bfseries\large\color{white},
-    drop shadow south east,   % sombra opcional (moderna)
     underlay={                % detalhe de faixa dupla
         \fill[pesgreen!60]
             ([yshift=-2pt]frame.south west) rectangle
@@ -83,7 +83,7 @@
     colframe = pesgreen, 
     boxrule = 0.2pt, 
     toprule = 6pt, 
-    arc =  0
+    arc = 0pt
 }
 
 \newtcolorbox{bluebox}[1][]{
@@ -92,7 +92,7 @@
     colframe = ieeeblue, 
     boxrule = 0.2pt, 
     toprule = 6pt, 
-    arc =  0
+    arc = 0pt
 }
 %===========================================%
 %                COMANDOS                   %
@@ -114,7 +114,7 @@
     {\Large \textbf{\color{pesgreen}Capítulo PES}}\\
     {\large \textbf{\color{ieeeblue}Ramo Estudantil IEEE – UFJF}}\\[2pt]
     {\small Universidade Federal de Juiz de Fora – MG, Brasil}\\[-2pt]
-    {\small https://edu.ieee.org/br-ufjf/&}
+    {\small https://edu.ieee.org/br-ufjf/}&
     
   
     \centering\includegraphics[width=3cm]{imagens/PES_logo.png}
@@ -212,7 +212,7 @@
     \begin{minipage}{0.48\linewidth}
         \centering
         \includegraphics[width=\linewidth]{#2}
-        \caption*{\textbf{Anexo \arabic{anexocount}}: #1}
+        \captionof*{figure}{\textbf{Anexo \arabic{anexocount}}: #1}
     \end{minipage}
     \hfill
     \vspace{0.4cm}

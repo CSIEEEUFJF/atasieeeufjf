@@ -1,0 +1,33 @@
+{
+  "sociedade": "CS",
+  "arquivo_saida": "ata_preenchida",
+  "data_elaboracao": "30/03/2026",
+  "autor": "Arthur Araújo",
+  "data_reuniao": "30/03/2026",
+  "local_reuniao": "Sala do RE IEEE-UFJF",
+  "membros": [
+    {
+      "nome": "Fulano da Silva",
+      "cargo": "Presidente CS"
+    },
+    {
+      "nome": "Ciclano Souza",
+      "cargo": "Vice-presidente CS"
+    },
+    {
+      "nome": "Beltrano A. Lima",
+      "cargo": "Apoio"
+    }
+  ],
+  "pautas": [
+    "Definição de novos projetos da gestão",
+    "Ajuste de calendário",
+    "Discussão sobre voluntariado"
+  ],
+  "resultados": [
+    "Projeto X aprovado, início previsto para dezembro.",
+    "Calendário será fechado até sexta-feira.",
+    "Equipe decide abrir vagas para novos voluntários."
+  ],
+  "anexos": []
+}

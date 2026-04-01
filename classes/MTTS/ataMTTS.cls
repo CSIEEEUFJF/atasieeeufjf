@@ -1,10 +1,10 @@
-
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesClass{ataRAS}[2025/11/20 Classe para Atas RAS IEEE]
+\ProvidesClass{ataMTTS}[2026/04/01 Classe para Atas MTT-S IEEE]
 \LoadClass[12pt,a4paper]{article}
 %===========================================%
 %                PACOTES                    %
 %===========================================%
+
 \RequirePackage[utf8]{inputenc}
 \RequirePackage{geometry}
 \RequirePackage{graphicx}
@@ -21,41 +21,21 @@
 \RequirePackage{tikz}
 \geometry{margin=2cm}
 \setstretch{1.2}
+
 %===========================================%
 %                DEF. CORES                 %
 %===========================================%
 \definecolor{ieeeblue}{RGB}{0,98,155}
-\definecolor{pesgreen}{RGB}{120,190,32}
-\definecolor{rasred}{RGB}{152,0,46}
-\definecolor{raspurple}{RGB}{97,17,106}
-\titleformat{\section}{\color{ieeeblue}\Large\bfseries}{}{0pt}{}
-\titleformat{\subsection}{\color{pesgreen}\bfseries\normalsize}{}{0pt}{}
+\definecolor{ieecyan}{RGB}{0,181,226}
+\definecolor{mttsblue}{HTML}{236392}
+\definecolor{mttslightblue}{HTML}{5F90B8}
+\definecolor{mttssoft}{HTML}{A7C2D8}
+\titleformat{\section}{\color{mttsblue}\Large\bfseries}{}{0pt}{}
+\titleformat{\subsection}{\color{mttslightblue}\bfseries\normalsize}{}{0pt}{}
+
 %===========================================%
 %          CABEÇALHO E CAIXAS               %
 %===========================================%
-
-\newtcolorbox{titulofaixa}[1][]{
-    enhanced,
-    sharp corners,
-    colback=rasred!85,
-    colframe=rasred!85,
-    boxrule=0pt,
-    arc=0pt,
-    left=8pt,
-    right=8pt,
-    top=2pt,
-    bottom=6pt,
-    width=\textwidth,
-    enlarge left by=0pt,
-    enlarge right by=0pt,
-    fontupper=\sffamily\bfseries\large\color{white},
-    underlay={                % detalhe de faixa dupla
-        \fill[rasred!60]
-            ([yshift=-2pt]frame.south west) rectangle
-            ([yshift=-4pt]frame.south east);
-    },
-    title=#1
-}
 
 \newtcolorbox{pescabecaixa}{
     enhanced,
@@ -67,26 +47,50 @@
     left=4pt,
     right=4pt,
     arc=0pt,
-    overlay={       
-      \draw[rasred, line width=3pt] (frame.north west) -- (frame.north east);
-        \draw[raspurple, line width=1.5pt] (frame.south west) -- (frame.south east);
+    overlay={
+      \draw[mttsblue, line width=3pt] (frame.north west) -- (frame.north east);
+        \draw[mttslightblue, line width=1.5pt] (frame.south west) -- (frame.south east);
     }
         }
+
+\newtcolorbox{titulofaixa}[1][]{
+    enhanced,
+    sharp corners,
+    colback=mttsblue!85,
+    colframe=mttsblue!85,
+    boxrule=0pt,
+    arc=0pt,
+    left=8pt,
+    right=8pt,
+    top=2pt,
+    bottom=6pt,
+    width=\textwidth,
+    enlarge left by=0pt,
+    enlarge right by=0pt,
+    fontupper=\sffamily\bfseries\large\color{white},
+    underlay={
+        \fill[mttsblue!60]
+            ([yshift=-2pt]frame.south west) rectangle
+            ([yshift=-4pt]frame.south east);
+    },
+    title=#1
+}
+
 \newtcolorbox{pesbox}[1][]{
-  title = #1,  
-  colback = white, 
-    colframe = rasred, 
-    boxrule = 0.2pt, 
-    toprule = 6pt, 
+  title = #1,
+  colback = white,
+    colframe = mttsblue,
+    boxrule = 0.2pt,
+    toprule = 6pt,
     arc = 0pt
 }
 
 \newtcolorbox{bluebox}[1][]{
-  title = #1,  
-  colback = white, 
-    colframe = raspurple, 
-    boxrule = 0.2pt, 
-    toprule = 6pt, 
+  title = #1,
+  colback = white,
+    colframe = mttslightblue,
+    boxrule = 0.2pt,
+    toprule = 6pt,
     arc = 0pt
 }
 %===========================================%
@@ -100,33 +104,38 @@
 
 \begin{center}
 \begin{tabular}{p{2.7cm} p{10cm} p{3cm}}
-    
-  \centering\raisebox{-15pt}{\includegraphics[width=3cm]{imagens/IEEE_logo.png}} &
-    
-   
+
+  \centering\raisebox{0pt}{\includegraphics[width=3cm]{imagens/IEEE_logo.png}} &
+
+
     \centering
-    {\Large \textbf{\color{rasred}Capítulo RAS}}\\
-    {\large \textbf{\color{raspurple}Ramo Estudantil IEEE – UFJF}}\\[2pt]
+    \vspace{-1.3cm}
+    {\Large \textbf{\color{mttsblue}Capítulo MTT-S}}\\
+    {\large \textbf{\color{mttslightblue}Ramo Estudantil IEEE – UFJF}}\\[2pt]
     {\small Universidade Federal de Juiz de Fora – MG, Brasil}\\[-2pt]
     {\small https://edu.ieee.org/br-ufjf/}&
-    
-  
-    \centering\includegraphics[width=3cm]{imagens/RAS_logo.png}
+
+
+    \centering\raisebox{0pt}{\includegraphics[width=2.45cm]{imagens/MTTS_logo.png}}
 \end{tabular}
 \end{center}
 \vspace{-0.8cm}
 \begin{center}
-  {\Huge\sffamily\bfseries\color{rasred}{ATA DE REUNIÃO}}
+    {\Huge\sffamily\bfseries\color{mttsblue}{ATA DE REUNIÃO}}
 \end{center}
 
 \end{pescabecaixa}
 \vspace{0.2cm}
 }
-%---------------FAIXA DE TITULO ----------------------%
+
+%------------FAIXA DE TITULO---------------%
 \newcommand{\faixatitulo}[1]{
     \begin{titulofaixa}{#1}\end{titulofaixa}
 }
-%-------------INFORMAÇÕES BÁSICAS ---------------------%
+
+
+
+%-------------INFORMAÇÕES BÁSICAS --------%
 \newcommand{\info}[4]{
   \begin{pesbox}[\centering \Large \sffamily\bfseries\color{white}{INFORMAÇÕES BÁSICAS}]
 
@@ -142,7 +151,6 @@
 \vspace{0.4cm}
 }
 
-%----------------MEMBROS--------------------%
 \newenvironment{membros}{
   \begin{bluebox}[\centering \centering \Large \sffamily\bfseries\color{white}{MEMBROS PRESENTES}]
 
@@ -199,25 +207,26 @@
 \newcommand{\anexo}[2]{
     \stepcounter{anexocount}
 
-    % bloco da imagem
     \begin{minipage}{0.48\linewidth}
         \centering
         \includegraphics[width=\linewidth]{#2}
         \captionof*{figure}{\textbf{Anexo \arabic{anexocount}}: #1}
     \end{minipage}
     \hfill
+    \vspace{0.4cm}
 }
+
 %------------ASSINATURAS------------------%
 
 \newcommand{\assinaturas}{
 \vspace{1.5cm}
 \begin{minipage}{0.45\textwidth}
 \rule{7cm}{0.4pt}\\
-\centering \textbf{\color{rasred}Presidente do \\ Capítulo RAS - UFJF}
+\centering \textbf{\color{mttsblue}Presidente do \\Capítulo MTT-S - UFJF}
 \end{minipage}
 \hfill
-\begin{minipage}{0.4\textwidth}
+\begin{minipage}{0.45\textwidth}
 \rule{7cm}{0.4pt}\\
-\centering \textbf{\color{raspurple}Vice-presidente\\ do Capítulo RAS - UFJF}
+\centering \textbf{\color{mttslightblue}Vice-presidente do \\Capítulo MTT-S - UFJF}
 \end{minipage}
 }
