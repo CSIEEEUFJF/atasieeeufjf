@@ -72,6 +72,20 @@ function baixarArquivo(blob, fileName) {
 }
 
 function App() {
+  const [theme, setTheme] = useState(() => {
+    if (typeof window === "undefined") {
+      return "light";
+    }
+
+    const savedTheme = window.localStorage.getItem("atas-ieee-theme");
+    if (savedTheme === "dark" || savedTheme === "light") {
+      return savedTheme;
+    }
+
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  });
   const [sociedades, setSociedades] = useState(FALLBACK_SOCIETIES);
   const [form, setForm] = useState(createInitialForm);
   const [memberDraft, setMemberDraft] = useState(createEmptyMember);
@@ -112,6 +126,12 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+    window.localStorage.setItem("atas-ieee-theme", theme);
+  }, [theme]);
+
   const outputName = (() => {
     const societySlug = slugify(form.sociedade || "ata");
     const dateSlug = slugify(form.data_reuniao || form.data_elaboracao || hojeFormatado());
@@ -120,9 +140,13 @@ function App() {
 
   const selectedSocietyName =
     sociedades.find((item) => item.chave === form.sociedade)?.nome || form.sociedade;
-
+  const nextTheme = theme === "dark" ? "light" : "dark";
   function updateField(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function toggleTheme() {
+    setTheme((current) => (current === "dark" ? "light" : "dark"));
   }
 
   function resetForm() {
@@ -364,13 +388,18 @@ function App() {
       });
 
       if (!response.ok) {
-        let detail = "Não foi possível gerar o PDF.";
-        try {
-          const errorPayload = await response.json();
-          detail = errorPayload.detail || detail;
-        } catch {
-          detail = await response.text();
+        let detail = `Não foi possível gerar o PDF (${response.status}).`;
+        const rawResponse = await response.text();
+
+        if (rawResponse.trim()) {
+          try {
+            const errorPayload = JSON.parse(rawResponse);
+            detail = errorPayload.detail || detail;
+          } catch {
+            detail = rawResponse.trim();
+          }
         }
+
         throw new Error(detail);
       }
 
@@ -383,9 +412,14 @@ function App() {
         text: "PDF gerado com sucesso. O download foi iniciado.",
       });
     } catch (error) {
+      const message =
+        error instanceof TypeError
+          ? "Não foi possível alcançar a API. Verifique se o backend está rodando em http://127.0.0.1:8000."
+          : error.message || "Não foi possível gerar o PDF.";
+
       setStatus({
         tone: "error",
-        text: error.message || "Não foi possível gerar o PDF.",
+        text: message,
       });
     } finally {
       setIsSubmitting(false);
@@ -477,17 +511,23 @@ function App() {
 
   return (
     <div className="app-shell">
-      <div className="ambient ambient-cobalt" />
-      <div className="ambient ambient-coral" />
+      <header className="site-nav">
+        <a href="#top" className="site-brand" aria-label="Ir para o topo">
+          <span className="site-brand-badge" aria-hidden="true">
+            AT
+          </span>
+          <span className="site-brand-lockup">
+            <span className="site-brand-text">Atas IEEE</span>
+            <span className="site-brand-meta">Ramo Estudantil IEEE UFJF</span>
+          </span>
+        </a>
 
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">IEEE UFJF</p>
-          <h1>Atas Web</h1>
-          <p className="topbar-subtitle">
-            Preencha, compile e baixe o PDF sem abrir o LaTeX.
-          </p>
-        </div>
+        <ul className="nav-links">
+          <li><a href="#sociedade">Sociedade</a></li>
+          <li><a href="#reuniao">Reunião</a></li>
+          <li><a href="#membros">Membros</a></li>
+          <li><a href="#anexos">Anexos</a></li>
+        </ul>
 
         <div className="topbar-actions">
           <button className="ghost-button" onClick={() => draftInputRef.current?.click()}>
@@ -502,9 +542,25 @@ function App() {
         </div>
       </header>
 
-      <main className="workspace">
-        <section className="main-column">
-          <article className="panel">
+      <button
+        type="button"
+        className="theme-toggle"
+        data-theme-current={theme}
+        onClick={toggleTheme}
+        aria-pressed={theme === "dark"}
+        aria-label={`Alternar para tema ${nextTheme === "dark" ? "escuro" : "claro"}`}
+        title={`Trocar para tema ${nextTheme === "dark" ? "escuro" : "claro"}`}
+      >
+        <span className="theme-toggle__icon" aria-hidden="true" />
+        <span className="theme-toggle__label">
+          {theme === "dark" ? "Tema escuro" : "Tema claro"}
+        </span>
+      </button>
+
+      <main className="page-main" id="top">
+        <div className="workspace">
+          <section className="main-column">
+          <article className="panel" id="sociedade">
             <div className="panel-header">
               <div>
                 <p className="panel-kicker">Sociedade</p>
@@ -530,7 +586,7 @@ function App() {
             </div>
           </article>
 
-          <article className="panel">
+          <article className="panel" id="reuniao">
             <div className="panel-header">
               <div>
                 <p className="panel-kicker">Reunião</p>
@@ -573,7 +629,7 @@ function App() {
             </div>
           </article>
 
-          <article className="panel">
+          <article className="panel" id="membros">
             <div className="panel-header">
               <div>
                 <p className="panel-kicker">Presença</p>
@@ -695,7 +751,7 @@ function App() {
             </article>
           </div>
 
-          <article className="panel">
+          <article className="panel" id="anexos">
             <div className="panel-header">
               <div>
                 <p className="panel-kicker">Anexos</p>
@@ -782,46 +838,42 @@ function App() {
               )}
             </div>
           </article>
-        </section>
+          </section>
 
-        <aside className="side-column">
-          <article className="panel panel-sticky">
-            <div className="panel-header">
-              <div>
-                <p className="panel-kicker">Saída</p>
-                <h2>Gerar documento</h2>
+          <aside className="side-column">
+            <article className="hero-panel side-summary">
+              <div className="panel-header">
+                <div>
+                  <p className="panel-kicker">Saída</p>
+                  <h2>Gerar documento</h2>
+                </div>
               </div>
-            </div>
 
-            <div className="summary-card">
-              <span>Sociedade selecionada</span>
-              <strong>{selectedSocietyName}</strong>
-            </div>
+              <div className="summary-card">
+                <span>Sociedade selecionada</span>
+                <strong>{selectedSocietyName}</strong>
+              </div>
 
-            <div className="summary-card">
-              <span>Nome do PDF</span>
-              <strong>{outputName}.pdf</strong>
-            </div>
+              <div className="summary-card">
+                <span>Nome do PDF</span>
+                <strong>{outputName}.pdf</strong>
+              </div>
 
-            <div className="summary-card">
-              <span>Pasta de compilação</span>
-              <strong>Servidor temporário</strong>
-            </div>
+              <div className={`status-box tone-${status.tone}`}>
+                <span>Status</span>
+                <strong>{status.text}</strong>
+              </div>
 
-            <div className={`status-box tone-${status.tone}`}>
-              <span>Status</span>
-              <strong>{status.text}</strong>
-            </div>
-
-            <button
-              className="primary-button"
-              onClick={handleGeneratePdf}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? "Compilando..." : "Gerar PDF"}
-            </button>
-          </article>
-        </aside>
+              <button
+                className="primary-button"
+                onClick={handleGeneratePdf}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Compilando..." : "Gerar PDF"}
+              </button>
+            </article>
+          </aside>
+        </div>
       </main>
 
       <input
