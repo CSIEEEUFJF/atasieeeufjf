@@ -37,7 +37,7 @@ Funciona hoje:
 - upload de anexos pelo navegador
 - salvamento de atas e anexos no Postgres
 - pagina `/atas` com biblioteca separada por capitulo
-- clique em ata salva para gerar PDF diretamente
+- clique em ata salva para gerar PDF diretamente quando a ata nao depende de anexos reenviados
 - opcao "Abrir no gerador" para editar ata salva antes de gerar
 - geracao de PDF no navegador com SwiftLaTeX
 - suporte aos templates atuais em `classes/`
@@ -47,7 +47,7 @@ Pontos importantes do estado atual:
 - a compilacao de PDF e client-side
 - a conexao do banco usa `DATABASE_URL`
 - migrations ficam em `prisma/migrations`
-- anexos salvos ficam como `BYTEA` no Postgres
+- anexos salvos ficam somente como metadados no Postgres; arquivos binarios nao sao persistidos
 - o primeiro usuario criado vira admin e membro de todos os capitulos
 - membros sem vinculo com um capitulo nao conseguem acessar atas daquele capitulo
 - a implementacao antiga em `web_atas/` foi mantida apenas como referencia
@@ -219,8 +219,8 @@ Arquivos principais:
 [`src/lib/saved-atas.js`](./src/lib/saved-atas.js):
 
 - normaliza payloads de atas
-- processa `multipart/form-data`
-- limita tamanho de anexos
+- processa JSON com dados da ata
+- extrai e salva somente metadados de anexos
 - salva, atualiza, lista, abre e remove atas
 - aplica controle de acesso por capitulo em todas as operacoes
 
@@ -305,9 +305,9 @@ Parametros atuais:
 
 1. Usuario preenche ou abre uma ata.
 2. Clica em `Salvar ata` ou `Atualizar ata`.
-3. Frontend envia `multipart/form-data` para `/api/atas`.
-4. Campo `payload` contem os dados da ata.
-5. Anexos sao enviados em campos `attachment:<id>`.
+3. Frontend envia JSON para `/api/atas`.
+4. Payload contem os dados da ata e metadados dos anexos.
+5. Arquivos binarios dos anexos nao sao enviados para salvamento.
 6. Backend valida sessao.
 7. Backend valida se o usuario pertence ao capitulo selecionado.
 8. Backend salva a ata em `atas`.
@@ -364,7 +364,7 @@ Importacao:
 Observacao:
 
 - rascunho JSON nao carrega o conteudo binario dos anexos
-- atas salvas no Postgres podem guardar anexos completos como `BYTEA`
+- atas salvas no Postgres tambem preservam somente metadados de anexos
 
 ## 7. Interface web
 
@@ -517,18 +517,18 @@ Payload:
 `POST /api/atas`
 
 - cria nova ata
-- recebe `multipart/form-data`
+- recebe JSON com payload da ata e metadados de anexos
 - exige que o usuario pertenca ao capitulo da ata
 
 `GET /api/atas/:id`
 
-- retorna ata completa, incluindo anexos em base64
+- retorna ata completa, incluindo metadados de anexos
 - retorna `404` se a ata nao existir ou se o usuario nao tiver acesso ao capitulo
 
 `PUT /api/atas/:id`
 
 - atualiza ata existente
-- substitui anexos anteriores pelos anexos enviados
+- substitui metadados de anexos anteriores pelos metadados enviados
 - exige acesso ao capitulo original e ao capitulo novo informado no payload
 
 `DELETE /api/atas/:id`
@@ -680,13 +680,12 @@ Campos principais:
 - `file_name`
 - `mime_type`
 - `size`
-- `content`
 - `position`
 
-Limites atuais:
+Observacoes:
 
-- ate `25 MB` por anexo
-- ate `80 MB` no total de anexos de uma ata
+- o conteudo binario do arquivo nao e salvo no Postgres
+- para gerar PDF com anexos a partir de uma ata salva, reabra no gerador e reenvie os arquivos
 
 ## 10. Capitulos e templates LaTeX
 
@@ -841,10 +840,11 @@ Ficam persistidos:
 - associacoes usuario-capitulo
 - atas salvas
 - payload JSON das atas
-- anexos como BLOB
+- metadados de anexos
 
 Nao ficam persistidos:
 
+- arquivos binarios dos anexos
 - estado visual do formulario nao salvo
 - caches SwiftLaTeX do navegador
 - arquivos temporarios de build
@@ -871,13 +871,13 @@ Importante:
 
 ## 12.3 Atas salvas
 
-Atas salvas no banco podem guardar anexos completos.
+Atas salvas no banco guardam somente metadados dos anexos.
 
 Ao gerar PDF pela pagina `/atas`:
 
-- a API retorna anexos em base64
-- o browser reconstrui os anexos como `File`
-- o compilador recebe os arquivos no filesystem em memoria
+- atas sem anexos podem ser compiladas diretamente
+- atas com anexos exigem reenvio dos arquivos pelo gerador
+- o compilador recebe apenas arquivos que existem na sessao atual do navegador
 
 ## 13. Seguranca
 
@@ -1055,7 +1055,7 @@ Depois de mudancas importantes, validar:
 13. criacao de ata no gerador
 14. salvamento de ata no banco
 15. listagem em `/atas`
-16. geracao de PDF clicando em ata salva
+16. geracao de PDF clicando em ata salva sem anexos
 17. abertura de ata salva no gerador
 18. geracao de PDF pelo gerador principal
 19. exclusao de ata salva
@@ -1114,17 +1114,16 @@ Cuidados:
 - `DATABASE_URL` deve apontar para um Postgres acessivel pelo ambiente de deploy
 - migrations de producao devem ser aplicadas com `npm run db:deploy`
 - backups devem ser feitos no provedor Postgres escolhido
-- anexos em `BYTEA` aumentam o tamanho do banco; para uso intenso, considerar storage externo no futuro
+- anexos ficam fora do banco; se for necessario persistir arquivos, considerar storage externo no futuro
 - migrations ficam em `prisma/migrations`
 
 ## 17.3 Anexos
 
 Cuidados:
 
-- anexos grandes aumentam tamanho do banco
 - anexos ficam em memoria durante compilacao
-- limite atual e `25 MB` por arquivo e `80 MB` por ata
-- rascunhos JSON nao preservam os binarios dos anexos
+- anexos salvos preservam nome, tipo MIME, tamanho e legenda
+- rascunhos JSON e atas salvas nao preservam os binarios dos anexos
 
 ## 17.4 Backend legado
 
@@ -1203,7 +1202,7 @@ Acoes:
 Possiveis causas:
 
 - ata salva esta incompleta
-- anexos salvos nao possuem conteudo binario
+- anexos salvos nao possuem conteudo binario; reabra no gerador e reenvie os arquivos
 - usuario perdeu acesso ao capitulo
 - SwiftLaTeX falhou ao carregar runtime
 

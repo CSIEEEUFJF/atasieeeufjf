@@ -30,22 +30,6 @@ function createMemberForm(defaultChapter = "") {
   };
 }
 
-function base64ToFile(contentBase64, fileName, mimeType) {
-  if (!contentBase64) {
-    return null;
-  }
-
-  const binary = window.atob(contentBase64);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-
-  return new File([bytes], fileName || "anexo.bin", {
-    type: mimeType || "application/octet-stream",
-  });
-}
-
 function createFormFromStoredAta(ata) {
   const savedForm = ata.form || {};
   const attachmentsById = new Map(
@@ -66,12 +50,12 @@ function createFormFromStoredAta(ata) {
       const fileName = storedAttachment?.fileName || item.fileName || "";
 
       return {
-        file: storedAttachment?.contentBase64
-          ? base64ToFile(storedAttachment.contentBase64, fileName, storedAttachment.mimeType)
-          : null,
+        file: null,
         fileName,
         id,
         legenda: item.legenda || storedAttachment?.legenda || "",
+        mimeType: storedAttachment?.mimeType || item.mimeType || "",
+        size: Number(storedAttachment?.size || item.size || 0),
       };
     }),
     autor: savedForm.autor || "",
@@ -113,7 +97,7 @@ function validateSavedAtaForm(form) {
   if (!form.pautasText.trim()) missing.push("ao menos uma pauta");
   if (!form.resultadosText.trim()) missing.push("ao menos um resultado");
   if (form.anexos.some((item) => !item.file)) {
-    missing.push("arquivos dos anexos salvos");
+    missing.push("arquivos dos anexos, que nao ficam armazenados no banco");
   }
 
   if (missing.length) {
@@ -419,6 +403,15 @@ function SavedAtasPage() {
     }
   }
 
+  function handleSavedAtaAction(ata) {
+    if (Number(ata.attachmentCount || 0) > 0) {
+      window.location.href = `/?ata=${ata.id}`;
+      return;
+    }
+
+    handleGenerateSavedAta(ata.id);
+  }
+
   async function handleLogout() {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
@@ -558,8 +551,12 @@ function SavedAtasPage() {
                             generatingId === ata.id ? "is-generating" : ""
                           }`}
                           key={ata.id}
-                          onClick={() => handleGenerateSavedAta(ata.id)}
-                          title="Gerar PDF desta ata"
+                          onClick={() => handleSavedAtaAction(ata)}
+                          title={
+                            ata.attachmentCount > 0
+                              ? "Abrir no gerador para reenviar anexos"
+                              : "Gerar PDF desta ata"
+                          }
                         >
                           <div className="saved-card-topline">
                             <span>{ata.sociedade}</span>
@@ -589,11 +586,15 @@ function SavedAtasPage() {
                               className="soft-button"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                handleGenerateSavedAta(ata.id);
+                                handleSavedAtaAction(ata);
                               }}
                               disabled={generatingId === ata.id}
                             >
-                              {generatingId === ata.id ? "Gerando..." : "Gerar PDF"}
+                              {generatingId === ata.id
+                                ? "Gerando..."
+                                : ata.attachmentCount > 0
+                                  ? "Reenviar anexos"
+                                  : "Gerar PDF"}
                             </button>
                             <a
                               className="text-button standalone-link"

@@ -3,9 +3,6 @@ import crypto from "node:crypto";
 import { normalizarNomeSaida, SOCIEDADES } from "./ata";
 import { getPrisma } from "./db";
 
-const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
-const MAX_TOTAL_ATTACHMENT_BYTES = 80 * 1024 * 1024;
-
 export class ChapterAccessError extends Error {}
 
 function text(value, fallback = "") {
@@ -39,6 +36,11 @@ function cleanFileName(value) {
   return cleaned || "anexo.bin";
 }
 
+function normalizeFileSize(value) {
+  const size = Number(value || 0);
+  return Number.isSafeInteger(size) && size > 0 ? size : 0;
+}
+
 function normalizeAtaPayload(raw) {
   const form = raw?.form && typeof raw.form === "object" ? raw.form : raw;
   const sociedade = SOCIEDADES[form?.sociedade] ? form.sociedade : "CS";
@@ -51,6 +53,8 @@ function normalizeAtaPayload(raw) {
         fileName: cleanFileName(item.fileName || item.arquivo_nome || item.arquivo || ""),
         id: limitedText(item.id || item.clientId || crypto.randomUUID(), 80),
         legenda: limitedText(item.legenda, 500),
+        mimeType: limitedText(item.mimeType || item.type, 180, "application/octet-stream"),
+        size: normalizeFileSize(item.size),
       })),
       autor: limitedText(form?.autor, 180),
       data_elaboracao: limitedText(form?.data_elaboracao, 40),
@@ -72,36 +76,23 @@ function normalizeAtaPayload(raw) {
   };
 }
 
-async function collectAttachments(formData, normalizedPayload) {
+function collectAttachments(formData, normalizedPayload) {
   const attachments = [];
-  let totalBytes = 0;
 
   for (const [position, item] of normalizedPayload.form.anexos.entries()) {
     const file = formData?.get(`attachment:${item.id}`);
-    let content = null;
     let fileName = item.fileName;
-    let mimeType = "application/octet-stream";
-    let size = 0;
+    let mimeType = item.mimeType || "application/octet-stream";
+    let size = normalizeFileSize(item.size);
 
     if (file && typeof file === "object" && typeof file.arrayBuffer === "function") {
       size = Number(file.size || 0);
-      if (size > MAX_ATTACHMENT_BYTES) {
-        throw new Error(`O anexo "${file.name || item.fileName}" excede 25 MB.`);
-      }
-
-      totalBytes += size;
-      if (totalBytes > MAX_TOTAL_ATTACHMENT_BYTES) {
-        throw new Error("Os anexos desta ata excedem o limite total de 80 MB.");
-      }
-
       fileName = cleanFileName(file.name || item.fileName);
       mimeType = text(file.type, "application/octet-stream") || "application/octet-stream";
-      content = Buffer.from(await file.arrayBuffer());
     }
 
     attachments.push({
       clientId: item.id,
-      content,
       fileName,
       legenda: item.legenda,
       mimeType,
@@ -117,9 +108,10 @@ export async function parseAtaSaveRequest(request) {
   const contentType = request.headers.get("content-type") || "";
   if (contentType.includes("application/json")) {
     const raw = await request.json();
+    const payload = normalizeAtaPayload(raw);
     return {
-      attachments: [],
-      payload: normalizeAtaPayload(raw),
+      attachments: collectAttachments(null, payload),
+      payload,
     };
   }
 
@@ -131,7 +123,7 @@ export async function parseAtaSaveRequest(request) {
   }
 
   const payload = normalizeAtaPayload(JSON.parse(payloadRaw));
-  const attachments = await collectAttachments(formData, payload);
+  const attachments = collectAttachments(formData, payload);
 
   return { attachments, payload };
 }
@@ -139,7 +131,6 @@ export async function parseAtaSaveRequest(request) {
 function attachmentCreateData(attachment) {
   return {
     clientId: attachment.clientId,
-    content: attachment.content,
     fileName: attachment.fileName,
     legenda: attachment.legenda,
     mimeType: attachment.mimeType,
@@ -328,7 +319,6 @@ export async function getSavedAta(user, ataId) {
 
   const attachments = ata.attachments.map((row) => ({
     clientId: row.clientId,
-    contentBase64: row.content ? Buffer.from(row.content).toString("base64") : null,
     fileName: row.fileName,
     legenda: row.legenda,
     mimeType: row.mimeType,

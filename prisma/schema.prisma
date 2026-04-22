@@ -73,7 +73,6 @@ model AtaAttachment {
   fileName String @map("file_name")
   mimeType String @map("mime_type")
   size     Int    @default(0)
-  content  Bytes?
   position Int    @default(0)
   ata      Ata    @relation(fields: [ataId], references: [id], onDelete: Cascade)
 

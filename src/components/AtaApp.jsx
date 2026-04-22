@@ -78,10 +78,12 @@ function createInitialAuthForm() {
 function createStoredAtaPayload(form, outputName) {
   return {
     form: {
-      anexos: form.anexos.map(({ file, fileName, id, legenda }) => ({
+      anexos: form.anexos.map(({ file, fileName, id, legenda, mimeType, size }) => ({
         fileName: fileName || file?.name || "",
         id,
         legenda,
+        mimeType: file?.type || mimeType || "",
+        size: Number(file?.size || size || 0),
       })),
       autor: form.autor,
       data_elaboracao: form.data_elaboracao,
@@ -95,22 +97,6 @@ function createStoredAtaPayload(form, outputName) {
     outputName,
     title: outputName,
   };
-}
-
-function base64ToFile(contentBase64, fileName, mimeType) {
-  if (!contentBase64) {
-    return null;
-  }
-
-  const binary = window.atob(contentBase64);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-
-  return new File([bytes], fileName || "anexo.bin", {
-    type: mimeType || "application/octet-stream",
-  });
 }
 
 function createFormFromStoredAta(ata) {
@@ -133,12 +119,12 @@ function createFormFromStoredAta(ata) {
       const fileName = storedAttachment?.fileName || item.fileName || "";
 
       return {
-        file: storedAttachment?.contentBase64
-          ? base64ToFile(storedAttachment.contentBase64, fileName, storedAttachment.mimeType)
-          : null,
+        file: null,
         fileName,
         id,
         legenda: item.legenda || storedAttachment?.legenda || "",
+        mimeType: storedAttachment?.mimeType || item.mimeType || "",
+        size: Number(storedAttachment?.size || item.size || 0),
       };
     }),
     autor: savedForm.autor || "",
@@ -617,22 +603,8 @@ function App() {
     }
   }
 
-  function createSaveFormData() {
-    const payload = createStoredAtaPayload(form, outputName);
-    const body = new FormData();
-    body.append("payload", JSON.stringify(payload));
-
-    for (const attachment of form.anexos) {
-      if (attachment.file) {
-        body.append(
-          `attachment:${attachment.id}`,
-          attachment.file,
-          attachment.fileName || attachment.file.name,
-        );
-      }
-    }
-
-    return body;
+  function createSavePayload() {
+    return JSON.stringify(createStoredAtaPayload(form, outputName));
   }
 
   async function handleSaveAta() {
@@ -660,7 +632,10 @@ function App() {
 
     try {
       const response = await fetch(activeAtaId ? `/api/atas/${activeAtaId}` : "/api/atas", {
-        body: createSaveFormData(),
+        body: createSavePayload(),
+        headers: {
+          "Content-Type": "application/json",
+        },
         method: activeAtaId ? "PUT" : "POST",
       });
 
@@ -675,7 +650,9 @@ function App() {
 
       setStatus({
         tone: "success",
-        text: activeAtaId ? "Ata atualizada no banco." : "Ata salva no banco.",
+        text: activeAtaId
+          ? "Ata atualizada no banco. Os anexos foram salvos somente como metadados."
+          : "Ata salva no banco. Os anexos foram salvos somente como metadados.",
       });
     } catch (error) {
       setStatus({
@@ -700,17 +677,21 @@ function App() {
       }
 
       const payload = await response.json();
+      const loadedForm = createFormFromStoredAta(payload.ata);
       startTransition(() => {
-        setForm(createFormFromStoredAta(payload.ata));
+        setForm(loadedForm);
         setMemberDraft(createEmptyMember());
         setAttachmentDraft(createEmptyAttachment());
         setEditingMemberId(null);
         setEditingAttachmentId(null);
         setActiveAtaId(payload.ata.id);
       });
+      const needsAttachmentReupload = loadedForm.anexos.some((attachment) => !attachment.file);
       setStatus({
         tone: "success",
-        text: "Ata carregada do banco. Você pode editar, gerar PDF ou salvar novamente.",
+        text: needsAttachmentReupload
+          ? "Ata carregada do banco. Os arquivos dos anexos nao ficam salvos; reenvie-os antes de gerar PDF."
+          : "Ata carregada do banco. Você pode editar, gerar PDF ou salvar novamente.",
       });
       if (options.replaceUrl) {
         window.history.replaceState(null, "", window.location.pathname);
@@ -1247,7 +1228,9 @@ function App() {
                     <div className="list-content">
                       <strong>{attachment.legenda}</strong>
                       <span>
-                        {attachment.fileName || "Arquivo precisa ser reenviado"}
+                        {attachment.file
+                          ? attachment.fileName
+                          : `${attachment.fileName || "Arquivo"} precisa ser reenviado`}
                       </span>
                     </div>
                     <div className="list-actions">
