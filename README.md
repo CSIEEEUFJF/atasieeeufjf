@@ -73,8 +73,8 @@ Pontos importantes do estado atual:
 Definidos em [`package.json`](./package.json):
 
 - `npm run dev` - inicia o Next.js em modo desenvolvimento
-- `npm run build` - gera Prisma Client e build de producao
-- `npm run vercel-build` - aplica migrations e gera build para Vercel
+- `npm run build` - gera Prisma Client, aplica migrations quando `DATABASE_URL` existe e gera build de producao
+- `npm run vercel-build` - alias do build usado para Vercel
 - `npm start` - inicia o servidor de producao apos build
 - `npm run db:generate` - gera Prisma Client
 - `npm run db:migrate` - cria/aplica migration em desenvolvimento
