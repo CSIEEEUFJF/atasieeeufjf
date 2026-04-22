@@ -5,6 +5,7 @@ __pycache__/
 node_modules/
 .next/
 out/
+.data/
 web_atas/frontend/node_modules/
 web_atas/frontend/dist/
 web_atas/frontend/.vite/
