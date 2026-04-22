@@ -887,7 +887,7 @@ function App() {
           <h1>{isSetup ? "Crie o primeiro acesso" : "Entre para continuar"}</h1>
           <p>
             {isSetup
-              ? "Este usuario inicial ficará salvo no banco interno do app."
+              ? "Este usuario inicial ficará salvo no banco Postgres configurado."
               : "Use seu usuario local para acessar as atas salvas e o gerador."}
           </p>
 

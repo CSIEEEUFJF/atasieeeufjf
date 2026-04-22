@@ -1,0 +1,82 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           Int           @id @default(autoincrement())
+  name         String
+  username     String        @unique
+  email        String        @unique
+  passwordHash String        @map("password_hash")
+  passwordSalt String        @map("password_salt")
+  isAdmin      Boolean       @default(false) @map("is_admin")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  atas         Ata[]
+  chapters     UserChapter[]
+  sessions     Session[]
+
+  @@map("users")
+}
+
+model Session {
+  id         Int      @id @default(autoincrement())
+  userId     Int      @map("user_id")
+  tokenHash  String   @unique @map("token_hash")
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  lastSeenAt DateTime @map("last_seen_at")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt], map: "idx_sessions_expires_at")
+  @@index([tokenHash], map: "idx_sessions_token_hash")
+  @@map("sessions")
+}
+
+model UserChapter {
+  userId     Int      @map("user_id")
+  chapterKey String   @map("chapter_key")
+  createdAt  DateTime @default(now()) @map("created_at")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, chapterKey])
+  @@index([chapterKey], map: "idx_user_chapters_chapter")
+  @@map("user_chapters")
+}
+
+model Ata {
+  id          Int             @id @default(autoincrement())
+  userId      Int             @map("user_id")
+  title       String
+  sociedade   String
+  outputName  String          @map("output_name")
+  payloadJson String          @map("payload_json")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attachments AtaAttachment[]
+
+  @@index([sociedade, updatedAt], map: "idx_atas_sociedade_updated")
+  @@index([userId, updatedAt], map: "idx_atas_user_updated")
+  @@map("atas")
+}
+
+model AtaAttachment {
+  id       Int    @id @default(autoincrement())
+  ataId    Int    @map("ata_id")
+  clientId String @map("client_id")
+  legenda  String
+  fileName String @map("file_name")
+  mimeType String @map("mime_type")
+  size     Int    @default(0)
+  content  Bytes?
+  position Int    @default(0)
+  ata      Ata    @relation(fields: [ataId], references: [id], onDelete: Cascade)
+
+  @@index([ataId, position], map: "idx_attachments_ata_position")
+  @@map("ata_attachments")
+}

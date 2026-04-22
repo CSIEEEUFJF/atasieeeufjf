@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import crypto from "node:crypto";
 
 import { SOCIEDADES, SOCIEDADE_LABELS } from "./ata";
-import { getDb, nowIso } from "./db";
+import { getPrisma, nowDate } from "./db";
 
 export const SESSION_COOKIE = "atas_ieee_session";
 
@@ -22,15 +22,21 @@ function internalEmailForUsername(username) {
   return `${username}@local.atas-ieee`;
 }
 
+function chapterKeyFromRelation(chapter) {
+  return typeof chapter === "string" ? chapter : chapter?.chapterKey;
+}
+
 function publicUser(row) {
   if (!row) {
     return null;
   }
 
   return {
-    chapters: Array.isArray(row.chapters) ? row.chapters : getUserChapters(row.id),
+    chapters: Array.isArray(row.chapters)
+      ? row.chapters.map(chapterKeyFromRelation).filter(Boolean)
+      : [],
     id: row.id,
-    isAdmin: Boolean(row.is_admin),
+    isAdmin: Boolean(row.isAdmin),
     name: row.name,
     username: row.username,
   };
@@ -44,20 +50,6 @@ function normalizeChapterKeys(chapters, { allowAll = false } = {}) {
   const requested = Array.isArray(chapters) ? chapters : [];
   const valid = new Set(CHAPTER_KEYS);
   return [...new Set(requested.map((item) => String(item || "").trim()).filter((item) => valid.has(item)))];
-}
-
-function setUserChapters(db, userId, chapters) {
-  const timestamp = nowIso();
-  db.prepare("DELETE FROM user_chapters WHERE user_id = ?").run(userId);
-
-  const insert = db.prepare(`
-    INSERT INTO user_chapters (user_id, chapter_key, created_at)
-    VALUES (?, ?, ?)
-  `);
-
-  for (const chapterKey of chapters) {
-    insert.run(userId, chapterKey, timestamp);
-  }
 }
 
 function hashToken(token) {
@@ -87,9 +79,13 @@ function verifyPassword(password, salt, expectedHash) {
   return crypto.timingSafeEqual(actual, expected);
 }
 
-export function hasUsers() {
-  const row = getDb().prepare("SELECT COUNT(*) AS count FROM users").get();
-  return Number(row?.count || 0) > 0;
+export function isUniqueConstraintError(error) {
+  return error?.code === "P2002";
+}
+
+export async function hasUsers() {
+  const count = await getPrisma().user.count();
+  return count > 0;
 }
 
 export function getChapterOptions() {
@@ -99,23 +95,21 @@ export function getChapterOptions() {
   }));
 }
 
-export function getUserChapters(userId) {
-  return getDb()
-    .prepare(`
-      SELECT chapter_key AS chapterKey
-      FROM user_chapters
-      WHERE user_id = ?
-      ORDER BY chapter_key ASC
-    `)
-    .all(userId)
-    .map((row) => row.chapterKey);
+export async function getUserChapters(userId) {
+  const rows = await getPrisma().userChapter.findMany({
+    orderBy: { chapterKey: "asc" },
+    select: { chapterKey: true },
+    where: { userId },
+  });
+
+  return rows.map((row) => row.chapterKey);
 }
 
 export function isChapterMember(user, chapterKey) {
   return Boolean(user?.chapters?.includes(chapterKey));
 }
 
-export function createUser({ chapters, email, name, password, username }, options = {}) {
+export async function createUser({ chapters, email, name, password, username }, options = {}) {
   const cleanUsername = normalizeUsername(username || email);
   const cleanName = String(name || "").trim();
   const cleanPassword = String(password || "");
@@ -139,92 +133,80 @@ export function createUser({ chapters, email, name, password, username }, option
   }
 
   const { passwordHash, passwordSalt } = hashPassword(cleanPassword);
-  const timestamp = nowIso();
-  const db = getDb();
-
-  const result = db.transaction(() => {
-    const inserted = db
-      .prepare(`
-        INSERT INTO users (
-          name, username, email, password_hash, password_salt, is_admin, created_at, updated_at
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `)
-      .run(
-        cleanName,
-        cleanUsername,
-        internalEmailForUsername(cleanUsername),
-        passwordHash,
-        passwordSalt,
-        isAdmin ? 1 : 0,
-        timestamp,
-        timestamp,
-      );
-
-    const userId = Number(inserted.lastInsertRowid);
-    setUserChapters(db, userId, userChapters);
-    return inserted;
-  })();
-
-  return publicUser({
-    chapters: userChapters,
-    id: Number(result.lastInsertRowid),
-    is_admin: isAdmin ? 1 : 0,
-    name: cleanName,
-    username: cleanUsername,
+  const user = await getPrisma().user.create({
+    data: {
+      chapters: {
+        create: userChapters.map((chapterKey) => ({ chapterKey })),
+      },
+      email: internalEmailForUsername(cleanUsername),
+      isAdmin,
+      name: cleanName,
+      passwordHash,
+      passwordSalt,
+      username: cleanUsername,
+    },
+    include: { chapters: true },
   });
+
+  return publicUser(user);
 }
 
-export function verifyCredentials(username, password) {
+export async function verifyCredentials(username, password) {
   const cleanUsername = normalizeUsername(username);
-  const row = getDb()
-    .prepare("SELECT * FROM users WHERE username = ?")
-    .get(cleanUsername);
+  const row = await getPrisma().user.findUnique({
+    include: { chapters: true },
+    where: { username: cleanUsername },
+  });
 
-  if (!row || !verifyPassword(String(password || ""), row.password_salt, row.password_hash)) {
+  if (!row || !verifyPassword(String(password || ""), row.passwordSalt, row.passwordHash)) {
     return null;
   }
 
   return publicUser(row);
 }
 
-export function listUsers() {
-  return getDb()
-    .prepare(`
-      SELECT id, name, username, is_admin
-      FROM users
-      ORDER BY name COLLATE NOCASE ASC
-    `)
-    .all()
-    .map(publicUser);
+export async function listUsers() {
+  const users = await getPrisma().user.findMany({
+    include: { chapters: true },
+    orderBy: { name: "asc" },
+  });
+
+  return users.map(publicUser);
 }
 
-export function createSession(userId) {
+export async function createSession(userId) {
   const token = crypto.randomBytes(32).toString("base64url");
   const tokenHash = hashToken(token);
-  const createdAt = nowIso();
-  const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const createdAt = nowDate();
+  const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
 
-  getDb()
-    .prepare(`
-      INSERT INTO sessions (user_id, token_hash, expires_at, created_at, last_seen_at)
-      VALUES (?, ?, ?, ?, ?)
-    `)
-    .run(userId, tokenHash, expiresAt, createdAt, createdAt);
+  await getPrisma().session.create({
+    data: {
+      createdAt,
+      expiresAt,
+      lastSeenAt: createdAt,
+      tokenHash,
+      userId,
+    },
+  });
 
-  return { expiresAt, token };
+  return { expiresAt: expiresAt.toISOString(), token };
 }
 
-export function destroySession(token) {
+export async function destroySession(token) {
   if (!token) {
     return;
   }
 
-  getDb().prepare("DELETE FROM sessions WHERE token_hash = ?").run(hashToken(token));
+  await getPrisma().session.deleteMany({
+    where: { tokenHash: hashToken(token) },
+  });
 }
 
-export function deleteExpiredSessions() {
-  getDb().prepare("DELETE FROM sessions WHERE expires_at <= ?").run(nowIso());
+export async function deleteExpiredSessions() {
+  await getPrisma().session.deleteMany({
+    where: { expiresAt: { lte: nowDate() } },
+  });
 }
 
 export async function getSessionToken() {
@@ -238,26 +220,31 @@ export async function getCurrentUser() {
     return null;
   }
 
-  deleteExpiredSessions();
+  await deleteExpiredSessions();
 
-  const row = getDb()
-    .prepare(`
-      SELECT users.id, users.name, users.username, users.is_admin
-      FROM sessions
-      INNER JOIN users ON users.id = sessions.user_id
-      WHERE sessions.token_hash = ? AND sessions.expires_at > ?
-    `)
-    .get(hashToken(token), nowIso());
+  const tokenHash = hashToken(token);
+  const session = await getPrisma().session.findFirst({
+    include: {
+      user: {
+        include: { chapters: true },
+      },
+    },
+    where: {
+      expiresAt: { gt: nowDate() },
+      tokenHash,
+    },
+  });
 
-  if (!row) {
+  if (!session) {
     return null;
   }
 
-  getDb()
-    .prepare("UPDATE sessions SET last_seen_at = ? WHERE token_hash = ?")
-    .run(nowIso(), hashToken(token));
+  await getPrisma().session.update({
+    data: { lastSeenAt: nowDate() },
+    where: { tokenHash },
+  });
 
-  return publicUser(row);
+  return publicUser(session.user);
 }
 
 export function setSessionCookie(response, token, expiresAt) {

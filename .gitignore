@@ -5,6 +5,8 @@ __pycache__/
 node_modules/
 .next/
 out/
+.env
+.env*.local
 .data/
 web_atas/frontend/node_modules/
 web_atas/frontend/dist/

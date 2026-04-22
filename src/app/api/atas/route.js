@@ -23,7 +23,7 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     return NextResponse.json({
-      atas: listSavedAtas(user, searchParams.get("capitulo") || ""),
+      atas: await listSavedAtas(user, searchParams.get("capitulo") || ""),
     });
   } catch (error) {
     if (error instanceof ChapterAccessError) {
@@ -46,7 +46,7 @@ export async function POST(request) {
 
   try {
     const parsed = await parseAtaSaveRequest(request);
-    const ata = createSavedAta(user, parsed);
+    const ata = await createSavedAta(user, parsed);
     return NextResponse.json({ ata }, { status: 201 });
   } catch (error) {
     if (error instanceof ChapterAccessError) {

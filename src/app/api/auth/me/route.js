@@ -9,7 +9,7 @@ export async function GET() {
 
   return NextResponse.json({
     chapters: getChapterOptions(),
-    setupRequired: !hasUsers(),
+    setupRequired: !(await hasUsers()),
     user,
   });
 }

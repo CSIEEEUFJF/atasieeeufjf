@@ -1,4 +1,4 @@
-# Gerador Web de Atas IEEE com React, SQLite e SwiftLaTeX
+# Gerador Web de Atas IEEE com React, Prisma Postgres e SwiftLaTeX
 
 Documentacao principal do projeto `Template-LaTex-ATAIEEE`.
 
@@ -12,15 +12,15 @@ geracao de atas de capitulos IEEE, com:
 - interface React/Next.js para preencher atas
 - autenticacao simples por nome de usuario e senha
 - controle de acesso por capitulo
-- banco SQLite interno para usuarios, sessoes, atas e anexos
+- banco PostgreSQL acessado via Prisma ORM para usuarios, sessoes, atas e anexos
 - templates LaTeX por sociedade/capitulo em `classes/`
 - compilacao de PDF no navegador com SwiftLaTeX/WebAssembly
-- APIs do proprio Next.js para entregar templates, assets, banco e autenticacao
+- APIs do proprio Next.js para entregar templates, assets, persistencia e autenticacao
 
 O ponto mais importante da arquitetura atual e que o backend nao executa
 `pdflatex`. A compilacao final do documento acontece no browser, usando
 SwiftLaTeX e o bundle local de pacotes TeX. O backend serve dados, templates,
-assets e banco interno.
+assets e persistencia em Postgres.
 
 ## 2. Estado atual
 
@@ -35,7 +35,7 @@ Funciona hoje:
 - formulario web para criar atas
 - importacao e exportacao de rascunho JSON
 - upload de anexos pelo navegador
-- salvamento de atas e anexos no SQLite
+- salvamento de atas e anexos no Postgres
 - pagina `/atas` com biblioteca separada por capitulo
 - clique em ata salva para gerar PDF diretamente
 - opcao "Abrir no gerador" para editar ata salva antes de gerar
@@ -45,9 +45,9 @@ Funciona hoje:
 Pontos importantes do estado atual:
 
 - a compilacao de PDF e client-side
-- o banco local padrao fica em `.data/atas-ieee.sqlite`
-- `.data/` nao e versionado pelo Git
-- anexos salvos ficam como BLOB no SQLite
+- a conexao do banco usa `DATABASE_URL`
+- migrations ficam em `prisma/migrations`
+- anexos salvos ficam como `BYTEA` no Postgres
 - o primeiro usuario criado vira admin e membro de todos os capitulos
 - membros sem vinculo com um capitulo nao conseguem acessar atas daquele capitulo
 - a implementacao antiga em `web_atas/` foi mantida apenas como referencia
@@ -59,9 +59,10 @@ Pontos importantes do estado atual:
 
 - Framework web: `Next.js 16`
 - Interface: `React 19`
-- Runtime: `Node.js 20.9+`
-- Banco: `SQLite`
-- Driver SQLite: `better-sqlite3`
+- Runtime: `Node.js 20.19+`
+- Banco: `PostgreSQL`
+- ORM: `Prisma`
+- Driver: `pg` via `@prisma/adapter-pg`
 - Compilador LaTeX no browser: `SwiftLaTeX`
 - Motor usado pelo app: `PdfTeXEngine`
 - Assets do motor: `public/swiftlatex/`
@@ -72,23 +73,29 @@ Pontos importantes do estado atual:
 Definidos em [`package.json`](./package.json):
 
 - `npm run dev` - inicia o Next.js em modo desenvolvimento
-- `npm run build` - gera build de producao
+- `npm run build` - gera Prisma Client e build de producao
+- `npm run vercel-build` - aplica migrations e gera build para Vercel
 - `npm start` - inicia o servidor de producao apos build
+- `npm run db:generate` - gera Prisma Client
+- `npm run db:migrate` - cria/aplica migration em desenvolvimento
+- `npm run db:deploy` - aplica migrations em ambiente de producao
+- `npm run db:studio` - abre Prisma Studio
 - `npm run vendor:texlive` - regenera o bundle local de pacotes TeX
 
 ## 3.3 Requisitos
 
 Ambiente esperado:
 
-- `Node.js >= 20.9.0`
+- `Node.js >= 20.19.0`
 - `npm`
+- banco PostgreSQL acessivel pela aplicacao
+- variavel `DATABASE_URL`
 - navegador moderno com suporte a WebAssembly
 
 Nao e necessario instalar:
 
 - `pdflatex`
 - TeX Live completo no sistema
-- servidor de banco externo
 
 ## 4. Estrutura do repositorio
 
@@ -97,6 +104,7 @@ Principais diretorios:
 - [`classes`](./classes): classes LaTeX e imagens por capitulo/sociedade
 - [`exemplos`](./exemplos): payloads JSON de exemplo
 - [`public/swiftlatex`](./public/swiftlatex): runtime SwiftLaTeX/WASM servido estaticamente
+- [`prisma`](./prisma): schema Prisma e migrations PostgreSQL
 - [`scripts`](./scripts): scripts auxiliares, incluindo vendor do TeX Live
 - [`src/app`](./src/app): rotas App Router do Next.js
 - [`src/components`](./src/components): componentes React principais
@@ -110,7 +118,7 @@ Arquivos principais:
 - [`src/components/SavedAtasPage.jsx`](./src/components/SavedAtasPage.jsx): biblioteca de atas salvas
 - [`src/lib/ata.js`](./src/lib/ata.js): sociedades, renderizacao LaTeX e utilitarios herdados
 - [`src/lib/auth.js`](./src/lib/auth.js): usuarios, senhas, sessoes e autorizacao
-- [`src/lib/db.js`](./src/lib/db.js): conexao SQLite e migracoes
+- [`src/lib/db.js`](./src/lib/db.js): cliente Prisma e conexao Postgres
 - [`src/lib/saved-atas.js`](./src/lib/saved-atas.js): persistencia e controle de acesso das atas
 - [`src/lib/swiftlatex-client.js`](./src/lib/swiftlatex-client.js): compilacao PDF no navegador
 - [`src/app/api`](./src/app/api): rotas HTTP do backend Next.js
@@ -135,7 +143,7 @@ Arquivos principais:
   - aplica autorizacao por capitulo
   - serve arquivos do bundle TeX local
 
-- Banco SQLite
+- Banco PostgreSQL/Prisma
   - persiste usuarios
   - persiste sessoes
   - persiste associacoes usuario-capitulo
@@ -202,13 +210,11 @@ Arquivos principais:
 
 [`src/lib/db.js`](./src/lib/db.js):
 
-- abre o SQLite local
-- cria diretorio `.data/`
-- executa migracoes
-- cria tabelas e indices
-- migra usuarios antigos para `username`
-- promove o primeiro usuario existente para admin quando necessario
-- associa admins a todos os capitulos
+- cria o Prisma Client sob demanda
+- usa `DATABASE_URL` como string de conexao
+- usa `@prisma/adapter-pg` para falar com PostgreSQL
+- mantem a conexao lazy para evitar acesso ao banco durante import/build
+- as migrations estruturais ficam em [`prisma/migrations`](./prisma/migrations)
 
 [`src/lib/saved-atas.js`](./src/lib/saved-atas.js):
 
@@ -231,7 +237,7 @@ Arquivos principais:
 
 No servidor:
 
-- SQLite
+- PostgreSQL via Prisma
 - autenticacao
 - autorizacao
 - APIs REST
@@ -358,7 +364,7 @@ Importacao:
 Observacao:
 
 - rascunho JSON nao carrega o conteudo binario dos anexos
-- atas salvas no SQLite podem guardar anexos completos como BLOB
+- atas salvas no Postgres podem guardar anexos completos como `BYTEA`
 
 ## 7. Interface web
 
@@ -404,7 +410,7 @@ Comportamento importante:
 
 - clicar no card gera PDF
 - `Abrir no gerador` nao gera PDF; apenas abre para edicao
-- exclusao remove a ata e seus anexos por cascade no SQLite
+- exclusao remove a ata e seus anexos por cascade no Postgres/Prisma
 - membros comuns veem apenas seus capitulos
 - admins veem todos os capitulos
 
@@ -550,28 +556,28 @@ Payload:
 
 ## 9. Modelo de dados
 
-## 9.1 Banco SQLite
+## 9.1 Banco PostgreSQL com Prisma
 
-Banco padrao:
+O banco e definido por [`prisma/schema.prisma`](./prisma/schema.prisma) e
+versionado por migrations em [`prisma/migrations`](./prisma/migrations).
 
-```text
-.data/atas-ieee.sqlite
-```
+Variavel de ambiente obrigatoria:
 
-Arquivos auxiliares do SQLite/WAL:
+- `DATABASE_URL` - string de conexao PostgreSQL usada pelo Prisma
 
-- `.data/atas-ieee.sqlite-shm`
-- `.data/atas-ieee.sqlite-wal`
-
-Variaveis de ambiente:
-
-- `ATAS_DB_PATH` - caminho completo do arquivo SQLite
-- `ATAS_DB_DIR` - diretorio onde o banco padrao sera criado
-
-Exemplo:
+Exemplo local:
 
 ```bash
-ATAS_DB_PATH=/caminho/atas-ieee.sqlite npm run dev
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require"
+```
+
+Comandos principais:
+
+```bash
+npm run db:generate
+npm run db:migrate
+npm run db:deploy
+npm run db:studio
 ```
 
 ## 9.2 Tabela `users`
@@ -595,9 +601,8 @@ Campos principais:
 Observacoes:
 
 - a autenticacao usa `username`
-- `email` foi mantido internamente por compatibilidade de migracao
+- `email` foi mantido internamente como campo unico auxiliar
 - novos usuarios recebem email interno no formato `<username>@local.atas-ieee`
-- usuarios antigos recebem `username` derivado do email
 
 ## 9.3 Tabela `sessions`
 
@@ -635,7 +640,7 @@ Campos principais:
 Regra:
 
 - acesso a atas e sempre filtrado por `chapter_key`
-- admins sao associados a todos os capitulos durante migracao/setup
+- admins criados no setup sao associados a todos os capitulos quando nenhum capitulo especifico e enviado
 
 ## 9.5 Tabela `atas`
 
@@ -826,7 +831,7 @@ npm run vendor:texlive
 
 ## 12. Persistencia
 
-## 12.1 O que fica no SQLite
+## 12.1 O que fica no Postgres
 
 Ficam persistidos:
 
@@ -949,6 +954,18 @@ Na raiz do repositorio:
 npm install
 ```
 
+Criar `.env` a partir do exemplo e informar a URL do Postgres:
+
+```bash
+cp .env.example .env
+```
+
+Aplicar migrations no banco de desenvolvimento:
+
+```bash
+npm run db:migrate
+```
+
 ## 14.2 Modo desenvolvimento
 
 ```bash
@@ -966,6 +983,16 @@ Abrir:
 npm run build
 npm start
 ```
+
+Para deploy na Vercel, configure `DATABASE_URL` nas variaveis do projeto e use
+o comando de build:
+
+```bash
+npm run vercel-build
+```
+
+Esse comando gera o Prisma Client, aplica `prisma migrate deploy` e entao roda
+o build do Next.js.
 
 ## 14.4 Bootstrap auxiliar
 
@@ -994,7 +1021,7 @@ npm run build
 Auditoria de dependencias:
 
 ```bash
-npm audit --omit=dev
+npm audit
 ```
 
 Regenerar TeX local:
@@ -1003,27 +1030,36 @@ Regenerar TeX local:
 npm run vendor:texlive
 ```
 
+Validar schema Prisma:
+
+```bash
+npx prisma validate
+```
+
 ## 15.2 Checklist rapido de validacao
 
 Depois de mudancas importantes, validar:
 
 1. `npm install`
-2. `npm run build`
-3. `npm audit --omit=dev`
-4. primeira criacao de admin
-5. login por nome de usuario
-6. logout
-7. cadastro de membro em `/atas`
-8. associacao de membro a um unico capitulo
-9. bloqueio de acesso cruzado entre capitulos
-10. criacao de ata no gerador
-11. salvamento de ata no banco
-12. listagem em `/atas`
-13. geracao de PDF clicando em ata salva
-14. abertura de ata salva no gerador
-15. geracao de PDF pelo gerador principal
-16. exclusao de ata salva
-17. importacao/exportacao de rascunho JSON
+2. configurar `DATABASE_URL`
+3. `npm run db:migrate` em banco de desenvolvimento
+4. `npx prisma validate`
+5. `npm run build`
+6. `npm audit`
+7. primeira criacao de admin
+8. login por nome de usuario
+9. logout
+10. cadastro de membro em `/atas`
+11. associacao de membro a um unico capitulo
+12. bloqueio de acesso cruzado entre capitulos
+13. criacao de ata no gerador
+14. salvamento de ata no banco
+15. listagem em `/atas`
+16. geracao de PDF clicando em ata salva
+17. abertura de ata salva no gerador
+18. geracao de PDF pelo gerador principal
+19. exclusao de ata salva
+20. importacao/exportacao de rascunho JSON
 
 ## 15.3 Checklist de SwiftLaTeX
 
@@ -1047,6 +1083,8 @@ Validar ao mexer em templates, TeX ou assets:
 - [`src/lib/db.js`](./src/lib/db.js)
 - [`src/lib/saved-atas.js`](./src/lib/saved-atas.js)
 - [`src/lib/swiftlatex-client.js`](./src/lib/swiftlatex-client.js)
+- [`prisma/schema.prisma`](./prisma/schema.prisma)
+- [`prisma/migrations`](./prisma/migrations)
 - [`src/app/api/atas/route.js`](./src/app/api/atas/route.js)
 - [`src/app/api/atas/[id]/route.js`](./src/app/api/atas/[id]/route.js)
 - [`src/app/api/auth/me/route.js`](./src/app/api/auth/me/route.js)
@@ -1069,14 +1107,15 @@ Cuidados:
 - hard refresh pode ser necessario apos atualizar runtime/manifest
 - pacotes LaTeX novos podem exigir atualizar `scripts/vendor-texlive.mjs`
 
-## 17.2 Banco SQLite
+## 17.2 Banco PostgreSQL/Prisma
 
 Cuidados:
 
-- SQLite local nao e banco multi-instancia
-- backups devem copiar o `.sqlite` e arquivos WAL quando o app estiver parado
-- remover `.data/` apaga usuarios, sessoes, atas e anexos
-- migracoes ficam em `src/lib/db.js`
+- `DATABASE_URL` deve apontar para um Postgres acessivel pelo ambiente de deploy
+- migrations de producao devem ser aplicadas com `npm run db:deploy`
+- backups devem ser feitos no provedor Postgres escolhido
+- anexos em `BYTEA` aumentam o tamanho do banco; para uso intenso, considerar storage externo no futuro
+- migrations ficam em `prisma/migrations`
 
 ## 17.3 Anexos
 
@@ -1181,9 +1220,10 @@ Acoes:
 Para resetar ambiente local:
 
 1. Parar o servidor Next.
-2. Remover `.data/`.
-3. Iniciar o app novamente.
-4. Criar o primeiro usuario admin.
+2. Confirmar que `DATABASE_URL` aponta para um banco de teste.
+3. Executar `npx prisma migrate reset`.
+4. Iniciar o app novamente.
+5. Criar o primeiro usuario admin.
 
 ## 19. Roadmap tecnico sugerido
 

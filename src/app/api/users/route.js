@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import {
   createUser,
   getCurrentUser,
+  isUniqueConstraintError,
   isSameOriginRequest,
   listUsers,
 } from "../../../lib/auth";
@@ -22,7 +23,7 @@ export async function GET() {
     return forbidden();
   }
 
-  return NextResponse.json({ users: listUsers() });
+  return NextResponse.json({ users: await listUsers() });
 }
 
 export async function POST(request) {
@@ -37,10 +38,10 @@ export async function POST(request) {
 
   try {
     const payload = await request.json();
-    const user = createUser(payload, { isAdmin: Boolean(payload.isAdmin) });
+    const user = await createUser(payload, { isAdmin: Boolean(payload.isAdmin) });
     return NextResponse.json({ user }, { status: 201 });
   } catch (error) {
-    const duplicateUsername = error?.code === "SQLITE_CONSTRAINT_UNIQUE";
+    const duplicateUsername = isUniqueConstraintError(error);
     return NextResponse.json(
       {
         detail: duplicateUsername

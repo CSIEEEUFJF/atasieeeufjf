@@ -15,7 +15,7 @@ export async function POST(request) {
     return NextResponse.json({ detail: "Origem invalida." }, { status: 403 });
   }
 
-  if (!hasUsers()) {
+  if (!(await hasUsers())) {
     return NextResponse.json(
       { detail: "Crie o primeiro usuario antes de entrar." },
       { status: 428 },
@@ -24,7 +24,7 @@ export async function POST(request) {
 
   try {
     const { password, username } = await request.json();
-    const user = verifyCredentials(username, password);
+    const user = await verifyCredentials(username, password);
 
     if (!user) {
       return NextResponse.json(
@@ -33,7 +33,7 @@ export async function POST(request) {
       );
     }
 
-    const session = createSession(user.id);
+    const session = await createSession(user.id);
     const response = NextResponse.json({ user });
     setSessionCookie(response, session.token, session.expiresAt);
     return response;

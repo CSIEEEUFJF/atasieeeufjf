@@ -15,7 +15,7 @@ export async function POST(request) {
     return NextResponse.json({ detail: "Origem invalida." }, { status: 403 });
   }
 
-  if (hasUsers()) {
+  if (await hasUsers()) {
     return NextResponse.json(
       { detail: "A configuracao inicial ja foi concluida." },
       { status: 409 },
@@ -24,8 +24,8 @@ export async function POST(request) {
 
   try {
     const payload = await request.json();
-    const user = createUser(payload, { isAdmin: true });
-    const session = createSession(user.id);
+    const user = await createUser(payload, { isAdmin: true });
+    const session = await createSession(user.id);
     const response = NextResponse.json({ user }, { status: 201 });
     setSessionCookie(response, session.token, session.expiresAt);
     return response;

@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 
 import { normalizarNomeSaida, SOCIEDADES } from "./ata";
-import { getDb, nowIso } from "./db";
+import { getPrisma } from "./db";
 
 const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 const MAX_TOTAL_ATTACHMENT_BYTES = 80 * 1024 * 1024;
@@ -14,10 +14,6 @@ function text(value, fallback = "") {
 
 function getAccessibleChapters(user) {
   return Array.isArray(user?.chapters) ? user.chapters.filter((chapter) => SOCIEDADES[chapter]) : [];
-}
-
-function placeholders(values) {
-  return values.map(() => "?").join(", ");
 }
 
 function assertChapterAccess(user, chapterKey) {
@@ -140,29 +136,35 @@ export async function parseAtaSaveRequest(request) {
   return { attachments, payload };
 }
 
-function insertAttachments(db, ataId, attachments) {
-  const insertAttachment = db.prepare(`
-    INSERT INTO ata_attachments (
-      ata_id, client_id, legenda, file_name, mime_type, size, content, position
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  for (const attachment of attachments) {
-    insertAttachment.run(
-      ataId,
-      attachment.clientId,
-      attachment.legenda,
-      attachment.fileName,
-      attachment.mimeType,
-      attachment.size,
-      attachment.content,
-      attachment.position,
-    );
-  }
+function attachmentCreateData(attachment) {
+  return {
+    clientId: attachment.clientId,
+    content: attachment.content,
+    fileName: attachment.fileName,
+    legenda: attachment.legenda,
+    mimeType: attachment.mimeType,
+    position: attachment.position,
+    size: attachment.size,
+  };
 }
 
-export function listSavedAtas(user, chapterKey = "") {
+function serializeDate(value) {
+  return value instanceof Date ? value.toISOString() : value;
+}
+
+function summarizeAta(row) {
+  return {
+    attachmentCount: Number(row?._count?.attachments || 0),
+    createdAt: serializeDate(row.createdAt),
+    id: row.id,
+    outputName: row.outputName,
+    sociedade: row.sociedade,
+    title: row.title,
+    updatedAt: serializeDate(row.updatedAt),
+  };
+}
+
+export async function listSavedAtas(user, chapterKey = "") {
   const accessibleChapters = getAccessibleChapters(user);
   if (!accessibleChapters.length) {
     return [];
@@ -174,193 +176,173 @@ export function listSavedAtas(user, chapterKey = "") {
     assertChapterAccess(user, requestedChapter);
   }
 
-  return getDb()
-    .prepare(`
-      SELECT
-        atas.id,
-        atas.title,
-        atas.sociedade,
-        atas.output_name AS outputName,
-        atas.created_at AS createdAt,
-        atas.updated_at AS updatedAt,
-        COUNT(ata_attachments.id) AS attachmentCount
-      FROM atas
-      LEFT JOIN ata_attachments ON ata_attachments.ata_id = atas.id
-      WHERE atas.sociedade IN (${placeholders(filteredChapters)})
-      GROUP BY atas.id
-      ORDER BY atas.sociedade COLLATE NOCASE ASC, atas.updated_at DESC
-    `)
-    .all(...filteredChapters)
-    .map((row) => ({
-      ...row,
-      attachmentCount: Number(row.attachmentCount || 0),
-    }));
-}
-
-export function getSavedAtaSummary(user, ataId) {
-  const accessibleChapters = getAccessibleChapters(user);
-  if (!accessibleChapters.length) {
-    return null;
-  }
-
-  const row = getDb()
-    .prepare(`
-      SELECT
-        atas.id,
-        atas.title,
-        atas.sociedade,
-        atas.output_name AS outputName,
-        atas.created_at AS createdAt,
-        atas.updated_at AS updatedAt,
-        COUNT(ata_attachments.id) AS attachmentCount
-      FROM atas
-      LEFT JOIN ata_attachments ON ata_attachments.ata_id = atas.id
-      WHERE atas.id = ? AND atas.sociedade IN (${placeholders(accessibleChapters)})
-      GROUP BY atas.id
-    `)
-    .get(ataId, ...accessibleChapters);
-
-  return row
-    ? {
-        ...row,
-        attachmentCount: Number(row.attachmentCount || 0),
-      }
-    : null;
-}
-
-export function createSavedAta(user, { attachments, payload }) {
-  assertChapterAccess(user, payload.form.sociedade);
-  const db = getDb();
-  const transaction = db.transaction(() => {
-    const timestamp = nowIso();
-    const result = db
-      .prepare(`
-        INSERT INTO atas (
-          user_id, title, sociedade, output_name, payload_json, created_at, updated_at
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `)
-      .run(
-        user.id,
-        payload.title,
-        payload.form.sociedade,
-        payload.outputName,
-        JSON.stringify(payload),
-        timestamp,
-        timestamp,
-      );
-
-    const ataId = Number(result.lastInsertRowid);
-    insertAttachments(db, ataId, attachments);
-    return ataId;
+  const atas = await getPrisma().ata.findMany({
+    include: {
+      _count: {
+        select: { attachments: true },
+      },
+    },
+    orderBy: [
+      { sociedade: "asc" },
+      { updatedAt: "desc" },
+    ],
+    where: {
+      sociedade: { in: filteredChapters },
+    },
   });
 
-  return getSavedAtaSummary(user, transaction());
+  return atas.map(summarizeAta);
 }
 
-export function updateSavedAta(user, ataId, { attachments, payload }) {
+export async function getSavedAtaSummary(user, ataId) {
+  const accessibleChapters = getAccessibleChapters(user);
+  if (!accessibleChapters.length) {
+    return null;
+  }
+
+  const row = await getPrisma().ata.findFirst({
+    include: {
+      _count: {
+        select: { attachments: true },
+      },
+    },
+    where: {
+      id: ataId,
+      sociedade: { in: accessibleChapters },
+    },
+  });
+
+  return row ? summarizeAta(row) : null;
+}
+
+export async function createSavedAta(user, { attachments, payload }) {
+  assertChapterAccess(user, payload.form.sociedade);
+
+  const ata = await getPrisma().ata.create({
+    data: {
+      attachments: {
+        create: attachments.map(attachmentCreateData),
+      },
+      outputName: payload.outputName,
+      payloadJson: JSON.stringify(payload),
+      sociedade: payload.form.sociedade,
+      title: payload.title,
+      userId: user.id,
+    },
+    include: {
+      _count: {
+        select: { attachments: true },
+      },
+    },
+  });
+
+  return summarizeAta(ata);
+}
+
+export async function updateSavedAta(user, ataId, { attachments, payload }) {
   assertChapterAccess(user, payload.form.sociedade);
   const accessibleChapters = getAccessibleChapters(user);
   if (!accessibleChapters.length) {
     return null;
   }
 
-  const db = getDb();
-  const transaction = db.transaction(() => {
-    const timestamp = nowIso();
-    const result = db
-      .prepare(`
-        UPDATE atas
-        SET title = ?, sociedade = ?, output_name = ?, payload_json = ?, updated_at = ?
-        WHERE id = ? AND sociedade IN (${placeholders(accessibleChapters)})
-      `)
-      .run(
-        payload.title,
-        payload.form.sociedade,
-        payload.outputName,
-        JSON.stringify(payload),
-        timestamp,
-        ataId,
-        ...accessibleChapters,
-      );
+  const ata = await getPrisma().$transaction(async (tx) => {
+    const existingAta = await tx.ata.findFirst({
+      select: { id: true },
+      where: {
+        id: ataId,
+        sociedade: { in: accessibleChapters },
+      },
+    });
 
-    if (result.changes === 0) {
-      return false;
+    if (!existingAta) {
+      return null;
     }
 
-    db.prepare("DELETE FROM ata_attachments WHERE ata_id = ?").run(ataId);
-    insertAttachments(db, ataId, attachments);
-    return true;
+    await tx.ataAttachment.deleteMany({
+      where: { ataId },
+    });
+
+    return tx.ata.update({
+      data: {
+        attachments: {
+          create: attachments.map(attachmentCreateData),
+        },
+        outputName: payload.outputName,
+        payloadJson: JSON.stringify(payload),
+        sociedade: payload.form.sociedade,
+        title: payload.title,
+      },
+      include: {
+        _count: {
+          select: { attachments: true },
+        },
+      },
+      where: { id: ataId },
+    });
   });
 
-  return transaction() ? getSavedAtaSummary(user, ataId) : null;
+  return ata ? summarizeAta(ata) : null;
 }
 
-export function deleteSavedAta(user, ataId) {
+export async function deleteSavedAta(user, ataId) {
   const accessibleChapters = getAccessibleChapters(user);
   if (!accessibleChapters.length) {
     return false;
   }
 
-  const result = getDb()
-    .prepare(`DELETE FROM atas WHERE id = ? AND sociedade IN (${placeholders(accessibleChapters)})`)
-    .run(ataId, ...accessibleChapters);
+  const result = await getPrisma().ata.deleteMany({
+    where: {
+      id: ataId,
+      sociedade: { in: accessibleChapters },
+    },
+  });
 
-  return result.changes > 0;
+  return result.count > 0;
 }
 
-export function getSavedAta(user, ataId) {
+export async function getSavedAta(user, ataId) {
   const accessibleChapters = getAccessibleChapters(user);
   if (!accessibleChapters.length) {
     return null;
   }
 
-  const db = getDb();
-  const ata = db
-    .prepare(`
-      SELECT
-        id,
-        title,
-        sociedade,
-        output_name AS outputName,
-        payload_json AS payloadJson,
-        created_at AS createdAt,
-        updated_at AS updatedAt
-      FROM atas
-      WHERE id = ? AND sociedade IN (${placeholders(accessibleChapters)})
-    `)
-    .get(ataId, ...accessibleChapters);
+  const ata = await getPrisma().ata.findFirst({
+    include: {
+      attachments: {
+        orderBy: [
+          { position: "asc" },
+          { id: "asc" },
+        ],
+      },
+    },
+    where: {
+      id: ataId,
+      sociedade: { in: accessibleChapters },
+    },
+  });
 
   if (!ata) {
     return null;
   }
 
-  const attachments = db
-    .prepare(`
-      SELECT client_id AS clientId, legenda, file_name AS fileName, mime_type AS mimeType,
-        size, content, position
-      FROM ata_attachments
-      WHERE ata_id = ?
-      ORDER BY position ASC, id ASC
-    `)
-    .all(ata.id)
-    .map((row) => ({
-      clientId: row.clientId,
-      contentBase64: row.content ? Buffer.from(row.content).toString("base64") : null,
-      fileName: row.fileName,
-      legenda: row.legenda,
-      mimeType: row.mimeType,
-      size: Number(row.size || 0),
-    }));
+  const attachments = ata.attachments.map((row) => ({
+    clientId: row.clientId,
+    contentBase64: row.content ? Buffer.from(row.content).toString("base64") : null,
+    fileName: row.fileName,
+    legenda: row.legenda,
+    mimeType: row.mimeType,
+    size: Number(row.size || 0),
+  }));
 
   return {
     attachments,
-    createdAt: ata.createdAt,
+    createdAt: serializeDate(ata.createdAt),
     form: JSON.parse(ata.payloadJson).form,
     id: ata.id,
     outputName: ata.outputName,
     sociedade: ata.sociedade,
     title: ata.title,
-    updatedAt: ata.updatedAt,
+    updatedAt: serializeDate(ata.updatedAt),
   };
 }

@@ -44,7 +44,7 @@ export async function GET(_request, context) {
     return routeContext.response;
   }
 
-  const ata = getSavedAta(routeContext.user, routeContext.id);
+  const ata = await getSavedAta(routeContext.user, routeContext.id);
   if (!ata) {
     return NextResponse.json({ detail: "Ata nao encontrada." }, { status: 404 });
   }
@@ -64,7 +64,7 @@ export async function PUT(request, context) {
 
   try {
     const parsed = await parseAtaSaveRequest(request);
-    const ata = updateSavedAta(routeContext.user, routeContext.id, parsed);
+    const ata = await updateSavedAta(routeContext.user, routeContext.id, parsed);
 
     if (!ata) {
       return NextResponse.json({ detail: "Ata nao encontrada." }, { status: 404 });
@@ -93,7 +93,7 @@ export async function DELETE(request, context) {
     return routeContext.response;
   }
 
-  const deleted = deleteSavedAta(routeContext.user, routeContext.id);
+  const deleted = await deleteSavedAta(routeContext.user, routeContext.id);
   if (!deleted) {
     return NextResponse.json({ detail: "Ata nao encontrada." }, { status: 404 });
   }
