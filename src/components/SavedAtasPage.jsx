@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { compileAtaPdfInBrowser } from "../lib/swiftlatex-client";
+import PdfGenerationProgress from "./PdfGenerationProgress";
 import UserPasswordDialog from "./UserPasswordDialog";
 
 async function readApiError(response, fallback) {
@@ -129,6 +130,8 @@ function SavedAtasPage() {
   const [deletingId, setDeletingId] = useState(null);
   const [generatingId, setGeneratingId] = useState(null);
   const [renamingId, setRenamingId] = useState(null);
+  const [updatingAdminId, setUpdatingAdminId] = useState(null);
+  const [generationProgressForm, setGenerationProgressForm] = useState(null);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
 
   useEffect(() => {
@@ -332,6 +335,62 @@ function SavedAtasPage() {
     }
   }
 
+  async function handleToggleAdmin(user) {
+    if (user.id === auth.user.id) {
+      setStatus({
+        tone: "error",
+        text: "Voce nao pode alterar sua propria permissao de administrador.",
+      });
+      return;
+    }
+
+    const nextIsAdmin = !user.isAdmin;
+    const confirmed = window.confirm(
+      nextIsAdmin
+        ? `Tornar ${user.name} administrador?`
+        : `Remover permissao de administrador de ${user.name}?`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setUpdatingAdminId(user.id);
+    setStatus({
+      tone: "loading",
+      text: "Atualizando permissao de administrador.",
+    });
+
+    try {
+      const response = await fetch(`/api/users/${user.id}`, {
+        body: JSON.stringify({ isAdmin: nextIsAdmin }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "PATCH",
+      });
+
+      if (!response.ok) {
+        throw new Error(await readApiError(response, "Nao foi possivel atualizar o usuario."));
+      }
+
+      const payload = await response.json();
+      setUsers((current) =>
+        current.map((item) => (item.id === user.id ? payload.user || item : item)),
+      );
+      setStatus({
+        tone: "success",
+        text: "Permissao de administrador atualizada.",
+      });
+    } catch (error) {
+      setStatus({
+        tone: "error",
+        text: error.message || "Nao foi possivel atualizar o usuario.",
+      });
+    } finally {
+      setUpdatingAdminId(null);
+    }
+  }
+
   async function handleDelete(ataId) {
     const confirmed = window.confirm("Excluir esta ata salva do banco?");
     if (!confirmed) {
@@ -433,6 +492,7 @@ function SavedAtasPage() {
       const payload = await response.json();
       const form = createFormFromStoredAta(payload.ata);
       validateSavedAtaForm(form);
+      setGenerationProgressForm(form);
 
       const result = await compileAtaPdfInBrowser({
         form,
@@ -454,6 +514,7 @@ function SavedAtasPage() {
         text: message,
       });
     } finally {
+      setGenerationProgressForm(null);
       setGeneratingId(null);
     }
   }
@@ -586,6 +647,11 @@ function SavedAtasPage() {
             <span>Status</span>
             <strong>{status.text}</strong>
           </div>
+          <PdfGenerationProgress
+            active={Boolean(generationProgressForm)}
+            form={generationProgressForm}
+            label="Gerando ata salva em PDF"
+          />
         </section>
 
         <section className="panel saved-library">
@@ -793,9 +859,32 @@ function SavedAtasPage() {
                 {users.length ? (
                   users.map((user) => (
                     <div className="member-row" key={user.id}>
-                      <div>
-                        <strong>{user.name}</strong>
-                        <span>@{user.username}</span>
+                      <div className="member-row-header">
+                        <div>
+                          <strong>{user.name}</strong>
+                          <span>@{user.username}</span>
+                        </div>
+                        <button
+                          className="soft-button member-permission-button"
+                          type="button"
+                          onClick={() => handleToggleAdmin(user)}
+                          disabled={user.id === auth.user.id || updatingAdminId === user.id}
+                          title={
+                            user.id === auth.user.id
+                              ? "Voce nao pode alterar sua propria permissao"
+                              : user.isAdmin
+                                ? "Remover permissao de administrador"
+                                : "Tornar administrador"
+                          }
+                        >
+                          {updatingAdminId === user.id
+                            ? "Atualizando..."
+                            : user.id === auth.user.id
+                              ? "Seu acesso"
+                              : user.isAdmin
+                                ? "Remover admin"
+                                : "Tornar admin"}
+                        </button>
                       </div>
                       <div className="member-chips">
                         {user.isAdmin ? <span>Admin</span> : null}

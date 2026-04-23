@@ -198,6 +198,42 @@ export async function listUsers() {
   return users.map(publicUser);
 }
 
+export async function updateUserAdminStatus(currentUser, targetUserId, isAdmin) {
+  if (currentUser.id === targetUserId) {
+    throw new Error("Voce nao pode alterar sua propria permissao de administrador.");
+  }
+
+  const targetUser = await getPrisma().user.findUnique({
+    include: { chapters: true },
+    where: { id: targetUserId },
+  });
+
+  if (!targetUser) {
+    return null;
+  }
+
+  const shouldBeAdmin = Boolean(isAdmin);
+  const currentChapters = new Set(targetUser.chapters.map((chapter) => chapter.chapterKey));
+  const missingAdminChapters = shouldBeAdmin
+    ? CHAPTER_KEYS.filter((chapterKey) => !currentChapters.has(chapterKey))
+    : [];
+
+  const updatedUser = await getPrisma().user.update({
+    data: {
+      chapters: missingAdminChapters.length
+        ? {
+            create: missingAdminChapters.map((chapterKey) => ({ chapterKey })),
+          }
+        : undefined,
+      isAdmin: shouldBeAdmin,
+    },
+    include: { chapters: true },
+    where: { id: targetUserId },
+  });
+
+  return publicUser(updatedUser);
+}
+
 export async function createSession(userId) {
   const token = crypto.randomBytes(32).toString("base64url");
   const tokenHash = hashToken(token);

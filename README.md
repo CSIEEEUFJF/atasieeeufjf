@@ -32,6 +32,7 @@ Funciona hoje:
 - sessoes persistidas em cookie HTTP-only
 - cadastro de membros por administradores
 - cadastro de novos administradores por administradores
+- edicao de permissao de administrador para outros usuarios
 - associacao de membros a capitulos especificos
 - isolamento de atas por capitulo no backend
 - formulario web para criar atas
@@ -42,6 +43,7 @@ Funciona hoje:
 - pagina `/atas` com biblioteca separada por capitulo
 - clique em ata salva para gerar PDF diretamente quando a ata nao depende de anexos reenviados
 - opcao "Abrir no gerador" para editar ata salva antes de gerar
+- barra de progresso com estimativa durante a geracao de PDF
 - geracao de PDF no navegador com SwiftLaTeX
 - suporte aos templates atuais em `classes/`
 
@@ -186,6 +188,7 @@ Arquivos principais:
 - link `Abrir no gerador`
 - exclusao de atas
 - cadastro de membros por administradores
+- promocao e remocao de permissao de administrador para outros usuarios
 - listagem de membros e capitulos associados
 
 ## 5.3 Bibliotecas internas
@@ -298,12 +301,13 @@ Parametros atuais:
 6. Usuario adiciona pautas e resultados.
 7. Usuario adiciona anexos opcionais.
 8. Ao clicar em `Gerar PDF`, a UI valida campos obrigatorios.
-9. A UI chama `compileAtaPdfInBrowser()`.
-10. O navegador busca o bundle da sociedade por `GET /api/latex/project`.
-11. O navegador carrega SwiftLaTeX e arquivos TeX necessarios.
-12. O navegador monta `main.tex` e anexos em memoria.
-13. O SwiftLaTeX gera o PDF.
-14. O download e iniciado no navegador.
+9. A UI exibe uma barra de progresso com tempo estimado.
+10. A UI chama `compileAtaPdfInBrowser()`.
+11. O navegador busca o bundle da sociedade por `GET /api/latex/project`.
+12. O navegador carrega SwiftLaTeX e arquivos TeX necessarios.
+13. O navegador monta `main.tex` e anexos em memoria.
+14. O SwiftLaTeX gera o PDF.
+15. O download e iniciado no navegador.
 
 ## 6.4 Salvamento de ata
 
@@ -317,7 +321,7 @@ Parametros atuais:
 8. Backend valida se o usuario pertence ao capitulo selecionado.
 9. Backend salva a ata em `atas`.
 10. Backend salva anexos em `ata_attachments`.
-11. A UI informa sucesso.
+11. A UI informa `Ata salva com sucesso`.
 
 ## 6.5 Geracao de PDF a partir de ata salva
 
@@ -351,6 +355,8 @@ Parametros atuais:
 7. Se for membro comum, backend grava associacoes em `user_chapters`.
 8. Se for admin, backend associa o usuario a todos os capitulos.
 9. Novo usuario passa a acessar o escopo associado ao seu perfil.
+10. Admins tambem podem promover ou remover permissao de administrador de outros usuarios pela lista de membros.
+11. A API bloqueia alteracao da propria permissao de administrador.
 
 ## 6.8 Importacao e exportacao de rascunho
 
@@ -422,6 +428,8 @@ Comportamento importante:
 - exclusao remove a ata e seus anexos por cascade no Postgres/Prisma
 - membros comuns veem apenas seus capitulos
 - admins veem todos os capitulos
+- admins podem tornar outro usuario admin ou remover permissao de admin
+- a propria permissao de admin do usuario logado nao pode ser alterada pela UI/API
 
 ## 7.4 Tema visual
 
@@ -503,6 +511,7 @@ Payload:
 - cria usuario membro
 - exige usuario admin
 - associa o membro aos capitulos informados
+- se `isAdmin` for `true`, associa o usuario a todos os capitulos
 
 Payload:
 
@@ -511,9 +520,18 @@ Payload:
   "name": "Membro CS",
   "username": "membro.cs",
   "password": "123456",
-  "chapters": ["CS"]
+  "chapters": ["CS"],
+  "isAdmin": false
 }
 ```
+
+`PATCH /api/users/:id`
+
+- altera permissao de administrador de outro usuario
+- exige usuario admin
+- recebe `{ "isAdmin": true }` ou `{ "isAdmin": false }`
+- quando promove para admin, garante acesso a todos os capitulos
+- bloqueia alteracao da propria permissao de administrador
 
 ## 8.4 Atas
 
@@ -947,6 +965,7 @@ As rotas mutantes verificam origem:
 - `PATCH /api/atas/:id`
 - `DELETE /api/atas/:id`
 - `POST /api/users`
+- `PATCH /api/users/:id`
 
 A funcao `isSameOriginRequest()` bloqueia origens diferentes quando o header
 `Origin` esta presente.
@@ -1069,17 +1088,20 @@ Depois de mudancas importantes, validar:
 9. logout
 10. cadastro de membro em `/atas`
 11. associacao de membro a um unico capitulo
-12. bloqueio de acesso cruzado entre capitulos
-13. criacao de ata no gerador
-14. salvamento de ata no banco
-15. nome personalizavel da ata salva
-16. renomear ata em `/atas`
-17. listagem em `/atas`
-18. geracao de PDF clicando em ata salva sem anexos
-19. abertura de ata salva no gerador
-20. geracao de PDF pelo gerador principal
-21. exclusao de ata salva
-22. importacao/exportacao de rascunho JSON
+12. promocao/remocao de permissao de admin para outro usuario
+13. bloqueio de edicao da propria permissao de admin
+14. bloqueio de acesso cruzado entre capitulos
+15. criacao de ata no gerador
+16. salvamento de ata no banco
+17. nome personalizavel da ata salva
+18. renomear ata em `/atas`
+19. listagem em `/atas`
+20. geracao de PDF clicando em ata salva sem anexos
+21. barra de progresso durante geracao de PDF
+22. abertura de ata salva no gerador
+23. geracao de PDF pelo gerador principal
+24. exclusao de ata salva
+25. importacao/exportacao de rascunho JSON
 
 ## 15.3 Checklist de SwiftLaTeX
 

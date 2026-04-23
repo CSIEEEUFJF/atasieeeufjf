@@ -6,6 +6,7 @@ import {
   compileAtaPdfInBrowser,
   preloadSwiftLatexForSociety,
 } from "../lib/swiftlatex-client";
+import PdfGenerationProgress from "./PdfGenerationProgress";
 import UserPasswordDialog from "./UserPasswordDialog";
 
 const FALLBACK_SOCIETIES = [
@@ -662,9 +663,7 @@ function App() {
 
       setStatus({
         tone: "success",
-        text: activeAtaId
-          ? "Ata atualizada no banco. Os anexos foram salvos somente como metadados."
-          : "Ata salva no banco. Os anexos foram salvos somente como metadados.",
+        text: "Ata salva com sucesso",
       });
     } catch (error) {
       setStatus({
@@ -1324,6 +1323,12 @@ function App() {
                 <span>Status</span>
                 <strong>{status.text}</strong>
               </div>
+
+              <PdfGenerationProgress
+                active={isSubmitting}
+                form={form}
+                label="Gerando ata em PDF"
+              />
 
               <button
                 className="primary-button"
