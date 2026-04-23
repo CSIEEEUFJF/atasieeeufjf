@@ -722,54 +722,60 @@ function App() {
     return JSON.stringify(createStoredAtaPayload(form, outputName));
   }
 
-  async function handleSaveAta() {
+  async function persistAta({
+    loadingText = activeAtaId ? "Atualizando ata salva no banco..." : "Salvando ata no banco...",
+    successText = "Ata salva com sucesso",
+    updateStatus = true,
+  } = {}) {
     if (!auth.user) {
-      setStatus({
-        tone: "error",
-        text: "Entre antes de salvar atas no banco.",
-      });
-      return;
+      throw new Error("Entre antes de salvar atas no banco.");
     }
 
     if (!hasChapterAccess) {
-      setStatus({
-        tone: "error",
-        text: "Seu usuario nao tem acesso ao capitulo selecionado.",
-      });
-      return;
+      throw new Error("Seu usuario nao tem acesso ao capitulo selecionado.");
     }
 
-    setIsSavingAta(true);
-    setStatus({
-      tone: "loading",
-      text: activeAtaId ? "Atualizando ata salva no banco..." : "Salvando ata no banco...",
+    if (updateStatus) {
+      setStatus({
+        tone: "loading",
+        text: loadingText,
+      });
+    }
+
+    const response = await fetch(activeAtaId ? `/api/atas/${activeAtaId}` : "/api/atas", {
+      body: createSavePayload(),
+      headers: {
+        "Content-Type": "application/json",
+      },
+      method: activeAtaId ? "PUT" : "POST",
     });
 
-    try {
-      const response = await fetch(activeAtaId ? `/api/atas/${activeAtaId}` : "/api/atas", {
-        body: createSavePayload(),
-        headers: {
-          "Content-Type": "application/json",
-        },
-        method: activeAtaId ? "PUT" : "POST",
-      });
+    if (!response.ok) {
+      throw new Error(await readApiError(response, "Nao foi possivel salvar a ata."));
+    }
 
-      if (!response.ok) {
-        throw new Error(await readApiError(response, "Nao foi possivel salvar a ata."));
-      }
+    const payload = await response.json();
+    if (payload.ata?.id) {
+      setActiveAtaId(payload.ata.id);
+    }
+    if (payload.ata?.title) {
+      setForm((current) => ({ ...current, titulo: payload.ata.title }));
+    }
 
-      const payload = await response.json();
-      if (payload.ata?.id) {
-        setActiveAtaId(payload.ata.id);
-      }
-      if (payload.ata?.title) {
-        setForm((current) => ({ ...current, titulo: payload.ata.title }));
-      }
-
+    if (updateStatus) {
       setStatus({
         tone: "success",
-        text: "Ata salva com sucesso",
+        text: successText,
       });
+    }
+
+    return payload.ata || null;
+  }
+
+  async function handleSaveAta() {
+    setIsSavingAta(true);
+    try {
+      await persistAta();
     } catch (error) {
       setStatus({
         tone: "error",
@@ -831,12 +837,25 @@ function App() {
     }
 
     setIsSubmitting(true);
+    setIsSavingAta(true);
     setStatus({
       tone: "loading",
-      text: "Carregando o SwiftLaTeX e gerando o PDF no navegador. A primeira execucao pode demorar mais.",
+      text: "Salvando ata no banco antes de gerar o PDF.",
     });
 
+    let wasSaved = false;
+
     try {
+      await persistAta({
+        loadingText: "Salvando ata no banco antes de gerar o PDF.",
+        updateStatus: false,
+      });
+      wasSaved = true;
+      setStatus({
+        tone: "loading",
+        text: "Ata salva com sucesso. Carregando o SwiftLaTeX e gerando o PDF no navegador.",
+      });
+
       const result = await compileAtaPdfInBrowser({
         form,
         outputName,
@@ -844,13 +863,14 @@ function App() {
       baixarArquivo(result.pdf, result.fileName);
       setStatus({
         tone: "success",
-        text: "PDF gerado no navegador com sucesso. O download foi iniciado.",
+        text: "Ata salva com sucesso. PDF gerado no navegador e download iniciado.",
       });
     } catch (error) {
-      const message =
-        error instanceof TypeError
-          ? "Nao foi possivel inicializar o compilador no navegador."
-          : error.message || "Nao foi possivel gerar o PDF.";
+      const message = wasSaved
+        ? error instanceof TypeError
+          ? "Ata salva com sucesso, mas nao foi possivel inicializar o compilador no navegador."
+          : `Ata salva com sucesso, mas ${error.message || "nao foi possivel gerar o PDF."}`
+        : error.message || "Nao foi possivel salvar a ata antes de gerar o PDF.";
 
       setStatus({
         tone: "error",
@@ -858,6 +878,7 @@ function App() {
       });
     } finally {
       setIsSubmitting(false);
+      setIsSavingAta(false);
     }
   }
 
@@ -1419,8 +1440,8 @@ function App() {
               </div>
 
               <div className="sidebar-action-list">
-                <button className="ghost-button" onClick={handleSaveAta} disabled={isSavingAta}>
-                  {activeAtaId ? "Atualizar ata" : "Salvar ata"}
+                <button className="ghost-button" onClick={handleSaveAta} disabled={isSavingAta || isSubmitting}>
+                  {isSavingAta ? "Salvando..." : activeAtaId ? "Atualizar ata" : "Salvar ata"}
                 </button>
                 <a className="ghost-button standalone-link" href="/atas">
                   Ver salvas
@@ -1481,9 +1502,9 @@ function App() {
               <button
                 className="primary-button"
                 onClick={handleGeneratePdf}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isSavingAta}
               >
-                {isSubmitting ? "Compilando..." : "Gerar PDF"}
+                {isSubmitting ? "Salvando e compilando..." : "Gerar PDF"}
               </button>
             </article>
 

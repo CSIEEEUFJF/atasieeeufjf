@@ -303,13 +303,14 @@ Parametros atuais:
 6. Usuario adiciona pautas e resultados.
 7. Usuario adiciona anexos opcionais.
 8. Ao clicar em `Gerar PDF`, a UI valida campos obrigatorios.
-9. A UI exibe uma barra de progresso com tempo estimado.
-10. A UI chama `compileAtaPdfInBrowser()`.
-11. O navegador busca o bundle da sociedade por `GET /api/latex/project`.
-12. O navegador carrega SwiftLaTeX e arquivos TeX necessarios.
-13. O navegador monta `main.tex` e anexos em memoria.
-14. O SwiftLaTeX gera o PDF.
-15. O download e iniciado no navegador.
+9. A UI salva ou atualiza automaticamente a ata no banco.
+10. A UI exibe uma barra de progresso com tempo estimado.
+11. A UI chama `compileAtaPdfInBrowser()`.
+12. O navegador busca o bundle da sociedade por `GET /api/latex/project`.
+13. O navegador carrega SwiftLaTeX e arquivos TeX necessarios.
+14. O navegador monta `main.tex` e anexos em memoria.
+15. O SwiftLaTeX gera o PDF.
+16. O download e iniciado no navegador.
 
 ## 6.4 Salvamento de ata
 
@@ -408,6 +409,7 @@ Comportamento importante:
 - usuarios comuns nao acessam a gestao de membros; eles apenas selecionam membros cadastrados durante o preenchimento da ata
 - ao escolher um membro cadastrado, nome e cargo/função da sociedade selecionada sao preenchidos na presenca
 - o bloco `Status` do painel de geracao aparece somente depois do clique em `Gerar PDF`
+- clicar em `Gerar PDF` salva ou atualiza a ata automaticamente antes da compilacao
 - se uma ata e aberta via `/?ata=<id>`, o formulario carrega automaticamente
 - se uma ata aberta for salva novamente, a API usa `PUT /api/atas/:id`
 - se for uma nova ata, a API usa `POST /api/atas`
