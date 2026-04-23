@@ -6,6 +6,7 @@ import {
   compileAtaPdfInBrowser,
   preloadSwiftLatexForSociety,
 } from "../lib/swiftlatex-client";
+import UserPasswordDialog from "./UserPasswordDialog";
 
 const FALLBACK_SOCIETIES = [
   { chave: "CS", nome: "CS - Computer Society" },
@@ -185,6 +186,7 @@ function App() {
   const [editingMemberId, setEditingMemberId] = useState(null);
   const [editingAttachmentId, setEditingAttachmentId] = useState(null);
   const [activeAtaId, setActiveAtaId] = useState(null);
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
   const [isSavingAta, setIsSavingAta] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [status, setStatus] = useState({
@@ -400,6 +402,7 @@ function App() {
         user: null,
       });
       setActiveAtaId(null);
+      setIsPasswordDialogOpen(false);
       setAuthMessage({
         tone: "idle",
         text: "Entre para acessar o gerador de atas.",
@@ -943,7 +946,14 @@ function App() {
         </ul>
 
         <div className="topbar-actions">
-          <span className="user-chip">{auth.user.name}</span>
+          <button
+            className="user-chip"
+            type="button"
+            onClick={() => setIsPasswordDialogOpen(true)}
+            title="Alterar senha"
+          >
+            {auth.user.name}
+          </button>
           <button className="ghost-button" onClick={handleSaveAta} disabled={isSavingAta}>
             {activeAtaId ? "Atualizar ata" : "Salvar ata"}
           </button>
@@ -966,6 +976,12 @@ function App() {
       </header>
 
       {themeToggleButton}
+      {isPasswordDialogOpen ? (
+        <UserPasswordDialog
+          user={auth.user}
+          onClose={() => setIsPasswordDialogOpen(false)}
+        />
+      ) : null}
 
       <main className="page-main" id="top">
         <div className="workspace">

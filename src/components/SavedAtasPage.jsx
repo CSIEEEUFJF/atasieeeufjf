@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { compileAtaPdfInBrowser } from "../lib/swiftlatex-client";
+import UserPasswordDialog from "./UserPasswordDialog";
 
 async function readApiError(response, fallback) {
   try {
@@ -24,6 +25,7 @@ function formatDate(value) {
 function createMemberForm(defaultChapter = "") {
   return {
     chapters: defaultChapter ? [defaultChapter] : [],
+    isAdmin: false,
     name: "",
     password: "",
     username: "",
@@ -125,6 +127,7 @@ function SavedAtasPage() {
   const [isCreatingMember, setIsCreatingMember] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [generatingId, setGeneratingId] = useState(null);
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
 
   useEffect(() => {
     const savedTheme = window.localStorage.getItem("atas-ieee-theme");
@@ -293,7 +296,7 @@ function SavedAtasPage() {
     setIsCreatingMember(true);
     setStatus({
       tone: "loading",
-      text: "Cadastrando membro do capitulo.",
+      text: memberForm.isAdmin ? "Cadastrando novo administrador." : "Cadastrando membro do capitulo.",
     });
 
     try {
@@ -313,7 +316,9 @@ function SavedAtasPage() {
       await loadUsers();
       setStatus({
         tone: "success",
-        text: "Membro cadastrado e associado ao(s) capitulo(s).",
+        text: memberForm.isAdmin
+          ? "Administrador cadastrado com acesso a todos os capitulos."
+          : "Membro cadastrado e associado ao(s) capitulo(s).",
       });
     } catch (error) {
       setStatus({
@@ -489,7 +494,14 @@ function SavedAtasPage() {
         </ul>
 
         <div className="topbar-actions">
-          <span className="user-chip">{auth.user.name}</span>
+          <button
+            className="user-chip"
+            type="button"
+            onClick={() => setIsPasswordDialogOpen(true)}
+            title="Alterar senha"
+          >
+            {auth.user.name}
+          </button>
           <a className="ghost-button" href="/">
             Nova ata
           </a>
@@ -503,6 +515,12 @@ function SavedAtasPage() {
       </header>
 
       {themeToggleButton}
+      {isPasswordDialogOpen ? (
+        <UserPasswordDialog
+          user={auth.user}
+          onClose={() => setIsPasswordDialogOpen(false)}
+        />
+      ) : null}
 
       <main className="page-main saved-page-main">
         <section className="hero-panel saved-hero">
@@ -674,6 +692,18 @@ function SavedAtasPage() {
                   />
                 </label>
 
+                <label className="member-admin-toggle">
+                  <input
+                    type="checkbox"
+                    checked={memberForm.isAdmin}
+                    onChange={(event) => updateMemberField("isAdmin", event.target.checked)}
+                  />
+                  <span>
+                    <strong>Criar como administrador</strong>
+                    <small>Admins podem gerenciar membros e acessam todos os capitulos.</small>
+                  </span>
+                </label>
+
                 <div className="chapter-checklist">
                   <span>Capítulos permitidos</span>
                   {chapters.map((chapter) => (
@@ -681,6 +711,7 @@ function SavedAtasPage() {
                       <input
                         type="checkbox"
                         checked={memberForm.chapters.includes(chapter.key)}
+                        disabled={memberForm.isAdmin}
                         onChange={() => toggleMemberChapter(chapter.key)}
                       />
                       <strong>{chapter.key}</strong>
@@ -690,7 +721,11 @@ function SavedAtasPage() {
                 </div>
 
                 <button className="primary-button" disabled={isCreatingMember}>
-                  {isCreatingMember ? "Cadastrando..." : "Cadastrar membro"}
+                  {isCreatingMember
+                    ? "Cadastrando..."
+                    : memberForm.isAdmin
+                      ? "Cadastrar admin"
+                      : "Cadastrar membro"}
                 </button>
               </form>
 

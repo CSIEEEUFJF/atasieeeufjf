@@ -28,8 +28,10 @@ Funciona hoje:
 
 - primeiro acesso cria um usuario administrador
 - login/logout por nome de usuario e senha
+- troca de senha pelo proprio usuario ao clicar no nome no header
 - sessoes persistidas em cookie HTTP-only
 - cadastro de membros por administradores
+- cadastro de novos administradores por administradores
 - associacao de membros a capitulos especificos
 - isolamento de atas por capitulo no backend
 - formulario web para criar atas
@@ -202,6 +204,7 @@ Arquivos principais:
 - normaliza nomes de usuario
 - gera hash de senha com `scrypt`
 - valida credenciais
+- altera senha do proprio usuario apos confirmar a senha atual
 - cria sessoes
 - limpa sessoes expiradas
 - aplica cookie HTTP-only
@@ -339,12 +342,13 @@ Parametros atuais:
 
 1. Admin abre `/atas`.
 2. A pagina mostra o painel `Acessos por capitulo`.
-3. Admin informa nome, nome de usuario, senha inicial e capitulos.
+3. Admin informa nome, nome de usuario, senha inicial, capitulos e se o acesso sera admin.
 4. Frontend envia `POST /api/users`.
 5. Backend valida que o solicitante e admin.
 6. Backend cria o usuario.
-7. Backend grava associacoes em `user_chapters`.
-8. Novo usuario passa a acessar apenas os capitulos associados.
+7. Se for membro comum, backend grava associacoes em `user_chapters`.
+8. Se for admin, backend associa o usuario a todos os capitulos.
+9. Novo usuario passa a acessar o escopo associado ao seu perfil.
 
 ## 6.8 Importacao e exportacao de rascunho
 
@@ -891,6 +895,7 @@ Modelo atual:
 - cookie HTTP-only
 - token de sessao aleatorio
 - hash do token salvo no banco
+- troca de senha exige sessao ativa e senha atual
 
 Regras de username:
 
@@ -924,6 +929,7 @@ As rotas mutantes verificam origem:
 - `POST /api/auth/setup`
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
+- `POST /api/auth/password`
 - `POST /api/atas`
 - `PUT /api/atas/:id`
 - `DELETE /api/atas/:id`
@@ -937,7 +943,6 @@ A funcao `isSameOriginRequest()` bloqueia origens diferentes quando o header
 Ainda nao ha:
 
 - recuperacao de senha
-- troca de senha pelo usuario
 - edicao de usuario existente
 - remocao de usuario pela UI
 - politicas avancadas de senha

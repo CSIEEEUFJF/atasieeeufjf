@@ -264,11 +264,98 @@ html[data-theme="dark"] .site-brand-badge {
   padding: 10px 12px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 999px;
+  background: transparent;
   color: rgba(255, 255, 255, 0.84);
+  cursor: pointer;
   font-size: 0.78rem;
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.user-chip:hover,
+.user-chip:focus-visible {
+  border-color: rgba(255, 255, 255, 0.34);
+  color: #ffffff;
+  outline: none;
+}
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 240;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 50% 20%, rgba(0, 133, 202, 0.22), transparent 34%),
+    rgba(2, 10, 18, 0.58);
+  backdrop-filter: blur(8px);
+}
+
+.password-dialog {
+  width: min(100%, 460px);
+  padding: 24px;
+  border: 1px solid rgba(0, 98, 155, 0.14);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--shadow-soft);
+}
+
+html[data-theme="dark"] .password-dialog {
+  background: rgba(15, 27, 42, 0.98);
+  border-color: rgba(97, 160, 206, 0.18);
+}
+
+.password-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.password-dialog-header h2 {
+  margin: 4px 0 6px;
+  color: var(--text-strong);
+}
+
+.password-dialog-header span {
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+.password-dialog-form {
+  display: grid;
+  gap: 14px;
+}
+
+.password-dialog .primary-button {
+  width: auto;
+}
+
+.inline-message {
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(0, 98, 155, 0.07);
+  color: var(--text);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.inline-message-error {
+  background: rgba(171, 68, 53, 0.1);
+  color: #ab4435;
+}
+
+.inline-message-success {
+  background: rgba(27, 122, 77, 0.1);
+  color: #1b7a4d;
+}
+
+.inline-message-loading {
+  background: rgba(0, 98, 155, 0.1);
+  color: var(--ieee-blue);
 }
 
 .theme-toggle {
@@ -1046,6 +1133,37 @@ html[data-theme="dark"] .saved-card-topline span {
 .member-form {
   display: grid;
   gap: 16px;
+}
+
+.member-admin-toggle {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px;
+  border: 1px solid rgba(0, 98, 155, 0.12);
+  border-radius: var(--radius-md);
+  background: rgba(0, 98, 155, 0.06);
+}
+
+html[data-theme="dark"] .member-admin-toggle {
+  background: rgba(0, 133, 202, 0.08);
+  border-color: rgba(97, 160, 206, 0.18);
+}
+
+.member-admin-toggle span,
+.member-admin-toggle strong,
+.member-admin-toggle small {
+  display: block;
+}
+
+.member-admin-toggle strong {
+  color: var(--text-strong);
+}
+
+.member-admin-toggle small {
+  margin-top: 4px;
+  color: var(--text-muted);
 }
 
 .chapter-checklist {

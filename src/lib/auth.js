@@ -114,7 +114,7 @@ export async function createUser({ chapters, email, name, password, username }, 
   const cleanName = String(name || "").trim();
   const cleanPassword = String(password || "");
   const isAdmin = Boolean(options.isAdmin);
-  const userChapters = normalizeChapterKeys(chapters, { allowAll: isAdmin && !Array.isArray(chapters) });
+  const userChapters = normalizeChapterKeys(chapters, { allowAll: isAdmin });
 
   if (!cleanName) {
     throw new Error("Informe o nome do usuario.");
@@ -163,6 +163,30 @@ export async function verifyCredentials(username, password) {
   }
 
   return publicUser(row);
+}
+
+export async function changeOwnPassword(userId, currentPassword, newPassword) {
+  const cleanPassword = String(newPassword || "");
+  if (cleanPassword.length < MIN_PASSWORD_LENGTH) {
+    throw new Error(`A nova senha precisa ter pelo menos ${MIN_PASSWORD_LENGTH} caracteres.`);
+  }
+
+  const user = await getPrisma().user.findUnique({
+    where: { id: userId },
+  });
+
+  if (!user || !verifyPassword(String(currentPassword || ""), user.passwordSalt, user.passwordHash)) {
+    throw new Error("Senha atual incorreta.");
+  }
+
+  const { passwordHash, passwordSalt } = hashPassword(cleanPassword);
+  await getPrisma().user.update({
+    data: {
+      passwordHash,
+      passwordSalt,
+    },
+    where: { id: userId },
+  });
 }
 
 export async function listUsers() {
