@@ -164,7 +164,7 @@ function memberCargoForSociety(member, society) {
   const roles = member?.chapterRoles && typeof member.chapterRoles === "object"
     ? member.chapterRoles
     : {};
-  const hasSpecificRoles = Object.keys(roles).length > 0;
+  const hasSpecificRoles = Boolean(member?.usesChapterRoles) || Object.keys(roles).length > 0;
 
   if (Object.prototype.hasOwnProperty.call(roles, society)) {
     return roles[society] || "";
@@ -323,6 +323,10 @@ function App() {
   }, [form.sociedade]);
 
   useEffect(() => {
+    setSelectedRegisteredMemberId("");
+  }, [form.sociedade]);
+
+  useEffect(() => {
     if (!auth.user) {
       setActiveAtaId(null);
       setMemberOptions([]);
@@ -346,7 +350,11 @@ function App() {
 
     async function loadMemberOptions() {
       try {
-        const response = await fetch("/api/users?scope=accessible", { cache: "no-store" });
+        const params = new URLSearchParams({
+          chapter: form.sociedade,
+          scope: "accessible",
+        });
+        const response = await fetch(`/api/users?${params.toString()}`, { cache: "no-store" });
         if (!response.ok) {
           throw new Error("Nao foi possivel carregar membros cadastrados.");
         }
@@ -366,7 +374,7 @@ function App() {
     return () => {
       active = false;
     };
-  }, [auth.user]);
+  }, [auth.user, form.sociedade]);
 
   const outputName = (() => {
     const societySlug = slugify(form.sociedade || "ata");

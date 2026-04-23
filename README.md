@@ -33,7 +33,7 @@ Funciona hoje:
 - APIs para cadastro de membros por administradores
 - APIs para cadastro de novos administradores por administradores
 - APIs para edicao de permissao de administrador de outros usuarios
-- pagina `/membros` visivel para gestao de membros por admins
+- pagina `/membros` bloqueada para usuarios nao-admin e visivel apenas para gestao por admins
 - cargo/função cadastrado por sociedade no usuario
 - associacao de membros a capitulos especificos
 - isolamento de atas por capitulo no backend
@@ -384,7 +384,7 @@ Observacao:
 
 - `/` - gerador principal de atas
 - `/atas` - biblioteca de atas salvas
-- `/membros` - gestao de membros, cargos, capitulos e admins
+- `/membros` - gestao de membros, cargos, capitulos e admins, com acesso exclusivo para admins
 
 ## 7.2 Gerador principal
 
@@ -404,7 +404,8 @@ Areas principais:
 Comportamento importante:
 
 - capitulos indisponiveis para o usuario nao aparecem
-- seletor de membros usa `GET /api/users?scope=accessible`
+- seletor de membros usa `GET /api/users?scope=accessible&chapter=<SOCIEDADE>`
+- usuarios comuns nao acessam a gestao de membros; eles apenas selecionam membros cadastrados durante o preenchimento da ata
 - ao escolher um membro cadastrado, nome e cargo/função da sociedade selecionada sao preenchidos na presenca
 - o bloco `Status` do painel de geracao aparece somente depois do clique em `Gerar PDF`
 - se uma ata e aberta via `/?ata=<id>`, o formulario carrega automaticamente
@@ -448,6 +449,7 @@ Areas principais:
 Comportamento importante:
 
 - apenas admins acessam `/membros`
+- a rota `/membros` redireciona usuarios nao-admin para o gerador
 - admins nao podem remover a propria permissao de administrador
 - usuario admin recebe acesso a todos os capitulos
 - o cargo salvo para a sociedade selecionada aparece no seletor de membros do gerador de atas
@@ -527,10 +529,12 @@ Payload:
 - lista usuarios
 - exige usuario admin
 
-`GET /api/users?scope=accessible`
+`GET /api/users?scope=accessible&chapter=CS`
 
-- lista usuarios dos capitulos acessiveis ao usuario autenticado
-- admins recebem todos os usuarios
+- lista opcoes de membros para o seletor de presenca no gerador
+- aceita `chapter=<SOCIEDADE>` para limitar a lista ao capitulo da ata atual
+- usuarios comuns recebem apenas membros associados ao capitulo solicitado e permitido
+- admins podem solicitar qualquer capitulo
 - usado pelo gerador para preencher membros presentes com nome e cargo da sociedade selecionada
 
 `POST /api/users`

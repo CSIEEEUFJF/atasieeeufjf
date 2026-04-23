@@ -30,7 +30,9 @@ export async function GET(request) {
 
   const { searchParams } = new URL(request.url);
   if (searchParams.get("scope") === "accessible") {
-    return NextResponse.json({ users: await listVisibleUsers(user) });
+    return NextResponse.json({
+      users: await listVisibleUsers(user, searchParams.get("chapter") || ""),
+    });
   }
 
   if (!user?.isAdmin) {

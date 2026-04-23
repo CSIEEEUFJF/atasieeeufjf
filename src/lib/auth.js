@@ -71,6 +71,26 @@ function publicUser(row) {
   };
 }
 
+function publicMemberOption(row, chapterKey = "") {
+  if (!row) {
+    return null;
+  }
+
+  const roles = normalizeChapterRoles(row.chapterRoles);
+  const hasSpecificRoles = Object.keys(roles).length > 0;
+  const selectedRole = chapterKey && Object.prototype.hasOwnProperty.call(roles, chapterKey)
+    ? { [chapterKey]: roles[chapterKey] }
+    : {};
+
+  return {
+    cargo: row.cargo || "",
+    chapterRoles: chapterKey ? selectedRole : roles,
+    id: row.id,
+    name: row.name,
+    usesChapterRoles: hasSpecificRoles,
+  };
+}
+
 function normalizeChapterKeys(chapters, { allowAll = false } = {}) {
   if (allowAll) {
     return CHAPTER_KEYS;
@@ -234,30 +254,43 @@ export async function listUsers() {
   return users.map(publicUser);
 }
 
-export async function listVisibleUsers(user) {
+export async function listVisibleUsers(user, chapterKey = "") {
   const accessibleChapters = Array.isArray(user?.chapters)
     ? user.chapters.filter((chapter) => CHAPTER_KEYS.includes(chapter))
     : [];
+  const requestedChapters = normalizeChapterKeys(chapterKey ? [chapterKey] : []);
 
-  if (!accessibleChapters.length) {
+  if (chapterKey && !requestedChapters.length) {
     return [];
   }
+
+  if (!accessibleChapters.length && !user.isAdmin) {
+    return [];
+  }
+
+  if (requestedChapters.length && !user.isAdmin && !accessibleChapters.includes(requestedChapters[0])) {
+    return [];
+  }
+
+  const visibleChapters = requestedChapters.length
+    ? requestedChapters
+    : user.isAdmin
+      ? CHAPTER_KEYS
+      : accessibleChapters;
 
   const users = await getPrisma().user.findMany({
     include: { chapters: true },
     orderBy: { name: "asc" },
-    where: user.isAdmin
-      ? {}
-      : {
-          chapters: {
-            some: {
-              chapterKey: { in: accessibleChapters },
-            },
-          },
+    where: {
+      chapters: {
+        some: {
+          chapterKey: { in: visibleChapters },
         },
+      },
+    },
   });
 
-  return users.map(publicUser);
+  return users.map((row) => publicMemberOption(row, requestedChapters[0] || ""));
 }
 
 export async function updateUserManagement(currentUser, targetUserId, payload = {}) {
