@@ -32,6 +32,7 @@ function publicUser(row) {
   }
 
   return {
+    cargo: row.cargo || "",
     chapters: Array.isArray(row.chapters)
       ? row.chapters.map(chapterKeyFromRelation).filter(Boolean)
       : [],
@@ -109,9 +110,10 @@ export function isChapterMember(user, chapterKey) {
   return Boolean(user?.chapters?.includes(chapterKey));
 }
 
-export async function createUser({ chapters, email, name, password, username }, options = {}) {
+export async function createUser({ cargo, chapters, email, name, password, username }, options = {}) {
   const cleanUsername = normalizeUsername(username || email);
   const cleanName = String(name || "").trim();
+  const cleanCargo = String(cargo || "").trim().slice(0, 180);
   const cleanPassword = String(password || "");
   const isAdmin = Boolean(options.isAdmin);
   const userChapters = normalizeChapterKeys(chapters, { allowAll: isAdmin });
@@ -138,6 +140,7 @@ export async function createUser({ chapters, email, name, password, username }, 
       chapters: {
         create: userChapters.map((chapterKey) => ({ chapterKey })),
       },
+      cargo: cleanCargo,
       email: internalEmailForUsername(cleanUsername),
       isAdmin,
       name: cleanName,
@@ -198,8 +201,35 @@ export async function listUsers() {
   return users.map(publicUser);
 }
 
-export async function updateUserAdminStatus(currentUser, targetUserId, isAdmin) {
-  if (currentUser.id === targetUserId) {
+export async function listVisibleUsers(user) {
+  const accessibleChapters = Array.isArray(user?.chapters)
+    ? user.chapters.filter((chapter) => CHAPTER_KEYS.includes(chapter))
+    : [];
+
+  if (!accessibleChapters.length) {
+    return [];
+  }
+
+  const users = await getPrisma().user.findMany({
+    include: { chapters: true },
+    orderBy: { name: "asc" },
+    where: user.isAdmin
+      ? {}
+      : {
+          chapters: {
+            some: {
+              chapterKey: { in: accessibleChapters },
+            },
+          },
+        },
+  });
+
+  return users.map(publicUser);
+}
+
+export async function updateUserManagement(currentUser, targetUserId, payload = {}) {
+  const hasAdminUpdate = typeof payload.isAdmin === "boolean";
+  if (hasAdminUpdate && currentUser.id === targetUserId) {
     throw new Error("Voce nao pode alterar sua propria permissao de administrador.");
   }
 
@@ -212,20 +242,37 @@ export async function updateUserAdminStatus(currentUser, targetUserId, isAdmin) 
     return null;
   }
 
-  const shouldBeAdmin = Boolean(isAdmin);
+  const shouldBeAdmin = hasAdminUpdate ? Boolean(payload.isAdmin) : Boolean(targetUser.isAdmin);
   const currentChapters = new Set(targetUser.chapters.map((chapter) => chapter.chapterKey));
-  const missingAdminChapters = shouldBeAdmin
-    ? CHAPTER_KEYS.filter((chapterKey) => !currentChapters.has(chapterKey))
-    : [];
+  const requestedChapters = normalizeChapterKeys(payload.chapters, { allowAll: shouldBeAdmin });
+  const nextChapters = requestedChapters.length
+    ? requestedChapters
+    : [...currentChapters].filter((chapterKey) => CHAPTER_KEYS.includes(chapterKey));
+
+  if (!nextChapters.length) {
+    throw new Error("Associe o usuario a pelo menos um capitulo.");
+  }
+
+  const chaptersToCreate = nextChapters.filter((chapterKey) => !currentChapters.has(chapterKey));
+  const chaptersToDelete = [...currentChapters].filter((chapterKey) => !nextChapters.includes(chapterKey));
+  const cleanName = typeof payload.name === "string" ? payload.name.trim() : targetUser.name;
+  const cleanCargo = typeof payload.cargo === "string" ? payload.cargo.trim().slice(0, 180) : targetUser.cargo;
+
+  if (!cleanName) {
+    throw new Error("Informe o nome do usuario.");
+  }
 
   const updatedUser = await getPrisma().user.update({
     data: {
-      chapters: missingAdminChapters.length
+      cargo: cleanCargo,
+      chapters: chaptersToCreate.length || chaptersToDelete.length
         ? {
-            create: missingAdminChapters.map((chapterKey) => ({ chapterKey })),
+            create: chaptersToCreate.map((chapterKey) => ({ chapterKey })),
+            deleteMany: chaptersToDelete.map((chapterKey) => ({ chapterKey })),
           }
         : undefined,
       isAdmin: shouldBeAdmin,
+      name: cleanName,
     },
     include: { chapters: true },
     where: { id: targetUserId },

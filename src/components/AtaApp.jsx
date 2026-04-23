@@ -186,8 +186,10 @@ function App() {
   });
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [sociedades, setSociedades] = useState(FALLBACK_SOCIETIES);
+  const [memberOptions, setMemberOptions] = useState([]);
   const [form, setForm] = useState(createInitialForm);
   const [memberDraft, setMemberDraft] = useState(createEmptyMember);
+  const [selectedRegisteredMemberId, setSelectedRegisteredMemberId] = useState("");
   const [attachmentDraft, setAttachmentDraft] = useState(createEmptyAttachment);
   const [editingMemberId, setEditingMemberId] = useState(null);
   const [editingAttachmentId, setEditingAttachmentId] = useState(null);
@@ -309,6 +311,7 @@ function App() {
   useEffect(() => {
     if (!auth.user) {
       setActiveAtaId(null);
+      setMemberOptions([]);
       return;
     }
 
@@ -317,6 +320,38 @@ function App() {
     if (Number.isSafeInteger(ataId) && ataId > 0 && activeAtaId !== ataId) {
       handleLoadSavedAta(ataId, { replaceUrl: true });
     }
+  }, [auth.user]);
+
+  useEffect(() => {
+    if (!auth.user) {
+      setMemberOptions([]);
+      return;
+    }
+
+    let active = true;
+
+    async function loadMemberOptions() {
+      try {
+        const response = await fetch("/api/users?scope=accessible", { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error("Nao foi possivel carregar membros cadastrados.");
+        }
+
+        const payload = await response.json();
+        if (active) {
+          setMemberOptions(Array.isArray(payload.users) ? payload.users : []);
+        }
+      } catch {
+        if (active) {
+          setMemberOptions([]);
+        }
+      }
+    }
+
+    loadMemberOptions();
+    return () => {
+      active = false;
+    };
   }, [auth.user]);
 
   const outputName = (() => {
@@ -409,6 +444,7 @@ function App() {
         user: null,
       });
       setActiveAtaId(null);
+      setMemberOptions([]);
       setIsPasswordDialogOpen(false);
       setAuthMessage({
         tone: "idle",
@@ -424,6 +460,7 @@ function App() {
       setAttachmentDraft(createEmptyAttachment());
       setEditingMemberId(null);
       setEditingAttachmentId(null);
+      setSelectedRegisteredMemberId("");
       setActiveAtaId(null);
       setStatus({
         tone: "idle",
@@ -611,6 +648,42 @@ function App() {
         `Preencha ou corrija os seguintes itens:\n- ${missing.join("\n- ")}`,
       );
     }
+  }
+
+  function handleAddRegisteredMember() {
+    const selectedMember = memberOptions.find((item) => String(item.id) === selectedRegisteredMemberId);
+    if (!selectedMember) {
+      setStatus({
+        tone: "error",
+        text: "Escolha um membro cadastrado antes de adicionar.",
+      });
+      return;
+    }
+
+    const alreadyAdded = form.membros.some((item) =>
+      item.nome.trim().toLowerCase() === selectedMember.name.trim().toLowerCase(),
+    );
+    if (alreadyAdded) {
+      setStatus({
+        tone: "error",
+        text: "Este membro ja foi adicionado na lista de presenca.",
+      });
+      return;
+    }
+
+    setForm((current) => ({
+      ...current,
+      membros: [
+        ...current.membros,
+        {
+          cargo: selectedMember.cargo || "",
+          id: crypto.randomUUID(),
+          nome: selectedMember.name,
+        },
+      ],
+    }));
+    setSelectedRegisteredMemberId("");
+    setStatus({ tone: "success", text: "Membro cadastrado adicionado a presenca." });
   }
 
   function createSavePayload() {
@@ -953,6 +1026,7 @@ function App() {
           <li><a href="#membros">Membros</a></li>
           <li><a href="#anexos">Anexos</a></li>
           <li><a href="/atas">Atas salvas</a></li>
+          {auth.user.isAdmin ? <li><a href="/membros">Gestão</a></li> : null}
         </ul>
 
         <div className="topbar-actions">
@@ -963,21 +1037,6 @@ function App() {
             title="Alterar senha"
           >
             {auth.user.name}
-          </button>
-          <button className="ghost-button" onClick={handleSaveAta} disabled={isSavingAta}>
-            {activeAtaId ? "Atualizar ata" : "Salvar ata"}
-          </button>
-          <a className="ghost-button" href="/atas">
-            Ver salvas
-          </a>
-          <button className="ghost-button" onClick={() => draftInputRef.current?.click()}>
-            Importar rascunho
-          </button>
-          <button className="ghost-button" onClick={handleDraftDownload}>
-            Baixar rascunho
-          </button>
-          <button className="ghost-button ghost-danger" onClick={resetForm}>
-            Limpar tudo
           </button>
           <button className="ghost-button" onClick={handleLogout}>
             Sair
@@ -1088,6 +1147,27 @@ function App() {
                 <p className="panel-kicker">Presença</p>
                 <h2>Membros presentes</h2>
               </div>
+            </div>
+
+            <div className="registered-member-picker">
+              <label className="field">
+                <span>Escolher membro cadastrado</span>
+                <select
+                  value={selectedRegisteredMemberId}
+                  onChange={(event) => setSelectedRegisteredMemberId(event.target.value)}
+                >
+                  <option value="">Selecione um membro</option>
+                  {memberOptions.map((member) => (
+                    <option key={member.id} value={member.id}>
+                      {member.name}{member.cargo ? ` - ${member.cargo}` : ""}
+                    </option>
+                  ))}
+                </select>
+                <small>O cargo vem da página de gestão de membros.</small>
+              </label>
+              <button className="soft-button" type="button" onClick={handleAddRegisteredMember}>
+                Adicionar selecionado
+              </button>
             </div>
 
             <div className="field-grid">
@@ -1296,6 +1376,38 @@ function App() {
           </section>
 
           <aside className="side-column">
+            <article className="panel side-actions">
+              <div className="panel-header">
+                <div>
+                  <p className="panel-kicker">Ações</p>
+                  <h2>Atalhos da ata</h2>
+                </div>
+              </div>
+
+              <div className="sidebar-action-list">
+                <button className="ghost-button" onClick={handleSaveAta} disabled={isSavingAta}>
+                  {activeAtaId ? "Atualizar ata" : "Salvar ata"}
+                </button>
+                <a className="ghost-button standalone-link" href="/atas">
+                  Ver salvas
+                </a>
+                {auth.user.isAdmin ? (
+                  <a className="ghost-button standalone-link" href="/membros">
+                    Gestão de membros
+                  </a>
+                ) : null}
+                <button className="ghost-button" onClick={() => draftInputRef.current?.click()}>
+                  Importar rascunho
+                </button>
+                <button className="ghost-button" onClick={handleDraftDownload}>
+                  Baixar rascunho
+                </button>
+                <button className="ghost-button ghost-danger" onClick={resetForm}>
+                  Limpar tudo
+                </button>
+              </div>
+            </article>
+
             <article className="hero-panel side-summary">
               <div className="panel-header">
                 <div>

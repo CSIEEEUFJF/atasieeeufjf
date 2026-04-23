@@ -9,6 +9,7 @@ datasource db {
 model User {
   id           Int           @id @default(autoincrement())
   name         String
+  cargo        String        @default("")
   username     String        @unique
   email        String        @unique
   passwordHash String        @map("password_hash")

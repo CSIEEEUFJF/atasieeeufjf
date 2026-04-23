@@ -33,9 +33,12 @@ Funciona hoje:
 - APIs para cadastro de membros por administradores
 - APIs para cadastro de novos administradores por administradores
 - APIs para edicao de permissao de administrador de outros usuarios
+- pagina `/membros` visivel para gestao de membros por admins
+- cargo/função cadastrado por usuario
 - associacao de membros a capitulos especificos
 - isolamento de atas por capitulo no backend
 - formulario web para criar atas
+- selecao de membros cadastrados ao preencher presenca da ata
 - importacao e exportacao de rascunho JSON
 - upload de anexos pelo navegador
 - salvamento de atas e anexos no Postgres
@@ -121,6 +124,7 @@ Arquivos principais:
 
 - [`src/components/AtaApp.jsx`](./src/components/AtaApp.jsx): gerador principal de atas
 - [`src/components/SavedAtasPage.jsx`](./src/components/SavedAtasPage.jsx): biblioteca de atas salvas
+- [`src/components/MembersPage.jsx`](./src/components/MembersPage.jsx): gestao visivel de membros, cargos e admins
 - [`src/lib/ata.js`](./src/lib/ata.js): sociedades, renderizacao LaTeX e utilitarios herdados
 - [`src/lib/auth.js`](./src/lib/auth.js): usuarios, senhas, sessoes e autorizacao
 - [`src/lib/db.js`](./src/lib/db.js): cliente Prisma e conexao Postgres
@@ -173,6 +177,7 @@ Arquivos principais:
 - formulario completo da ata
 - selecao de capitulo permitido ao usuario
 - cadastro de membros presentes
+- selecao de membros cadastrados com cargo preenchido automaticamente
 - cadastro de pautas e resultados
 - anexos opcionais
 - importacao/exportacao de rascunho JSON
@@ -343,14 +348,15 @@ Parametros atuais:
 
 ## 6.7 APIs de membros por admin
 
-1. Cliente autenticado como admin envia `POST /api/users`.
-2. Backend valida que o solicitante e admin.
-3. Backend cria o usuario.
-4. Se for membro comum, backend grava associacoes em `user_chapters`.
-5. Se for admin, backend associa o usuario a todos os capitulos.
-6. Novo usuario passa a acessar o escopo associado ao seu perfil.
-7. Admins podem promover ou remover permissao de administrador por `PATCH /api/users/:id`.
-8. A API bloqueia alteracao da propria permissao de administrador.
+1. Admin abre `/membros`.
+2. Cliente autenticado como admin envia `POST /api/users`.
+3. Backend valida que o solicitante e admin.
+4. Backend cria o usuario com nome, nome de usuario, cargo/função e senha inicial.
+5. Se for membro comum, backend grava associacoes em `user_chapters`.
+6. Se for admin, backend associa o usuario a todos os capitulos.
+7. Novo usuario passa a acessar o escopo associado ao seu perfil.
+8. Admins podem editar nome, cargo, capitulos e permissao por `PATCH /api/users/:id`.
+9. A API bloqueia alteracao da propria permissao de administrador.
 
 ## 6.8 Importacao e exportacao de rascunho
 
@@ -378,6 +384,7 @@ Observacao:
 
 - `/` - gerador principal de atas
 - `/atas` - biblioteca de atas salvas
+- `/membros` - gestao de membros, cargos, capitulos e admins
 
 ## 7.2 Gerador principal
 
@@ -386,16 +393,19 @@ Areas principais:
 - login/setup quando nao ha sessao
 - selecao de capitulo/sociedade
 - dados principais da reuniao
-- membros presentes
+- membros presentes, manualmente ou a partir de membros cadastrados
 - pautas
 - resultados
 - anexos
 - painel lateral de saida
-- acoes de salvar, importar, exportar, limpar e gerar PDF
+- sidebar de atalhos para salvar, importar, exportar, limpar e navegar
+- painel de geracao de PDF
 
 Comportamento importante:
 
 - capitulos indisponiveis para o usuario nao aparecem
+- seletor de membros usa `GET /api/users?scope=accessible`
+- ao escolher um membro cadastrado, nome e cargo/função sao preenchidos na presenca
 - se uma ata e aberta via `/?ata=<id>`, o formulario carrega automaticamente
 - se uma ata aberta for salva novamente, a API usa `PUT /api/atas/:id`
 - se for uma nova ata, a API usa `POST /api/atas`
@@ -423,7 +433,25 @@ Comportamento importante:
 - admins veem todos os capitulos
 - a pagina `/atas` nao exibe cadastro/listagem de membros
 
-## 7.4 Tema visual
+## 7.4 Pagina de gestao de membros
+
+Areas principais:
+
+- cadastro de novo membro
+- campo `Cargo / função`
+- controle de capitulos permitidos
+- opcao para criar ou remover permissao de admin
+- lista de usuarios cadastrados
+- edicao de nome, cargo, capitulos e permissao de admin
+
+Comportamento importante:
+
+- apenas admins acessam `/membros`
+- admins nao podem remover a propria permissao de administrador
+- usuario admin recebe acesso a todos os capitulos
+- o cargo salvo aparece no seletor de membros do gerador de atas
+
+## 7.5 Tema visual
 
 A interface tem tema claro/escuro:
 
@@ -498,17 +526,25 @@ Payload:
 - lista usuarios
 - exige usuario admin
 
+`GET /api/users?scope=accessible`
+
+- lista usuarios dos capitulos acessiveis ao usuario autenticado
+- admins recebem todos os usuarios
+- usado pelo gerador para preencher membros presentes com nome e cargo
+
 `POST /api/users`
 
 - cria usuario membro
 - exige usuario admin
 - associa o membro aos capitulos informados
 - se `isAdmin` for `true`, associa o usuario a todos os capitulos
+- aceita `cargo` para preencher a funcao padrao do usuario
 
 Payload:
 
 ```json
 {
+  "cargo": "Secretario",
   "name": "Membro CS",
   "username": "membro.cs",
   "password": "123456",
@@ -519,9 +555,9 @@ Payload:
 
 `PATCH /api/users/:id`
 
-- altera permissao de administrador de outro usuario
+- edita nome, cargo, capitulos e permissao de administrador
 - exige usuario admin
-- recebe `{ "isAdmin": true }` ou `{ "isAdmin": false }`
+- recebe campos como `{ "name": "Novo nome", "cargo": "Presidente", "chapters": ["CS"], "isAdmin": true }`
 - quando promove para admin, garante acesso a todos os capitulos
 - bloqueia alteracao da propria permissao de administrador
 
@@ -616,6 +652,7 @@ Campos principais:
 
 - `id`
 - `name`
+- `cargo`
 - `username`
 - `email`
 - `password_hash`
@@ -1078,22 +1115,24 @@ Depois de mudancas importantes, validar:
 7. primeira criacao de admin
 8. login por nome de usuario
 9. logout
-10. cadastro de membro em `/atas`
-11. associacao de membro a um unico capitulo
-12. promocao/remocao de permissao de admin para outro usuario
-13. bloqueio de edicao da propria permissao de admin
-14. bloqueio de acesso cruzado entre capitulos
-15. criacao de ata no gerador
-16. salvamento de ata no banco
-17. nome personalizavel da ata salva
-18. renomear ata em `/atas`
-19. listagem em `/atas`
-20. geracao de PDF clicando em ata salva sem anexos
-21. barra de progresso durante geracao de PDF
-22. abertura de ata salva no gerador
-23. geracao de PDF pelo gerador principal
-24. exclusao de ata salva
-25. importacao/exportacao de rascunho JSON
+10. cadastro de membro em `/membros`
+11. edicao de cargo/função do membro
+12. associacao de membro a um unico capitulo
+13. promocao/remocao de permissao de admin para outro usuario
+14. bloqueio de edicao da propria permissao de admin
+15. seletor de membro cadastrado no gerador
+16. bloqueio de acesso cruzado entre capitulos
+17. criacao de ata no gerador
+18. salvamento de ata no banco
+19. nome personalizavel da ata salva
+20. renomear ata em `/atas`
+21. listagem em `/atas`
+22. geracao de PDF clicando em ata salva sem anexos
+23. barra de progresso durante geracao de PDF
+24. abertura de ata salva no gerador
+25. geracao de PDF pelo gerador principal
+26. exclusao de ata salva
+27. importacao/exportacao de rascunho JSON
 
 ## 15.3 Checklist de SwiftLaTeX
 
@@ -1112,6 +1151,7 @@ Validar ao mexer em templates, TeX ou assets:
 
 - [`src/components/AtaApp.jsx`](./src/components/AtaApp.jsx)
 - [`src/components/SavedAtasPage.jsx`](./src/components/SavedAtasPage.jsx)
+- [`src/components/MembersPage.jsx`](./src/components/MembersPage.jsx)
 - [`src/lib/ata.js`](./src/lib/ata.js)
 - [`src/lib/auth.js`](./src/lib/auth.js)
 - [`src/lib/db.js`](./src/lib/db.js)
@@ -1124,6 +1164,7 @@ Validar ao mexer em templates, TeX ou assets:
 - [`src/app/api/auth/login/route.js`](./src/app/api/auth/login/route.js)
 - [`src/app/api/auth/setup/route.js`](./src/app/api/auth/setup/route.js)
 - [`src/app/api/users/route.js`](./src/app/api/users/route.js)
+- [`src/app/api/users/[id]/route.js`](./src/app/api/users/%5Bid%5D/route.js)
 - [`src/app/api/latex/project/route.js`](./src/app/api/latex/project/route.js)
 - [`src/app/api/swiftlatex/texlive/[engine]/[...slug]/route.js`](./src/app/api/swiftlatex/texlive/%5Bengine%5D/%5B...slug%5D/route.js)
 - [`scripts/vendor-texlive.mjs`](./scripts/vendor-texlive.mjs)

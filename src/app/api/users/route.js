@@ -5,6 +5,7 @@ import {
   getCurrentUser,
   isUniqueConstraintError,
   isSameOriginRequest,
+  listVisibleUsers,
   listUsers,
 } from "../../../lib/auth";
 
@@ -17,8 +18,21 @@ function forbidden() {
   );
 }
 
-export async function GET() {
+function unauthorized() {
+  return NextResponse.json({ detail: "Autenticacao necessaria." }, { status: 401 });
+}
+
+export async function GET(request) {
   const user = await getCurrentUser();
+  if (!user) {
+    return unauthorized();
+  }
+
+  const { searchParams } = new URL(request.url);
+  if (searchParams.get("scope") === "accessible") {
+    return NextResponse.json({ users: await listVisibleUsers(user) });
+  }
+
   if (!user?.isAdmin) {
     return forbidden();
   }

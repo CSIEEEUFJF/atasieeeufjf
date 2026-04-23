@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import {
   getCurrentUser,
   isSameOriginRequest,
-  updateUserAdminStatus,
+  updateUserManagement,
 } from "../../../../lib/auth";
 
 export const runtime = "nodejs";
@@ -38,14 +38,18 @@ export async function PATCH(request, context) {
 
   try {
     const payload = await request.json();
-    if (typeof payload.isAdmin !== "boolean") {
+    const hasKnownField = ["cargo", "chapters", "isAdmin", "name"].some((field) =>
+      Object.prototype.hasOwnProperty.call(payload, field),
+    );
+
+    if (!hasKnownField) {
       return NextResponse.json(
-        { detail: "Informe se o usuario deve ser administrador." },
+        { detail: "Informe pelo menos um campo para atualizar." },
         { status: 400 },
       );
     }
 
-    const user = await updateUserAdminStatus(currentUser, userId, payload.isAdmin);
+    const user = await updateUserManagement(currentUser, userId, payload);
     if (!user) {
       return NextResponse.json({ detail: "Usuario nao encontrado." }, { status: 404 });
     }
