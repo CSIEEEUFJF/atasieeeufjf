@@ -40,7 +40,7 @@ export const SOCIEDADES = {
     folder: path.join(ROOT_DIR, "classes", "RAS"),
     documentclass: "ataRAS",
   },
-  "Ramo Geral": {
+  Ramo: {
     folder: path.join(ROOT_DIR, "classes", "Ramo Geral"),
     documentclass: "ataIEEE",
   },
@@ -59,8 +59,13 @@ export const SOCIEDADE_LABELS = {
   MTTS: "MTT-S - Microwave Theory and Technology Society",
   PES: "PES - Power & Energy Society",
   RAS: "RAS - Robotics and Automation Society",
-  "Ramo Geral": "Ramo Geral IEEE",
+  Ramo: "Ramo",
   VTS: "VTS - Vehicular Technology Society",
+};
+
+export const SOCIEDADE_ALIASES = {
+  "Ramo Geral": "Ramo",
+  "Ramo Geral IEEE": "Ramo",
 };
 
 const AUXILIARY_SUFFIXES = [
@@ -73,6 +78,28 @@ const AUXILIARY_SUFFIXES = [
 
 function texto(value, fallback = "") {
   return typeof value === "string" ? value.trim() : fallback;
+}
+
+export function normalizarSociedadeChave(value, fallback = "CS") {
+  const cleanValue = texto(value);
+  const canonical = SOCIEDADE_ALIASES[cleanValue] || cleanValue;
+  return SOCIEDADES[canonical] ? canonical : fallback;
+}
+
+export function expandirSociedadesParaBusca(chaves) {
+  const requested = Array.isArray(chaves) ? chaves : [chaves];
+  const normalized = requested
+    .map((chave) => normalizarSociedadeChave(chave, ""))
+    .filter(Boolean);
+  const expanded = new Set(normalized);
+
+  for (const [alias, canonical] of Object.entries(SOCIEDADE_ALIASES)) {
+    if (expanded.has(canonical)) {
+      expanded.add(alias);
+    }
+  }
+
+  return [...expanded];
 }
 
 function listaStrings(value) {
@@ -102,7 +129,7 @@ export function normalizarPayload(raw) {
   }
 
   return {
-    sociedade: texto(raw.sociedade, "CS") || "CS",
+    sociedade: normalizarSociedadeChave(raw.sociedade),
     arquivo_saida: texto(raw.arquivo_saida, "ata_preenchida") || "ata_preenchida",
     data_elaboracao: texto(raw.data_elaboracao),
     autor: texto(raw.autor),
@@ -172,7 +199,7 @@ function resolverArquivo(caminhoArquivo, baseDir) {
 
 function limparDados(dados) {
   return {
-    sociedade: texto(dados.sociedade, "CS") || "CS",
+    sociedade: normalizarSociedadeChave(dados.sociedade),
     arquivo_saida: texto(dados.arquivo_saida, "ata_preenchida") || "ata_preenchida",
     data_elaboracao: texto(dados.data_elaboracao),
     autor: texto(dados.autor),
@@ -186,7 +213,7 @@ function limparDados(dados) {
 }
 
 export async function copiarRecursosSociedade(sociedade, destino) {
-  const origem = SOCIEDADES[sociedade]?.folder;
+  const origem = SOCIEDADES[normalizarSociedadeChave(sociedade, "")]?.folder;
   if (!origem) {
     throw new Error("Sociedade invalida.");
   }

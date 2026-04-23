@@ -23,6 +23,15 @@ function formatDate(value) {
   return new Date(value).toLocaleString("pt-BR");
 }
 
+function normalizeSocietyKey(value) {
+  const cleanValue = String(value || "").trim();
+  if (cleanValue === "Ramo Geral" || cleanValue === "Ramo Geral IEEE") {
+    return "Ramo";
+  }
+
+  return cleanValue || "CS";
+}
+
 function createFormFromStoredAta(ata) {
   const savedForm = ata.form || {};
   const attachmentsById = new Map(
@@ -64,7 +73,7 @@ function createFormFromStoredAta(ata) {
       : [],
     pautasText: savedForm.pautasText || "",
     resultadosText: savedForm.resultadosText || "",
-    sociedade: savedForm.sociedade || ata.sociedade || "CS",
+    sociedade: normalizeSocietyKey(savedForm.sociedade || ata.sociedade),
     titulo: ata.title || savedForm.titulo || savedForm.title || "",
   };
 }

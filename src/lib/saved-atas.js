@@ -1,6 +1,11 @@
 import crypto from "node:crypto";
 
-import { normalizarNomeSaida, SOCIEDADES } from "./ata";
+import {
+  expandirSociedadesParaBusca,
+  normalizarNomeSaida,
+  normalizarSociedadeChave,
+  SOCIEDADES,
+} from "./ata";
 import { getPrisma } from "./db";
 
 export class ChapterAccessError extends Error {}
@@ -10,11 +15,21 @@ function text(value, fallback = "") {
 }
 
 function getAccessibleChapters(user) {
-  return Array.isArray(user?.chapters) ? user.chapters.filter((chapter) => SOCIEDADES[chapter]) : [];
+  if (!Array.isArray(user?.chapters)) {
+    return [];
+  }
+
+  return [
+    ...new Set(
+      user.chapters
+        .map((chapter) => normalizarSociedadeChave(chapter, ""))
+        .filter((chapter) => SOCIEDADES[chapter]),
+    ),
+  ];
 }
 
 function assertChapterAccess(user, chapterKey) {
-  if (!getAccessibleChapters(user).includes(chapterKey)) {
+  if (!getAccessibleChapters(user).includes(normalizarSociedadeChave(chapterKey, ""))) {
     throw new ChapterAccessError("Voce nao tem acesso a este capitulo.");
   }
 }
@@ -43,7 +58,7 @@ function normalizeFileSize(value) {
 
 function normalizeAtaPayload(raw) {
   const form = raw?.form && typeof raw.form === "object" ? raw.form : raw;
-  const sociedade = SOCIEDADES[form?.sociedade] ? form.sociedade : "CS";
+  const sociedade = normalizarSociedadeChave(form?.sociedade);
   const outputName = normalizarNomeSaida(raw?.outputName || raw?.arquivo_saida || "ata_preenchida");
   const title = limitedText(raw?.title || form?.titulo || form?.title || outputName, 140, outputName);
 
@@ -150,7 +165,7 @@ function summarizeAta(row) {
     createdAt: serializeDate(row.createdAt),
     id: row.id,
     outputName: row.outputName,
-    sociedade: row.sociedade,
+    sociedade: normalizarSociedadeChave(row.sociedade, row.sociedade),
     title: row.title,
     updatedAt: serializeDate(row.updatedAt),
   };
@@ -162,7 +177,13 @@ export async function listSavedAtas(user, chapterKey = "") {
     return [];
   }
 
-  const requestedChapter = text(chapterKey);
+  const rawRequestedChapter = text(chapterKey);
+  const requestedChapter = rawRequestedChapter
+    ? normalizarSociedadeChave(rawRequestedChapter, "")
+    : "";
+  if (rawRequestedChapter && !requestedChapter) {
+    throw new ChapterAccessError("Capitulo invalido.");
+  }
   const filteredChapters = requestedChapter ? [requestedChapter] : accessibleChapters;
   if (requestedChapter) {
     assertChapterAccess(user, requestedChapter);
@@ -179,7 +200,7 @@ export async function listSavedAtas(user, chapterKey = "") {
       { updatedAt: "desc" },
     ],
     where: {
-      sociedade: { in: filteredChapters },
+      sociedade: { in: expandirSociedadesParaBusca(filteredChapters) },
     },
   });
 
@@ -200,7 +221,7 @@ export async function getSavedAtaSummary(user, ataId) {
     },
     where: {
       id: ataId,
-      sociedade: { in: accessibleChapters },
+      sociedade: { in: expandirSociedadesParaBusca(accessibleChapters) },
     },
   });
 
@@ -243,7 +264,7 @@ export async function updateSavedAta(user, ataId, { attachments, payload }) {
       select: { id: true },
       where: {
         id: ataId,
-        sociedade: { in: accessibleChapters },
+        sociedade: { in: expandirSociedadesParaBusca(accessibleChapters) },
       },
     });
 
@@ -293,7 +314,7 @@ export async function renameSavedAta(user, ataId, title) {
       select: { id: true, payloadJson: true },
       where: {
         id: ataId,
-        sociedade: { in: accessibleChapters },
+        sociedade: { in: expandirSociedadesParaBusca(accessibleChapters) },
       },
     });
 
@@ -340,7 +361,7 @@ export async function deleteSavedAta(user, ataId) {
   const result = await getPrisma().ata.deleteMany({
     where: {
       id: ataId,
-      sociedade: { in: accessibleChapters },
+      sociedade: { in: expandirSociedadesParaBusca(accessibleChapters) },
     },
   });
 
@@ -364,7 +385,7 @@ export async function getSavedAta(user, ataId) {
     },
     where: {
       id: ataId,
-      sociedade: { in: accessibleChapters },
+      sociedade: { in: expandirSociedadesParaBusca(accessibleChapters) },
     },
   });
 
@@ -380,13 +401,19 @@ export async function getSavedAta(user, ataId) {
     size: Number(row.size || 0),
   }));
 
+  const parsedPayload = JSON.parse(ata.payloadJson);
+  const form = parsedPayload.form || {};
+
   return {
     attachments,
     createdAt: serializeDate(ata.createdAt),
-    form: JSON.parse(ata.payloadJson).form,
+    form: {
+      ...form,
+      sociedade: normalizarSociedadeChave(form.sociedade || ata.sociedade),
+    },
     id: ata.id,
     outputName: ata.outputName,
-    sociedade: ata.sociedade,
+    sociedade: normalizarSociedadeChave(ata.sociedade, ata.sociedade),
     title: ata.title,
     updatedAt: serializeDate(ata.updatedAt),
   };

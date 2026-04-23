@@ -19,7 +19,7 @@ const FALLBACK_SOCIETIES = [
   { chave: "APS", nome: "APS - Antennas and Propagation Society" },
   { chave: "EdSoc", nome: "EdSoc - Education Society" },
   { chave: "VTS", nome: "VTS - Vehicular Technology Society" },
-  { chave: "Ramo Geral", nome: "Ramo Geral IEEE" },
+  { chave: "Ramo", nome: "Ramo" },
 ];
 
 function hojeFormatado() {
@@ -44,6 +44,15 @@ function splitLines(value) {
     .split("\n")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function normalizeSocietyKey(value) {
+  const cleanValue = String(value || "").trim();
+  if (cleanValue === "Ramo Geral" || cleanValue === "Ramo Geral IEEE") {
+    return "Ramo";
+  }
+
+  return cleanValue || "CS";
 }
 
 function createEmptyMember() {
@@ -146,7 +155,7 @@ function createFormFromStoredAta(ata) {
       : [],
     pautasText: savedForm.pautasText || "",
     resultadosText: savedForm.resultadosText || "",
-    sociedade: savedForm.sociedade || "CS",
+    sociedade: normalizeSocietyKey(savedForm.sociedade),
     titulo: ata.title || savedForm.titulo || savedForm.title || "",
   };
 }
@@ -893,7 +902,7 @@ function App() {
 
       startTransition(() => {
         setForm({
-          sociedade: data.sociedade || "CS",
+          sociedade: normalizeSocietyKey(data.sociedade),
           titulo: data.titulo || data.title || "",
           data_elaboracao: data.data_elaboracao || hojeFormatado(),
           autor: data.autor || "",

@@ -776,7 +776,7 @@ Capitulos/sociedades atuais:
 - `MTTS`
 - `PES`
 - `RAS`
-- `Ramo Geral`
+- `Ramo`
 - `VTS`
 
 Definidos em [`src/lib/ata.js`](./src/lib/ata.js), no objeto `SOCIEDADES`.

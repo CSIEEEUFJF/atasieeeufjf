@@ -47,7 +47,7 @@ SOCIEDADES: dict[str, dict[str, Path | str]] = {
         "folder": ROOT_DIR / "classes" / "RAS",
         "documentclass": "ataRAS",
     },
-    "Ramo Geral": {
+    "Ramo": {
         "folder": ROOT_DIR / "classes" / "Ramo Geral",
         "documentclass": "ataIEEE",
     },
@@ -57,6 +57,11 @@ SOCIEDADES: dict[str, dict[str, Path | str]] = {
     },
 }
 
+SOCIEDADE_ALIASES = {
+    "Ramo Geral": "Ramo",
+    "Ramo Geral IEEE": "Ramo",
+}
+
 AUXILIARY_SUFFIXES = (
     ".aux",
     ".fdb_latexmk",
@@ -64,6 +69,12 @@ AUXILIARY_SUFFIXES = (
     ".log",
     ".synctex.gz",
 )
+
+
+def normalizar_sociedade(value: Any) -> str:
+    sociedade = str(value or "").strip()
+    canonical = SOCIEDADE_ALIASES.get(sociedade, sociedade)
+    return canonical if canonical in SOCIEDADES else "CS"
 
 
 @dataclass
@@ -110,7 +121,7 @@ class AtaData:
             if isinstance(item, dict)
         ]
         return cls(
-            sociedade=str(raw.get("sociedade", "CS")).strip() or "CS",
+            sociedade=normalizar_sociedade(raw.get("sociedade", "CS")),
             arquivo_saida=str(raw.get("arquivo_saida", "ata_preenchida")).strip()
             or "ata_preenchida",
             data_elaboracao=str(raw.get("data_elaboracao", "")).strip(),
@@ -136,7 +147,7 @@ class AtaData:
 
     def cleaned(self) -> "AtaData":
         return AtaData(
-            sociedade=self.sociedade,
+            sociedade=normalizar_sociedade(self.sociedade),
             arquivo_saida=self.arquivo_saida,
             data_elaboracao=self.data_elaboracao.strip(),
             autor=self.autor.strip(),

@@ -19,6 +19,7 @@ from .gerador import (
     MembroData,
     SOCIEDADES,
     gerar_ata,
+    normalizar_sociedade,
     normalizar_nome_arquivo,
     normalizar_nome_saida,
 )
@@ -36,7 +37,7 @@ SOCIEDADE_LABELS = {
     "MTTS": "MTT-S - Microwave Theory and Technology Society",
     "PES": "PES - Power & Energy Society",
     "RAS": "RAS - Robotics and Automation Society",
-    "Ramo Geral": "Ramo Geral IEEE",
+    "Ramo": "Ramo",
     "VTS": "VTS - Vehicular Technology Society",
 }
 
@@ -93,7 +94,7 @@ if (FRONTEND_DIST_DIR / "assets").exists():
 
 
 def copiar_recursos_sociedade(sociedade: str, destino: Path) -> None:
-    origem = Path(SOCIEDADES[sociedade]["folder"])
+    origem = Path(SOCIEDADES[normalizar_sociedade(sociedade)]["folder"])
     destino.mkdir(parents=True, exist_ok=True)
 
     for item in origem.iterdir():
@@ -136,7 +137,7 @@ def montar_dados(payload: AtaPayload, upload_map: dict[str, UploadFile], uploads
         anexos.append(AnexoData(legenda=legenda, arquivo=str(destino)))
 
     return AtaData(
-        sociedade=payload.sociedade,
+        sociedade=normalizar_sociedade(payload.sociedade),
         arquivo_saida=payload.arquivo_saida,
         data_elaboracao=payload.data_elaboracao,
         autor=payload.autor,
@@ -210,7 +211,8 @@ async def gerar_pdf(request: Request) -> Response:
     except (json.JSONDecodeError, ValidationError) as exc:
         raise HTTPException(status_code=400, detail=f"Payload inválido: {exc}") from exc
 
-    if payload.sociedade not in SOCIEDADES:
+    sociedade = normalizar_sociedade(payload.sociedade)
+    if sociedade not in SOCIEDADES:
         raise HTTPException(status_code=400, detail="Sociedade inválida.")
 
     uploads = {
@@ -227,7 +229,7 @@ async def gerar_pdf(request: Request) -> Response:
             uploads_dir = Path(raiz_temporaria) / "uploads"
             uploads_dir.mkdir(parents=True, exist_ok=True)
 
-            copiar_recursos_sociedade(payload.sociedade, workspace)
+            copiar_recursos_sociedade(sociedade, workspace)
             dados = montar_dados(payload, uploads, uploads_dir)
             saidas = gerar_ata(
                 dados,

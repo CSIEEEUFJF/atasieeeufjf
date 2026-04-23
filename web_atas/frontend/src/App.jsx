@@ -10,7 +10,7 @@ const FALLBACK_SOCIETIES = [
   { chave: "APS", nome: "APS - Antennas and Propagation Society" },
   { chave: "EdSoc", nome: "EdSoc - Education Society" },
   { chave: "VTS", nome: "VTS - Vehicular Technology Society" },
-  { chave: "Ramo Geral", nome: "Ramo Geral IEEE" },
+  { chave: "Ramo", nome: "Ramo" },
 ];
 
 function hojeFormatado() {

@@ -1,7 +1,12 @@
 import { cookies } from "next/headers";
 import crypto from "node:crypto";
 
-import { SOCIEDADES, SOCIEDADE_LABELS } from "./ata";
+import {
+  expandirSociedadesParaBusca,
+  normalizarSociedadeChave,
+  SOCIEDADES,
+  SOCIEDADE_LABELS,
+} from "./ata";
 import { getPrisma, nowDate } from "./db";
 
 export const SESSION_COOKIE = "atas_ieee_session";
@@ -23,7 +28,10 @@ function internalEmailForUsername(username) {
 }
 
 function chapterKeyFromRelation(chapter) {
-  return typeof chapter === "string" ? chapter : chapter?.chapterKey;
+  return normalizarSociedadeChave(
+    typeof chapter === "string" ? chapter : chapter?.chapterKey,
+    "",
+  );
 }
 
 function sanitizeCargo(value) {
@@ -37,7 +45,7 @@ function normalizeChapterRoles(chapterRoles) {
 
   return Object.fromEntries(
     Object.entries(chapterRoles)
-      .map(([chapterKey, cargo]) => [String(chapterKey || "").trim(), sanitizeCargo(cargo)])
+      .map(([chapterKey, cargo]) => [normalizarSociedadeChave(chapterKey, ""), sanitizeCargo(cargo)])
       .filter(([chapterKey, cargo]) => CHAPTER_KEYS.includes(chapterKey) && cargo),
   );
 }
@@ -98,7 +106,13 @@ function normalizeChapterKeys(chapters, { allowAll = false } = {}) {
 
   const requested = Array.isArray(chapters) ? chapters : [];
   const valid = new Set(CHAPTER_KEYS);
-  return [...new Set(requested.map((item) => String(item || "").trim()).filter((item) => valid.has(item)))];
+  return [
+    ...new Set(
+      requested
+        .map((item) => normalizarSociedadeChave(item, ""))
+        .filter((item) => valid.has(item)),
+    ),
+  ];
 }
 
 function hashToken(token) {
@@ -151,11 +165,11 @@ export async function getUserChapters(userId) {
     where: { userId },
   });
 
-  return rows.map((row) => row.chapterKey);
+  return rows.map((row) => normalizarSociedadeChave(row.chapterKey, "")).filter(Boolean);
 }
 
 export function isChapterMember(user, chapterKey) {
-  return Boolean(user?.chapters?.includes(chapterKey));
+  return Boolean(user?.chapters?.includes(normalizarSociedadeChave(chapterKey, "")));
 }
 
 export async function createUser(
@@ -284,7 +298,7 @@ export async function listVisibleUsers(user, chapterKey = "") {
     where: {
       chapters: {
         some: {
-          chapterKey: { in: visibleChapters },
+          chapterKey: { in: expandirSociedadesParaBusca(visibleChapters) },
         },
       },
     },
@@ -309,7 +323,11 @@ export async function updateUserManagement(currentUser, targetUserId, payload = 
   }
 
   const shouldBeAdmin = hasAdminUpdate ? Boolean(payload.isAdmin) : Boolean(targetUser.isAdmin);
-  const currentChapters = new Set(targetUser.chapters.map((chapter) => chapter.chapterKey));
+  const currentChapters = new Set(
+    targetUser.chapters
+      .map((chapter) => normalizarSociedadeChave(chapter.chapterKey, ""))
+      .filter(Boolean),
+  );
   const requestedChapters = normalizeChapterKeys(payload.chapters, { allowAll: shouldBeAdmin });
   const nextChapters = requestedChapters.length
     ? requestedChapters
@@ -320,7 +338,9 @@ export async function updateUserManagement(currentUser, targetUserId, payload = 
   }
 
   const chaptersToCreate = nextChapters.filter((chapterKey) => !currentChapters.has(chapterKey));
-  const chaptersToDelete = [...currentChapters].filter((chapterKey) => !nextChapters.includes(chapterKey));
+  const chaptersToDelete = targetUser.chapters
+    .map((chapter) => chapter.chapterKey)
+    .filter((chapterKey) => !nextChapters.includes(normalizarSociedadeChave(chapterKey, "")));
   const cleanName = typeof payload.name === "string" ? payload.name.trim() : targetUser.name;
   const nextCargo = typeof payload.cargo === "string" ? sanitizeCargo(payload.cargo) : targetUser.cargo;
   const nextChapterRoles = rolesForChapters(
