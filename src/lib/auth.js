@@ -15,6 +15,22 @@ const SESSION_DAYS = 14;
 const PASSWORD_KEY_LENGTH = 64;
 const MIN_PASSWORD_LENGTH = 6;
 const CHAPTER_KEYS = Object.keys(SOCIEDADES);
+export const MEMBER_ROLE_OPTIONS = [
+  "Membro",
+  "Presidente",
+  "Vice-Presidente",
+  "Tesoureiro",
+  "Webmaster",
+  "Secretário",
+  "Conselheiro",
+];
+
+const MEMBER_ROLE_ALIASES = {
+  "Secretario": "Secretário",
+  "Vice Presidente": "Vice-Presidente",
+  "Vice-presidente": "Vice-Presidente",
+  "Membros": "Membro",
+};
 
 function normalizeUsername(username) {
   return String(username || "")
@@ -38,6 +54,16 @@ function sanitizeCargo(value) {
   return String(value || "").trim().slice(0, 180);
 }
 
+function normalizeMemberRole(value, fallback = "") {
+  const cleanValue = sanitizeCargo(value);
+  if (!cleanValue) {
+    return fallback;
+  }
+
+  const canonical = MEMBER_ROLE_ALIASES[cleanValue] || cleanValue;
+  return MEMBER_ROLE_OPTIONS.includes(canonical) ? canonical : fallback;
+}
+
 function normalizeChapterRoles(chapterRoles) {
   if (!chapterRoles || typeof chapterRoles !== "object" || Array.isArray(chapterRoles)) {
     return {};
@@ -45,14 +71,17 @@ function normalizeChapterRoles(chapterRoles) {
 
   return Object.fromEntries(
     Object.entries(chapterRoles)
-      .map(([chapterKey, cargo]) => [normalizarSociedadeChave(chapterKey, ""), sanitizeCargo(cargo)])
+      .map(([chapterKey, cargo]) => [
+        normalizarSociedadeChave(chapterKey, ""),
+        normalizeMemberRole(cargo, ""),
+      ])
       .filter(([chapterKey, cargo]) => CHAPTER_KEYS.includes(chapterKey) && cargo),
   );
 }
 
 function rolesForChapters(chapterRoles, chapterKeys, fallbackCargo = "") {
   const roles = normalizeChapterRoles(chapterRoles);
-  const fallback = sanitizeCargo(fallbackCargo);
+  const fallback = normalizeMemberRole(fallbackCargo, "");
 
   return Object.fromEntries(
     chapterKeys
@@ -61,21 +90,64 @@ function rolesForChapters(chapterRoles, chapterKeys, fallbackCargo = "") {
   );
 }
 
+function roleForChapter(user, chapterKey) {
+  const roles = normalizeChapterRoles(user?.chapterRoles);
+  if (Object.prototype.hasOwnProperty.call(roles, chapterKey)) {
+    return roles[chapterKey] || "Membro";
+  }
+
+  if (Object.keys(roles).length) {
+    return "Membro";
+  }
+
+  return normalizeMemberRole(user?.cargo, "Membro");
+}
+
+export function getManageableChapterKeys(user) {
+  if (!user) {
+    return [];
+  }
+
+  if (user.isAdmin) {
+    return CHAPTER_KEYS;
+  }
+
+  const userChapters = Array.isArray(user.chapters)
+    ? user.chapters.map((chapter) => normalizarSociedadeChave(chapter, "")).filter(Boolean)
+    : [];
+
+  return userChapters.filter((chapterKey) => roleForChapter(user, chapterKey) !== "Membro");
+}
+
+export function canManageMembers(user) {
+  return getManageableChapterKeys(user).length > 0;
+}
+
 function publicUser(row) {
   if (!row) {
     return null;
   }
 
-  return {
-    cargo: row.cargo || "",
-    chapterRoles: normalizeChapterRoles(row.chapterRoles),
-    chapters: Array.isArray(row.chapters)
-      ? row.chapters.map(chapterKeyFromRelation).filter(Boolean)
-      : [],
+  const cargo = normalizeMemberRole(row.cargo, row.cargo || "");
+  const chapterRoles = normalizeChapterRoles(row.chapterRoles);
+  const chapters = Array.isArray(row.chapters)
+    ? row.chapters.map(chapterKeyFromRelation).filter(Boolean)
+    : [];
+  const user = {
+    cargo,
+    chapterRoles,
+    chapters,
     id: row.id,
     isAdmin: Boolean(row.isAdmin),
     name: row.name,
     username: row.username,
+  };
+  const manageableChapters = getManageableChapterKeys(user);
+
+  return {
+    ...user,
+    canManageMembers: manageableChapters.length > 0,
+    manageableChapters,
   };
 }
 
@@ -91,7 +163,7 @@ function publicMemberOption(row, chapterKey = "") {
     : {};
 
   return {
-    cargo: row.cargo || "",
+    cargo: normalizeMemberRole(row.cargo, row.cargo || ""),
     chapterRoles: chapterKey ? selectedRole : roles,
     id: row.id,
     name: row.name,
@@ -178,7 +250,7 @@ export async function createUser(
 ) {
   const cleanUsername = normalizeUsername(username || email);
   const cleanName = String(name || "").trim();
-  const cleanCargo = sanitizeCargo(cargo);
+  const cleanCargo = normalizeMemberRole(cargo, "Membro");
   const cleanPassword = String(password || "");
   const isAdmin = Boolean(options.isAdmin);
   const userChapters = normalizeChapterKeys(chapters, { allowAll: isAdmin });
@@ -268,6 +340,90 @@ export async function listUsers() {
   return users.map(publicUser);
 }
 
+function limitPublicUserToChapters(user, chapterKeys) {
+  const allowed = new Set(chapterKeys);
+  const chapterRoles = Object.fromEntries(
+    Object.entries(user.chapterRoles || {}).filter(([chapterKey]) => allowed.has(chapterKey)),
+  );
+  const limitedUser = {
+    ...user,
+    chapterRoles,
+    chapters: user.chapters.filter((chapterKey) => allowed.has(chapterKey)),
+  };
+  const manageableChapters = getManageableChapterKeys(limitedUser);
+
+  return {
+    ...limitedUser,
+    canManageMembers: manageableChapters.length > 0,
+    manageableChapters,
+  };
+}
+
+export async function listManageableUsers(user) {
+  if (user.isAdmin) {
+    return listUsers();
+  }
+
+  const manageableChapters = getManageableChapterKeys(user);
+  if (!manageableChapters.length) {
+    return [];
+  }
+
+  const users = await getPrisma().user.findMany({
+    include: { chapters: true },
+    orderBy: { name: "asc" },
+    where: {
+      chapters: {
+        some: {
+          chapterKey: { in: expandirSociedadesParaBusca(manageableChapters) },
+        },
+      },
+    },
+  });
+
+  return users
+    .map(publicUser)
+    .map((item) => limitPublicUserToChapters(item, manageableChapters));
+}
+
+export async function createUserFromManagement(currentUser, payload = {}) {
+  if (!canManageMembers(currentUser)) {
+    throw new Error("Voce nao tem permissao para gerenciar membros.");
+  }
+
+  if (currentUser.isAdmin) {
+    return createUser(payload, { isAdmin: Boolean(payload.isAdmin) });
+  }
+
+  if (payload.isAdmin) {
+    throw new Error("Somente administradores podem criar outros administradores.");
+  }
+
+  const manageableChapters = getManageableChapterKeys(currentUser);
+  const requestedChapters = normalizeChapterKeys(payload.chapters);
+  const hasInvalidChapter = requestedChapters.some(
+    (chapterKey) => !manageableChapters.includes(chapterKey),
+  );
+
+  if (!requestedChapters.length || hasInvalidChapter) {
+    throw new Error("Voce so pode cadastrar membros nos capitulos que gerencia.");
+  }
+
+  const memberRoles = Object.fromEntries(
+    requestedChapters.map((chapterKey) => [chapterKey, "Membro"]),
+  );
+
+  return createUser(
+    {
+      ...payload,
+      cargo: "Membro",
+      chapterRoles: memberRoles,
+      chapters: requestedChapters,
+    },
+    { isAdmin: false },
+  );
+}
+
 export async function listVisibleUsers(user, chapterKey = "") {
   const accessibleChapters = Array.isArray(user?.chapters)
     ? user.chapters.filter((chapter) => CHAPTER_KEYS.includes(chapter))
@@ -342,7 +498,9 @@ export async function updateUserManagement(currentUser, targetUserId, payload = 
     .map((chapter) => chapter.chapterKey)
     .filter((chapterKey) => !nextChapters.includes(normalizarSociedadeChave(chapterKey, "")));
   const cleanName = typeof payload.name === "string" ? payload.name.trim() : targetUser.name;
-  const nextCargo = typeof payload.cargo === "string" ? sanitizeCargo(payload.cargo) : targetUser.cargo;
+  const nextCargo = typeof payload.cargo === "string"
+    ? normalizeMemberRole(payload.cargo, "Membro")
+    : normalizeMemberRole(targetUser.cargo, "Membro");
   const nextChapterRoles = rolesForChapters(
     Object.prototype.hasOwnProperty.call(payload, "chapterRoles")
       ? payload.chapterRoles

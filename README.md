@@ -30,10 +30,10 @@ Funciona hoje:
 - login/logout por nome de usuario e senha
 - troca de senha pelo proprio usuario ao clicar no nome no header
 - sessoes persistidas em cookie HTTP-only
-- APIs para cadastro de membros por administradores
+- APIs para cadastro de membros por administradores e gestores de capitulo
 - APIs para cadastro de novos administradores por administradores
 - APIs para edicao de permissao de administrador de outros usuarios
-- pagina `/membros` bloqueada para usuarios nao-admin e visivel apenas para gestao por admins
+- pagina `/membros` disponivel para administradores e usuarios com cargo diferente de `Membro`
 - cargo/função cadastrado por sociedade no usuario
 - associacao de membros a capitulos especificos
 - isolamento de atas por capitulo no backend
@@ -347,13 +347,13 @@ Parametros atuais:
 5. O formulario e preenchido com os dados salvos.
 6. Usuario pode editar, salvar novamente ou gerar PDF.
 
-## 6.7 APIs de membros por admin
+## 6.7 APIs de membros por admin ou gestor de capitulo
 
-1. Admin abre `/membros`.
-2. Cliente autenticado como admin envia `POST /api/users`.
-3. Backend valida que o solicitante e admin.
+1. Admin ou gestor de capitulo abre `/membros`.
+2. Cliente autenticado envia `POST /api/users`.
+3. Backend valida que o solicitante e admin ou tem cargo diferente de `Membro` no capitulo.
 4. Backend cria o usuario com nome, nome de usuario, cargo/função padrao e senha inicial.
-5. Se for membro comum, backend grava associacoes em `user_chapters`.
+5. Se o solicitante for gestor de capitulo, o novo usuario e criado como `Membro` apenas nos capitulos gerenciados.
 6. Se for admin, backend associa o usuario a todos os capitulos.
 7. Novo usuario passa a acessar o escopo associado ao seu perfil.
 8. Admins podem editar nome, cargos por sociedade, capitulos e permissao por `PATCH /api/users/:id`.
@@ -385,7 +385,7 @@ Observacao:
 
 - `/` - gerador principal de atas
 - `/atas` - biblioteca de atas salvas
-- `/membros` - gestao de membros, cargos, capitulos e admins, com acesso exclusivo para admins
+- `/membros` - gestao de membros, cargos, capitulos e admins, com acesso para admins e gestores de capitulo
 
 ## 7.2 Gerador principal
 
@@ -406,7 +406,7 @@ Comportamento importante:
 
 - capitulos indisponiveis para o usuario nao aparecem
 - seletor de membros usa `GET /api/users?scope=accessible&chapter=<SOCIEDADE>`
-- usuarios comuns nao acessam a gestao de membros; eles apenas selecionam membros cadastrados durante o preenchimento da ata
+- usuarios com cargo `Membro` nao acessam a gestao de membros; eles apenas selecionam membros cadastrados durante o preenchimento da ata
 - ao escolher um membro cadastrado, nome e cargo/função da sociedade selecionada sao preenchidos na presenca
 - o bloco `Status` do painel de geracao aparece somente depois do clique em `Gerar PDF`
 - clicar em `Gerar PDF` salva ou atualiza a ata automaticamente antes da compilacao
@@ -450,11 +450,13 @@ Areas principais:
 
 Comportamento importante:
 
-- apenas admins acessam `/membros`
-- a rota `/membros` redireciona usuarios nao-admin para o gerador
+- admins acessam todos os capitulos em `/membros`
+- usuarios com cargo diferente de `Membro` acessam `/membros` apenas para cadastrar novos membros nos capitulos que gerenciam
+- a rota `/membros` redireciona usuarios sem permissao de gestao para o gerador
 - admins nao podem remover a propria permissao de administrador
 - usuario admin recebe acesso a todos os capitulos
 - o cargo salvo para a sociedade selecionada aparece no seletor de membros do gerador de atas
+- cargos aceitos: `Membro`, `Presidente`, `Vice-Presidente`, `Tesoureiro`, `Webmaster`, `Secretário` e `Conselheiro`
 
 ## 7.5 Tema visual
 
@@ -528,8 +530,9 @@ Payload:
 
 `GET /api/users`
 
-- lista usuarios
-- exige usuario admin
+- lista usuarios gerenciaveis
+- admins recebem todos os usuarios
+- gestores de capitulo recebem apenas usuarios dos capitulos que gerenciam
 
 `GET /api/users?scope=accessible&chapter=CS`
 
@@ -542,9 +545,10 @@ Payload:
 `POST /api/users`
 
 - cria usuario membro
-- exige usuario admin
+- exige usuario admin ou gestor de capitulo
 - associa o membro aos capitulos informados
 - se `isAdmin` for `true`, associa o usuario a todos os capitulos
+- gestores de capitulo nao podem criar admins e sempre criam usuarios com cargo `Membro`
 - aceita `cargo` para preencher a funcao padrao do usuario
 - aceita `chapterRoles` para gravar cargos especificos por sociedade
 
@@ -552,9 +556,9 @@ Payload:
 
 ```json
 {
-  "cargo": "Secretario",
+  "cargo": "Secretário",
   "chapterRoles": {
-    "CS": "Secretario"
+    "CS": "Secretário"
   },
   "name": "Membro CS",
   "username": "membro.cs",

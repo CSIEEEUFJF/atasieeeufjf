@@ -457,7 +457,7 @@ function SavedAtasPage() {
         <ul className="nav-links">
           <li><a href="/">Gerador</a></li>
           <li><a href="/atas" aria-current="page">Atas salvas</a></li>
-          {auth.user.isAdmin ? <li><a href="/membros">Membros</a></li> : null}
+          {auth.user.canManageMembers ? <li><a href="/membros">Membros</a></li> : null}
         </ul>
 
         <div className="topbar-actions">
@@ -472,7 +472,7 @@ function SavedAtasPage() {
           <a className="ghost-button" href="/">
             Nova ata
           </a>
-          {auth.user.isAdmin ? (
+          {auth.user.canManageMembers ? (
             <a className="ghost-button" href="/membros">
               Membros
             </a>

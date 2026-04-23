@@ -5,15 +5,21 @@ import { useEffect, useState } from "react";
 import UserPasswordDialog from "./UserPasswordDialog";
 
 const ROLE_OPTIONS = [
-  "Presidente",
-  "Vice-presidente",
-  "Secretario",
-  "Tesoureiro",
-  "Diretor",
-  "Coordenador",
-  "Representante",
   "Membro",
+  "Presidente",
+  "Vice-Presidente",
+  "Tesoureiro",
+  "Webmaster",
+  "Secretário",
+  "Conselheiro",
 ];
+
+const ROLE_ALIASES = {
+  "Secretario": "Secretário",
+  "Vice Presidente": "Vice-Presidente",
+  "Vice-presidente": "Vice-Presidente",
+  "Membros": "Membro",
+};
 
 async function readApiError(response, fallback) {
   try {
@@ -26,13 +32,23 @@ async function readApiError(response, fallback) {
 
 function createMemberForm(defaultChapter = "") {
   return {
-    cargo: "",
+    cargo: "Membro",
     chapters: defaultChapter ? [defaultChapter] : [],
     isAdmin: false,
     name: "",
     password: "",
     username: "",
   };
+}
+
+function normalizeRole(value, fallback = "Membro") {
+  const cleanValue = String(value || "").trim();
+  if (!cleanValue) {
+    return fallback;
+  }
+
+  const canonical = ROLE_ALIASES[cleanValue] || cleanValue;
+  return ROLE_OPTIONS.includes(canonical) ? canonical : fallback;
 }
 
 function normalizeChapterRoles(chapterRoles) {
@@ -42,14 +58,14 @@ function normalizeChapterRoles(chapterRoles) {
 
   return Object.fromEntries(
     Object.entries(chapterRoles)
-      .map(([chapterKey, cargo]) => [chapterKey, String(cargo || "").trim()])
+      .map(([chapterKey, cargo]) => [chapterKey, normalizeRole(cargo, "")])
       .filter(([, cargo]) => cargo),
   );
 }
 
 function createChapterRolesDraft(user) {
   const roles = normalizeChapterRoles(user.chapterRoles);
-  const fallbackCargo = user.cargo || "";
+  const fallbackCargo = normalizeRole(user.cargo, "Membro");
   const hasSpecificRoles = Object.keys(roles).length > 0;
   const userChapters = Array.isArray(user.chapters) ? user.chapters : [];
 
@@ -78,12 +94,8 @@ function hydrateDrafts(users) {
 }
 
 function roleOptionsFor(value) {
-  const cleanValue = String(value || "").trim();
-  if (!cleanValue || ROLE_OPTIONS.includes(cleanValue)) {
-    return ROLE_OPTIONS;
-  }
-
-  return [...ROLE_OPTIONS, cleanValue];
+  const cleanValue = normalizeRole(value, "");
+  return cleanValue && !ROLE_OPTIONS.includes(cleanValue) ? [...ROLE_OPTIONS, cleanValue] : ROLE_OPTIONS;
 }
 
 function selectedChaptersForDraft(draft, chapters) {
@@ -159,13 +171,16 @@ export default function MembersPage() {
 
         const currentUser = payload.user || null;
         const chapterOptions = Array.isArray(payload.chapters) ? payload.chapters : [];
+        const defaultChapter = currentUser?.isAdmin
+          ? currentUser?.chapters?.[0] || chapterOptions[0]?.key || ""
+          : currentUser?.manageableChapters?.[0] || "";
         setAuth({
           loading: false,
           setupRequired: Boolean(payload.setupRequired),
           user: currentUser,
         });
         setChapters(chapterOptions);
-        setMemberForm(createMemberForm(currentUser?.chapters?.[0] || chapterOptions[0]?.key || ""));
+        setMemberForm(createMemberForm(defaultChapter));
       } catch (error) {
         if (active) {
           setAuth({
@@ -188,12 +203,20 @@ export default function MembersPage() {
   }, []);
 
   useEffect(() => {
-    if (auth.user?.isAdmin) {
+    if (auth.user?.canManageMembers) {
       loadUsers();
     }
   }, [auth.user]);
 
   const nextTheme = theme === "dark" ? "light" : "dark";
+  const isAdmin = Boolean(auth.user?.isAdmin);
+  const manageableChapterKeys = Array.isArray(auth.user?.manageableChapters)
+    ? auth.user.manageableChapters
+    : [];
+  const visibleChapters = isAdmin
+    ? chapters
+    : chapters.filter((chapter) => manageableChapterKeys.includes(chapter.key));
+  const defaultManagedChapter = visibleChapters[0]?.key || "";
 
   function toggleTheme() {
     setTheme((current) => (current === "dark" ? "light" : "dark"));
@@ -309,15 +332,35 @@ export default function MembersPage() {
 
   async function handleCreateMember(event) {
     event.preventDefault();
+    const allowedChapters = new Set(visibleChapters.map((chapter) => chapter.key));
+    const selectedChapters = memberForm.chapters.filter((chapterKey) => allowedChapters.has(chapterKey));
+    const selectedRole = isAdmin ? normalizeRole(memberForm.cargo) : "Membro";
+
+    if (!selectedChapters.length) {
+      setStatus({
+        tone: "error",
+        text: "Selecione pelo menos um capitulo que voce pode gerenciar.",
+      });
+      return;
+    }
+
     setIsCreatingMember(true);
     setStatus({
       tone: "loading",
-      text: memberForm.isAdmin ? "Cadastrando novo administrador." : "Cadastrando membro.",
+      text: isAdmin && memberForm.isAdmin ? "Cadastrando novo administrador." : "Cadastrando membro.",
     });
 
     try {
       const response = await fetch("/api/users", {
-        body: JSON.stringify(memberForm),
+        body: JSON.stringify({
+          ...memberForm,
+          cargo: selectedRole,
+          chapterRoles: Object.fromEntries(
+            selectedChapters.map((chapterKey) => [chapterKey, selectedRole]),
+          ),
+          chapters: selectedChapters,
+          isAdmin: isAdmin ? memberForm.isAdmin : false,
+        }),
         headers: {
           "Content-Type": "application/json",
         },
@@ -328,11 +371,11 @@ export default function MembersPage() {
         throw new Error(await readApiError(response, "Nao foi possivel cadastrar o membro."));
       }
 
-      setMemberForm(createMemberForm(auth.user?.chapters?.[0] || chapters[0]?.key || ""));
+      setMemberForm(createMemberForm(defaultManagedChapter));
       await loadUsers();
       setStatus({
         tone: "success",
-        text: memberForm.isAdmin
+        text: isAdmin && memberForm.isAdmin
           ? "Administrador cadastrado com acesso a todos os capitulos."
           : "Membro cadastrado.",
       });
@@ -347,6 +390,14 @@ export default function MembersPage() {
   }
 
   async function handleSaveUser(user) {
+    if (!isAdmin) {
+      setStatus({
+        tone: "error",
+        text: "Apenas administradores podem editar usuarios existentes.",
+      });
+      return;
+    }
+
     const draft = userDrafts[user.id] || createUserDraft(user);
     const selectedChapters = selectedChaptersForDraft(draft, chapters);
     const chapterRoles = chapterRolesForPayload(draft, selectedChapters);
@@ -427,17 +478,17 @@ export default function MembersPage() {
     );
   }
 
-  if (!auth.user || !auth.user.isAdmin) {
+  if (!auth.user || !auth.user.canManageMembers) {
     return (
       <div className="app-shell auth-shell">
         {themeToggleButton}
         <section className="hero-panel auth-card">
           <p className="panel-kicker">Membros</p>
-          <h1>Acesso de administrador necessario</h1>
+          <h1>Acesso de gestao necessario</h1>
           <p>
             {auth.setupRequired
               ? "Crie o primeiro usuario pelo gerador antes de gerenciar membros."
-              : "Entre com um usuario administrador para gerenciar membros e cargos."}
+              : "Entre com um administrador ou gestor de capitulo para gerenciar membros."}
           </p>
           <a className="primary-button standalone-link" href="/">
             Ir para o gerador
@@ -496,7 +547,7 @@ export default function MembersPage() {
             <h1>Gestao de membros</h1>
             <p>
               Cadastre usuarios, defina cargo/função por sociedade e controle acesso por capitulo.
-              O cargo cadastrado aparece no gerador conforme a sociedade escolhida.
+              Gestores de capitulo podem cadastrar novos membros nos capitulos que gerenciam.
             </p>
           </div>
           <div className={`status-box tone-${status.tone}`}>
@@ -534,18 +585,19 @@ export default function MembersPage() {
               </label>
 
               <label className="field">
-                <span>Cargo / função padrão</span>
+                <span>{isAdmin ? "Cargo / função padrão" : "Cargo / função"}</span>
                 <select
                   value={memberForm.cargo}
                   onChange={(event) => updateMemberField("cargo", event.target.value)}
+                  disabled={!isAdmin}
                 >
-                  <option value="">Sem cargo definido</option>
                   {ROLE_OPTIONS.map((role) => (
                     <option key={role} value={role}>
                       {role}
                     </option>
                   ))}
                 </select>
+                {!isAdmin ? <small>Gestores cadastram novos usuarios como Membro.</small> : null}
               </label>
 
               <label className="field">
@@ -558,26 +610,28 @@ export default function MembersPage() {
                 />
               </label>
 
-              <label className="member-admin-toggle">
-                <input
-                  type="checkbox"
-                  checked={memberForm.isAdmin}
-                  onChange={(event) => updateMemberField("isAdmin", event.target.checked)}
-                />
-                <span>
-                  <strong>Criar como administrador</strong>
-                  <small>Admins podem gerenciar membros e acessam todos os capitulos.</small>
-                </span>
-              </label>
+              {isAdmin ? (
+                <label className="member-admin-toggle">
+                  <input
+                    type="checkbox"
+                    checked={memberForm.isAdmin}
+                    onChange={(event) => updateMemberField("isAdmin", event.target.checked)}
+                  />
+                  <span>
+                    <strong>Criar como administrador</strong>
+                    <small>Admins podem gerenciar membros e acessam todos os capitulos.</small>
+                  </span>
+                </label>
+              ) : null}
 
               <div className="chapter-checklist">
-                <span>Capitulos permitidos</span>
-                {chapters.map((chapter) => (
+                <span>{isAdmin ? "Capitulos permitidos" : "Capitulos que voce gerencia"}</span>
+                {visibleChapters.map((chapter) => (
                   <label key={chapter.key}>
                     <input
                       type="checkbox"
-                      checked={memberForm.isAdmin || memberForm.chapters.includes(chapter.key)}
-                      disabled={memberForm.isAdmin}
+                      checked={(isAdmin && memberForm.isAdmin) || memberForm.chapters.includes(chapter.key)}
+                      disabled={isAdmin && memberForm.isAdmin}
                       onChange={() => toggleMemberChapter(chapter.key)}
                     />
                     <strong>{chapter.key}</strong>
@@ -612,7 +666,8 @@ export default function MembersPage() {
                 users.map((user) => {
                   const draft = userDrafts[user.id] || createUserDraft(user);
                   const isSelf = user.id === auth.user.id;
-                  const selectedChapterKeys = selectedChaptersForDraft(draft, chapters);
+                  const editableChapters = isAdmin ? chapters : visibleChapters;
+                  const selectedChapterKeys = selectedChaptersForDraft(draft, editableChapters);
                   const selectedChapterCount = selectedChapterKeys.length;
 
                   return (
@@ -630,28 +685,30 @@ export default function MembersPage() {
                         </div>
                       </div>
 
-                      <div className="member-edit-grid">
-                        <label className="field">
-                          <span>Nome</span>
-                          <input
-                            value={draft.name}
-                            onChange={(event) => updateUserDraft(user.id, "name", event.target.value)}
-                          />
-                        </label>
+                      {isAdmin ? (
+                        <div className="member-edit-grid">
+                          <label className="field">
+                            <span>Nome</span>
+                            <input
+                              value={draft.name}
+                              onChange={(event) => updateUserDraft(user.id, "name", event.target.value)}
+                            />
+                          </label>
 
-                        <label className="member-admin-toggle compact">
-                          <input
-                            type="checkbox"
-                            checked={draft.isAdmin}
-                            disabled={isSelf}
-                            onChange={(event) => updateUserDraft(user.id, "isAdmin", event.target.checked)}
-                          />
-                          <span>
-                            <strong>Administrador</strong>
-                            <small>{isSelf ? "Voce nao pode alterar sua propria permissao." : "Concede acesso a gestao."}</small>
-                          </span>
-                        </label>
-                      </div>
+                          <label className="member-admin-toggle compact">
+                            <input
+                              type="checkbox"
+                              checked={draft.isAdmin}
+                              disabled={isSelf}
+                              onChange={(event) => updateUserDraft(user.id, "isAdmin", event.target.checked)}
+                            />
+                            <span>
+                              <strong>Administrador</strong>
+                              <small>{isSelf ? "Voce nao pode alterar sua propria permissao." : "Concede acesso a gestao."}</small>
+                            </span>
+                          </label>
+                        </div>
+                      ) : null}
 
                       <details className="member-society-editor">
                         <summary>
@@ -664,7 +721,7 @@ export default function MembersPage() {
                         </summary>
 
                         <div className="chapter-role-grid">
-                          {chapters.map((chapter) => {
+                          {editableChapters.map((chapter) => {
                             const chapterEnabled = draft.isAdmin || draft.chapters.includes(chapter.key);
                             const roleValue = draft.chapterRoles?.[chapter.key] || "";
 
@@ -677,7 +734,7 @@ export default function MembersPage() {
                                   <input
                                     type="checkbox"
                                     checked={chapterEnabled}
-                                    disabled={draft.isAdmin}
+                                    disabled={!isAdmin || draft.isAdmin}
                                     onChange={() => toggleUserDraftChapter(user.id, chapter.key)}
                                   />
                                   <span>
@@ -690,7 +747,7 @@ export default function MembersPage() {
                                   <span>Cargo em {chapter.key}</span>
                                   <select
                                     value={roleValue}
-                                    disabled={!chapterEnabled}
+                                    disabled={!isAdmin || !chapterEnabled}
                                     onChange={(event) =>
                                       updateUserDraftChapterRole(
                                         user.id,
@@ -713,16 +770,18 @@ export default function MembersPage() {
                         </div>
                       </details>
 
-                      <div className="inline-actions">
-                        <button
-                          className="soft-button"
-                          type="button"
-                          onClick={() => handleSaveUser(user)}
-                          disabled={savingUserId === user.id}
-                        >
-                          {savingUserId === user.id ? "Salvando..." : "Salvar neste usuario"}
-                        </button>
-                      </div>
+                      {isAdmin ? (
+                        <div className="inline-actions">
+                          <button
+                            className="soft-button"
+                            type="button"
+                            onClick={() => handleSaveUser(user)}
+                            disabled={savingUserId === user.id}
+                          >
+                            {savingUserId === user.id ? "Salvando..." : "Salvar neste usuario"}
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
                   );
                 })

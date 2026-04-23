@@ -1077,7 +1077,7 @@ function App() {
 
         <ul className="nav-links">
           <li><a href="/atas">Atas salvas</a></li>
-          {auth.user.isAdmin ? <li><a href="/membros">Gestão</a></li> : null}
+          {auth.user.canManageMembers ? <li><a href="/membros">Gestão</a></li> : null}
         </ul>
 
         <div className="topbar-actions">
@@ -1446,7 +1446,7 @@ function App() {
                 <a className="ghost-button standalone-link" href="/atas">
                   Ver salvas
                 </a>
-                {auth.user.isAdmin ? (
+                {auth.user.canManageMembers ? (
                   <a className="ghost-button standalone-link" href="/membros">
                     Gestão de membros
                   </a>

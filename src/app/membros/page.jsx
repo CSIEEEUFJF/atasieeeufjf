@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import MembersPage from "../../components/MembersPage";
-import { getCurrentUser } from "../../lib/auth";
+import { canManageMembers, getCurrentUser } from "../../lib/auth";
 
 export const metadata = {
   title: "Membros | Atas IEEE",
@@ -9,7 +9,7 @@ export const metadata = {
 
 export default async function MembrosPage() {
   const user = await getCurrentUser();
-  if (!user?.isAdmin) {
+  if (!canManageMembers(user)) {
     redirect("/");
   }
 

@@ -1,19 +1,20 @@
 import { NextResponse } from "next/server";
 
 import {
-  createUser,
+  canManageMembers,
+  createUserFromManagement,
   getCurrentUser,
   isUniqueConstraintError,
   isSameOriginRequest,
+  listManageableUsers,
   listVisibleUsers,
-  listUsers,
 } from "../../../lib/auth";
 
 export const runtime = "nodejs";
 
 function forbidden() {
   return NextResponse.json(
-    { detail: "Apenas administradores podem gerenciar membros." },
+    { detail: "Apenas administradores ou gestores de capitulo podem gerenciar membros." },
     { status: 403 },
   );
 }
@@ -35,11 +36,11 @@ export async function GET(request) {
     });
   }
 
-  if (!user?.isAdmin) {
+  if (!canManageMembers(user)) {
     return forbidden();
   }
 
-  return NextResponse.json({ users: await listUsers() });
+  return NextResponse.json({ users: await listManageableUsers(user) });
 }
 
 export async function POST(request) {
@@ -48,13 +49,13 @@ export async function POST(request) {
   }
 
   const currentUser = await getCurrentUser();
-  if (!currentUser?.isAdmin) {
+  if (!canManageMembers(currentUser)) {
     return forbidden();
   }
 
   try {
     const payload = await request.json();
-    const user = await createUser(payload, { isAdmin: Boolean(payload.isAdmin) });
+    const user = await createUserFromManagement(currentUser, payload);
     return NextResponse.json({ user }, { status: 201 });
   } catch (error) {
     const duplicateUsername = isUniqueConstraintError(error);
