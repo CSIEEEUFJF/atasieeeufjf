@@ -19,7 +19,7 @@ export async function GET() {
     return NextResponse.json(
       {
         detail:
-          "Banco de dados indisponivel. Configure DATABASE_URL na Vercel e aplique as migrations do Prisma.",
+          "Banco de dados indisponivel. Configure DATABASE_URL na Vercel e sincronize o schema com Prisma db push.",
       },
       { status: 503 },
     );

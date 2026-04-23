@@ -46,7 +46,7 @@ Pontos importantes do estado atual:
 
 - a compilacao de PDF e client-side
 - a conexao do banco usa `DATABASE_URL`
-- migrations ficam em `prisma/migrations`
+- schema do banco fica em `prisma/schema.prisma` e e sincronizado por `prisma db push`
 - anexos salvos ficam somente como metadados no Postgres; arquivos binarios nao sao persistidos
 - o primeiro usuario criado vira admin e membro de todos os capitulos
 - membros sem vinculo com um capitulo nao conseguem acessar atas daquele capitulo
@@ -73,12 +73,12 @@ Pontos importantes do estado atual:
 Definidos em [`package.json`](./package.json):
 
 - `npm run dev` - inicia o Next.js em modo desenvolvimento
-- `npm run build` - gera Prisma Client, aplica migrations quando `DATABASE_URL` existe e gera build de producao
+- `npm run build` - gera Prisma Client, sincroniza o schema quando `DATABASE_URL` existe e gera build de producao
 - `npm run vercel-build` - alias do build usado para Vercel
 - `npm start` - inicia o servidor de producao apos build
 - `npm run db:generate` - gera Prisma Client
-- `npm run db:migrate` - cria/aplica migration em desenvolvimento
-- `npm run db:deploy` - aplica migrations em ambiente de producao
+- `npm run db:push` - sincroniza o schema Prisma no banco
+- `npm run db:deploy` - alias de `prisma db push` para deploy
 - `npm run db:studio` - abre Prisma Studio
 - `npm run vendor:texlive` - regenera o bundle local de pacotes TeX
 
@@ -104,7 +104,7 @@ Principais diretorios:
 - [`classes`](./classes): classes LaTeX e imagens por capitulo/sociedade
 - [`exemplos`](./exemplos): payloads JSON de exemplo
 - [`public/swiftlatex`](./public/swiftlatex): runtime SwiftLaTeX/WASM servido estaticamente
-- [`prisma`](./prisma): schema Prisma e migrations PostgreSQL
+- [`prisma`](./prisma): schema Prisma do banco PostgreSQL
 - [`scripts`](./scripts): scripts auxiliares, incluindo vendor do TeX Live
 - [`src/app`](./src/app): rotas App Router do Next.js
 - [`src/components`](./src/components): componentes React principais
@@ -214,7 +214,7 @@ Arquivos principais:
 - usa `DATABASE_URL` como string de conexao
 - usa `@prisma/adapter-pg` para falar com PostgreSQL
 - mantem a conexao lazy para evitar acesso ao banco durante import/build
-- as migrations estruturais ficam em [`prisma/migrations`](./prisma/migrations)
+- o schema estrutural fica em [`prisma/schema.prisma`](./prisma/schema.prisma)
 
 [`src/lib/saved-atas.js`](./src/lib/saved-atas.js):
 
@@ -559,7 +559,7 @@ Payload:
 ## 9.1 Banco PostgreSQL com Prisma
 
 O banco e definido por [`prisma/schema.prisma`](./prisma/schema.prisma) e
-versionado por migrations em [`prisma/migrations`](./prisma/migrations).
+sincronizado diretamente com `prisma db push`.
 
 Variavel de ambiente obrigatoria:
 
@@ -575,7 +575,7 @@ Comandos principais:
 
 ```bash
 npm run db:generate
-npm run db:migrate
+npm run db:push
 npm run db:deploy
 npm run db:studio
 ```
@@ -960,10 +960,10 @@ Criar `.env` a partir do exemplo e informar a URL do Postgres:
 cp .env.example .env
 ```
 
-Aplicar migrations no banco de desenvolvimento:
+Sincronizar o schema no banco de desenvolvimento:
 
 ```bash
-npm run db:migrate
+npm run db:push
 ```
 
 ## 14.2 Modo desenvolvimento
@@ -991,8 +991,8 @@ o comando de build:
 npm run vercel-build
 ```
 
-Esse comando gera o Prisma Client, aplica `prisma migrate deploy` e entao roda
-o build do Next.js.
+Esse comando gera o Prisma Client, executa `prisma db push --accept-data-loss`
+quando `DATABASE_URL` existe e entao roda o build do Next.js.
 
 ## 14.4 Bootstrap auxiliar
 
@@ -1042,7 +1042,7 @@ Depois de mudancas importantes, validar:
 
 1. `npm install`
 2. configurar `DATABASE_URL`
-3. `npm run db:migrate` em banco de desenvolvimento
+3. `npm run db:push` em banco de desenvolvimento
 4. `npx prisma validate`
 5. `npm run build`
 6. `npm audit`
@@ -1084,7 +1084,6 @@ Validar ao mexer em templates, TeX ou assets:
 - [`src/lib/saved-atas.js`](./src/lib/saved-atas.js)
 - [`src/lib/swiftlatex-client.js`](./src/lib/swiftlatex-client.js)
 - [`prisma/schema.prisma`](./prisma/schema.prisma)
-- [`prisma/migrations`](./prisma/migrations)
 - [`src/app/api/atas/route.js`](./src/app/api/atas/route.js)
 - [`src/app/api/atas/[id]/route.js`](./src/app/api/atas/[id]/route.js)
 - [`src/app/api/auth/me/route.js`](./src/app/api/auth/me/route.js)
@@ -1112,10 +1111,10 @@ Cuidados:
 Cuidados:
 
 - `DATABASE_URL` deve apontar para um Postgres acessivel pelo ambiente de deploy
-- migrations de producao devem ser aplicadas com `npm run db:deploy`
+- o schema de producao deve ser sincronizado com `npm run db:deploy`
 - backups devem ser feitos no provedor Postgres escolhido
 - anexos ficam fora do banco; se for necessario persistir arquivos, considerar storage externo no futuro
-- migrations ficam em `prisma/migrations`
+- o schema fica em `prisma/schema.prisma`
 
 ## 17.3 Anexos
 
@@ -1220,7 +1219,7 @@ Para resetar ambiente local:
 
 1. Parar o servidor Next.
 2. Confirmar que `DATABASE_URL` aponta para um banco de teste.
-3. Executar `npx prisma migrate reset`.
+3. Executar `npx prisma db push --force-reset`.
 4. Iniciar o app novamente.
 5. Criar o primeiro usuario admin.
 

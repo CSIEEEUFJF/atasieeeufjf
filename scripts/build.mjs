@@ -46,9 +46,9 @@ runNodeScript("node_modules/prisma/build/index.js", ["generate"]);
 copyPdftexMapToPublic();
 
 if (process.env.DATABASE_URL) {
-  runNodeScript("node_modules/prisma/build/index.js", ["migrate", "deploy"]);
+  runNodeScript("node_modules/prisma/build/index.js", ["db", "push", "--accept-data-loss"]);
 } else {
-  console.warn("DATABASE_URL nao definida; pulando prisma migrate deploy.");
+  console.warn("DATABASE_URL nao definida; pulando prisma db push.");
 }
 
 runNodeScript("node_modules/next/dist/bin/next", ["build"]);
