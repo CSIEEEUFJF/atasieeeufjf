@@ -1025,10 +1025,6 @@ function App() {
         </a>
 
         <ul className="nav-links">
-          <li><a href="#sociedade">Sociedade</a></li>
-          <li><a href="#reuniao">Reunião</a></li>
-          <li><a href="#membros">Membros</a></li>
-          <li><a href="#anexos">Anexos</a></li>
           <li><a href="/atas">Atas salvas</a></li>
           {auth.user.isAdmin ? <li><a href="/membros">Gestão</a></li> : null}
         </ul>
