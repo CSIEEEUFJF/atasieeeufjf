@@ -57,6 +57,7 @@ function createInitialForm() {
   const hoje = hojeFormatado();
   return {
     sociedade: "CS",
+    titulo: "",
     data_elaboracao: hoje,
     autor: "",
     data_reuniao: hoje,
@@ -77,6 +78,8 @@ function createInitialAuthForm() {
 }
 
 function createStoredAtaPayload(form, outputName) {
+  const title = String(form.titulo || "").trim() || outputName;
+
   return {
     form: {
       anexos: form.anexos.map(({ file, fileName, id, legenda, mimeType, size }) => ({
@@ -94,9 +97,10 @@ function createStoredAtaPayload(form, outputName) {
       pautasText: form.pautasText,
       resultadosText: form.resultadosText,
       sociedade: form.sociedade,
+      titulo: title,
     },
     outputName,
-    title: outputName,
+    title,
   };
 }
 
@@ -142,6 +146,7 @@ function createFormFromStoredAta(ata) {
     pautasText: savedForm.pautasText || "",
     resultadosText: savedForm.resultadosText || "",
     sociedade: savedForm.sociedade || "CS",
+    titulo: ata.title || savedForm.titulo || savedForm.title || "",
   };
 }
 
@@ -318,6 +323,7 @@ function App() {
     const dateSlug = slugify(form.data_reuniao || form.data_elaboracao || hojeFormatado());
     return `ata_${societySlug}${dateSlug ? `_${dateSlug}` : ""}`;
   })();
+  const ataTitle = String(form.titulo || "").trim() || outputName;
 
   const selectedSocietyName =
     sociedades.find((item) => item.chave === form.sociedade)?.nome || form.sociedade;
@@ -650,6 +656,9 @@ function App() {
       if (payload.ata?.id) {
         setActiveAtaId(payload.ata.id);
       }
+      if (payload.ata?.title) {
+        setForm((current) => ({ ...current, titulo: payload.ata.title }));
+      }
 
       setStatus({
         tone: "success",
@@ -748,6 +757,7 @@ function App() {
 
   function handleDraftDownload() {
     const payload = {
+      titulo: form.titulo,
       sociedade: form.sociedade,
       arquivo_saida: outputName,
       data_elaboracao: form.data_elaboracao,
@@ -787,6 +797,7 @@ function App() {
       startTransition(() => {
         setForm({
           sociedade: data.sociedade || "CS",
+          titulo: data.titulo || data.title || "",
           data_elaboracao: data.data_elaboracao || hojeFormatado(),
           autor: data.autor || "",
           data_reuniao: data.data_reuniao || hojeFormatado(),
@@ -1027,6 +1038,17 @@ function App() {
             </div>
 
             <div className="field-grid">
+              <label className="field field-span-2">
+                <span>Nome da ata</span>
+                <input
+                  maxLength={140}
+                  placeholder="Ex.: Reuniao ordinaria CS - abril"
+                  value={form.titulo}
+                  onChange={(event) => updateField("titulo", event.target.value)}
+                />
+                <small>Esse nome aparece na biblioteca de atas salvas. Se ficar vazio, usamos o nome do PDF.</small>
+              </label>
+
               <label className="field">
                 <span>Data da elaboração</span>
                 <input
@@ -1286,6 +1308,11 @@ function App() {
               <div className="summary-card">
                 <span>Sociedade selecionada</span>
                 <strong>{selectedSocietyName}</strong>
+              </div>
+
+              <div className="summary-card">
+                <span>Nome da ata</span>
+                <strong>{ataTitle}</strong>
               </div>
 
               <div className="summary-card">

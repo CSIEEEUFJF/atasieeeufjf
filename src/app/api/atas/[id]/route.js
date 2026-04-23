@@ -6,6 +6,7 @@ import {
   deleteSavedAta,
   getSavedAta,
   parseAtaSaveRequest,
+  renameSavedAta,
   updateSavedAta,
 } from "../../../../lib/saved-atas";
 
@@ -78,6 +79,33 @@ export async function PUT(request, context) {
 
     return NextResponse.json(
       { detail: error.message || "Nao foi possivel atualizar a ata." },
+      { status: 400 },
+    );
+  }
+}
+
+export async function PATCH(request, context) {
+  if (!isSameOriginRequest(request)) {
+    return NextResponse.json({ detail: "Origem invalida." }, { status: 403 });
+  }
+
+  const routeContext = await getRouteContext(context);
+  if (routeContext.response) {
+    return routeContext.response;
+  }
+
+  try {
+    const payload = await request.json();
+    const ata = await renameSavedAta(routeContext.user, routeContext.id, payload.title);
+
+    if (!ata) {
+      return NextResponse.json({ detail: "Ata nao encontrada." }, { status: 404 });
+    }
+
+    return NextResponse.json({ ata });
+  } catch (error) {
+    return NextResponse.json(
+      { detail: error.message || "Nao foi possivel renomear a ata." },
       { status: 400 },
     );
   }

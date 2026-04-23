@@ -45,7 +45,7 @@ function normalizeAtaPayload(raw) {
   const form = raw?.form && typeof raw.form === "object" ? raw.form : raw;
   const sociedade = SOCIEDADES[form?.sociedade] ? form.sociedade : "CS";
   const outputName = normalizarNomeSaida(raw?.outputName || raw?.arquivo_saida || "ata_preenchida");
-  const title = limitedText(raw?.title || outputName, 140, outputName);
+  const title = limitedText(raw?.title || form?.titulo || form?.title || outputName, 140, outputName);
 
   return {
     form: {
@@ -70,6 +70,7 @@ function normalizeAtaPayload(raw) {
         form?.resultadosText || (Array.isArray(form?.resultados) ? form.resultados.join("\n") : ""),
       ),
       sociedade,
+      titulo: title,
     },
     outputName,
     title,
@@ -263,6 +264,60 @@ export async function updateSavedAta(user, ataId, { attachments, payload }) {
         payloadJson: JSON.stringify(payload),
         sociedade: payload.form.sociedade,
         title: payload.title,
+      },
+      include: {
+        _count: {
+          select: { attachments: true },
+        },
+      },
+      where: { id: ataId },
+    });
+  });
+
+  return ata ? summarizeAta(ata) : null;
+}
+
+export async function renameSavedAta(user, ataId, title) {
+  const cleanTitle = limitedText(title, 140);
+  if (!cleanTitle) {
+    throw new Error("Informe um nome para a ata.");
+  }
+
+  const accessibleChapters = getAccessibleChapters(user);
+  if (!accessibleChapters.length) {
+    return null;
+  }
+
+  const ata = await getPrisma().$transaction(async (tx) => {
+    const existingAta = await tx.ata.findFirst({
+      select: { id: true, payloadJson: true },
+      where: {
+        id: ataId,
+        sociedade: { in: accessibleChapters },
+      },
+    });
+
+    if (!existingAta) {
+      return null;
+    }
+
+    let payloadJson = existingAta.payloadJson;
+    try {
+      const payload = JSON.parse(existingAta.payloadJson);
+      payload.title = cleanTitle;
+      payload.form = {
+        ...(payload.form || {}),
+        titulo: cleanTitle,
+      };
+      payloadJson = JSON.stringify(payload);
+    } catch {
+      payloadJson = existingAta.payloadJson;
+    }
+
+    return tx.ata.update({
+      data: {
+        payloadJson,
+        title: cleanTitle,
       },
       include: {
         _count: {

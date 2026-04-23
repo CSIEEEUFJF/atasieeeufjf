@@ -74,6 +74,7 @@ function createFormFromStoredAta(ata) {
     pautasText: savedForm.pautasText || "",
     resultadosText: savedForm.resultadosText || "",
     sociedade: savedForm.sociedade || ata.sociedade || "CS",
+    titulo: ata.title || savedForm.titulo || savedForm.title || "",
   };
 }
 
@@ -127,6 +128,7 @@ function SavedAtasPage() {
   const [isCreatingMember, setIsCreatingMember] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [generatingId, setGeneratingId] = useState(null);
+  const [renamingId, setRenamingId] = useState(null);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
 
   useEffect(() => {
@@ -360,6 +362,54 @@ function SavedAtasPage() {
       });
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  async function handleRename(ata) {
+    const nextTitle = window.prompt("Novo nome da ata:", ata.title || "");
+    if (nextTitle === null) {
+      return;
+    }
+
+    const cleanTitle = nextTitle.trim();
+    if (!cleanTitle || cleanTitle === ata.title) {
+      return;
+    }
+
+    setRenamingId(ata.id);
+    setStatus({
+      tone: "loading",
+      text: "Renomeando ata salva.",
+    });
+
+    try {
+      const response = await fetch(`/api/atas/${ata.id}`, {
+        body: JSON.stringify({ title: cleanTitle }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "PATCH",
+      });
+
+      if (!response.ok) {
+        throw new Error(await readApiError(response, "Nao foi possivel renomear a ata."));
+      }
+
+      const payload = await response.json();
+      setAtas((current) =>
+        current.map((item) => (item.id === ata.id ? payload.ata || item : item)),
+      );
+      setStatus({
+        tone: "success",
+        text: "Ata renomeada.",
+      });
+    } catch (error) {
+      setStatus({
+        tone: "error",
+        text: error.message || "Nao foi possivel renomear a ata.",
+      });
+    } finally {
+      setRenamingId(null);
     }
   }
 
@@ -621,6 +671,16 @@ function SavedAtasPage() {
                             >
                               Abrir no gerador
                             </a>
+                            <button
+                              className="text-button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleRename(ata);
+                              }}
+                              disabled={renamingId === ata.id}
+                            >
+                              {renamingId === ata.id ? "Renomeando..." : "Renomear"}
+                            </button>
                             <button
                               className="text-button danger"
                               onClick={(event) => {

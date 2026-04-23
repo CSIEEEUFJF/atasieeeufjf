@@ -38,6 +38,7 @@ Funciona hoje:
 - importacao e exportacao de rascunho JSON
 - upload de anexos pelo navegador
 - salvamento de atas e anexos no Postgres
+- nome personalizavel para atas salvas
 - pagina `/atas` com biblioteca separada por capitulo
 - clique em ata salva para gerar PDF diretamente quando a ata nao depende de anexos reenviados
 - opcao "Abrir no gerador" para editar ata salva antes de gerar
@@ -224,7 +225,7 @@ Arquivos principais:
 - normaliza payloads de atas
 - processa JSON com dados da ata
 - extrai e salva somente metadados de anexos
-- salva, atualiza, lista, abre e remove atas
+- salva, atualiza, renomeia, lista, abre e remove atas
 - aplica controle de acesso por capitulo em todas as operacoes
 
 [`src/lib/swiftlatex-client.js`](./src/lib/swiftlatex-client.js):
@@ -307,15 +308,16 @@ Parametros atuais:
 ## 6.4 Salvamento de ata
 
 1. Usuario preenche ou abre uma ata.
-2. Clica em `Salvar ata` ou `Atualizar ata`.
-3. Frontend envia JSON para `/api/atas`.
-4. Payload contem os dados da ata e metadados dos anexos.
-5. Arquivos binarios dos anexos nao sao enviados para salvamento.
-6. Backend valida sessao.
-7. Backend valida se o usuario pertence ao capitulo selecionado.
-8. Backend salva a ata em `atas`.
-9. Backend salva anexos em `ata_attachments`.
-10. A UI informa sucesso.
+2. Opcionalmente informa `Nome da ata`, usado na biblioteca.
+3. Clica em `Salvar ata` ou `Atualizar ata`.
+4. Frontend envia JSON para `/api/atas`.
+5. Payload contem nome da ata, dados da ata e metadados dos anexos.
+6. Arquivos binarios dos anexos nao sao enviados para salvamento.
+7. Backend valida sessao.
+8. Backend valida se o usuario pertence ao capitulo selecionado.
+9. Backend salva a ata em `atas`.
+10. Backend salva anexos em `ata_attachments`.
+11. A UI informa sucesso.
 
 ## 6.5 Geracao de PDF a partir de ata salva
 
@@ -397,6 +399,7 @@ Comportamento importante:
 - se uma ata e aberta via `/?ata=<id>`, o formulario carrega automaticamente
 - se uma ata aberta for salva novamente, a API usa `PUT /api/atas/:id`
 - se for uma nova ata, a API usa `POST /api/atas`
+- `Nome da ata` define o titulo exibido na biblioteca; se ficar vazio, o nome do PDF e usado
 
 ## 7.3 Pagina de atas salvas
 
@@ -407,6 +410,7 @@ Areas principais:
 - cards de atas
 - botao `Gerar PDF`
 - link `Abrir no gerador`
+- botao `Renomear`
 - botao `Excluir`
 - painel de membros para administradores
 
@@ -414,6 +418,7 @@ Comportamento importante:
 
 - clicar no card gera PDF
 - `Abrir no gerador` nao gera PDF; apenas abre para edicao
+- `Renomear` atualiza somente o titulo exibido da ata, preservando conteudo e metadados
 - exclusao remove a ata e seus anexos por cascade no Postgres/Prisma
 - membros comuns veem apenas seus capitulos
 - admins veem todos os capitulos
@@ -534,6 +539,13 @@ Payload:
 - atualiza ata existente
 - substitui metadados de anexos anteriores pelos metadados enviados
 - exige acesso ao capitulo original e ao capitulo novo informado no payload
+
+`PATCH /api/atas/:id`
+
+- renomeia ata existente
+- recebe `{ "title": "Novo nome" }`
+- preserva conteudo da ata e metadados de anexos
+- exige acesso ao capitulo da ata
 
 `DELETE /api/atas/:id`
 
@@ -932,6 +944,7 @@ As rotas mutantes verificam origem:
 - `POST /api/auth/password`
 - `POST /api/atas`
 - `PUT /api/atas/:id`
+- `PATCH /api/atas/:id`
 - `DELETE /api/atas/:id`
 - `POST /api/users`
 
@@ -1059,12 +1072,14 @@ Depois de mudancas importantes, validar:
 12. bloqueio de acesso cruzado entre capitulos
 13. criacao de ata no gerador
 14. salvamento de ata no banco
-15. listagem em `/atas`
-16. geracao de PDF clicando em ata salva sem anexos
-17. abertura de ata salva no gerador
-18. geracao de PDF pelo gerador principal
-19. exclusao de ata salva
-20. importacao/exportacao de rascunho JSON
+15. nome personalizavel da ata salva
+16. renomear ata em `/atas`
+17. listagem em `/atas`
+18. geracao de PDF clicando em ata salva sem anexos
+19. abertura de ata salva no gerador
+20. geracao de PDF pelo gerador principal
+21. exclusao de ata salva
+22. importacao/exportacao de rascunho JSON
 
 ## 15.3 Checklist de SwiftLaTeX
 
