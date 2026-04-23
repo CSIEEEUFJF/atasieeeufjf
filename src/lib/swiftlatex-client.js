@@ -247,15 +247,22 @@ async function fetchSocietyBundle(sociedade) {
 async function ensurePdftexMapBytes() {
   if (!pdftexMapBytesPromise) {
     pdftexMapBytesPromise = (async () => {
-      const response = await fetch(`/api/swiftlatex/texlive/pdftex/11/pdftex.map?v=${SWIFTLATEX_CACHE_BUSTER}`, {
-        cache: "no-store",
-      });
+      const urls = [
+        `/swiftlatex/pdftex.map?v=${SWIFTLATEX_CACHE_BUSTER}`,
+        `/api/swiftlatex/texlive/pdftex/11/pdftex.map?v=${SWIFTLATEX_CACHE_BUSTER}`,
+      ];
+      const failures = [];
 
-      if (!response.ok) {
-        throw new Error(`Nao foi possivel carregar pdftex.map (${response.status}).`);
+      for (const url of urls) {
+        const response = await fetch(url, { cache: "no-store" });
+        if (response.ok) {
+          return new Uint8Array(await response.arrayBuffer());
+        }
+
+        failures.push(`${url}: ${response.status}`);
       }
 
-      return new Uint8Array(await response.arrayBuffer());
+      throw new Error(`Nao foi possivel carregar pdftex.map (${failures.join("; ")}).`);
     })().catch((error) => {
       pdftexMapBytesPromise = undefined;
       throw new Error(normalizarMensagemSwiftlatex(error, "Falha ao carregar pdftex.map."));
