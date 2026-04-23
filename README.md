@@ -406,6 +406,7 @@ Comportamento importante:
 - capitulos indisponiveis para o usuario nao aparecem
 - seletor de membros usa `GET /api/users?scope=accessible`
 - ao escolher um membro cadastrado, nome e cargo/função sao preenchidos na presenca
+- o bloco `Status` do painel de geracao aparece somente depois do clique em `Gerar PDF`
 - se uma ata e aberta via `/?ata=<id>`, o formulario carrega automaticamente
 - se uma ata aberta for salva novamente, a API usa `PUT /api/atas/:id`
 - se for uma nova ata, a API usa `POST /api/atas`

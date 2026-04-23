@@ -197,6 +197,7 @@ function App() {
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
   const [isSavingAta, setIsSavingAta] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPdfStatus, setShowPdfStatus] = useState(false);
   const [status, setStatus] = useState({
     tone: "idle",
     text: "Preencha os campos. A primeira compilacao baixa o motor LaTeX no navegador.",
@@ -462,6 +463,7 @@ function App() {
       setEditingAttachmentId(null);
       setSelectedRegisteredMemberId("");
       setActiveAtaId(null);
+      setShowPdfStatus(false);
       setStatus({
         tone: "idle",
         text: "Formulário limpo. Você pode começar outra ata.",
@@ -789,6 +791,8 @@ function App() {
   }
 
   async function handleGeneratePdf() {
+    setShowPdfStatus(true);
+
     try {
       validateForm();
     } catch (error) {
@@ -1431,10 +1435,12 @@ function App() {
                 <strong>{outputName}.pdf</strong>
               </div>
 
-              <div className={`status-box tone-${status.tone}`}>
-                <span>Status</span>
-                <strong>{status.text}</strong>
-              </div>
+              {showPdfStatus ? (
+                <div className={`status-box tone-${status.tone}`}>
+                  <span>Status</span>
+                  <strong>{status.text}</strong>
+                </div>
+              ) : null}
 
               <PdfGenerationProgress
                 active={isSubmitting}
