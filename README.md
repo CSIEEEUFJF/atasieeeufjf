@@ -30,9 +30,9 @@ Funciona hoje:
 - login/logout por nome de usuario e senha
 - troca de senha pelo proprio usuario ao clicar no nome no header
 - sessoes persistidas em cookie HTTP-only
-- cadastro de membros por administradores
-- cadastro de novos administradores por administradores
-- edicao de permissao de administrador para outros usuarios
+- APIs para cadastro de membros por administradores
+- APIs para cadastro de novos administradores por administradores
+- APIs para edicao de permissao de administrador de outros usuarios
 - associacao de membros a capitulos especificos
 - isolamento de atas por capitulo no backend
 - formulario web para criar atas
@@ -187,9 +187,6 @@ Arquivos principais:
 - botao explicito `Gerar PDF`
 - link `Abrir no gerador`
 - exclusao de atas
-- cadastro de membros por administradores
-- promocao e remocao de permissao de administrador para outros usuarios
-- listagem de membros e capitulos associados
 
 ## 5.3 Bibliotecas internas
 
@@ -344,19 +341,16 @@ Parametros atuais:
 5. O formulario e preenchido com os dados salvos.
 6. Usuario pode editar, salvar novamente ou gerar PDF.
 
-## 6.7 Cadastro de membros por admin
+## 6.7 APIs de membros por admin
 
-1. Admin abre `/atas`.
-2. A pagina mostra o painel `Acessos por capitulo`.
-3. Admin informa nome, nome de usuario, senha inicial, capitulos e se o acesso sera admin.
-4. Frontend envia `POST /api/users`.
-5. Backend valida que o solicitante e admin.
-6. Backend cria o usuario.
-7. Se for membro comum, backend grava associacoes em `user_chapters`.
-8. Se for admin, backend associa o usuario a todos os capitulos.
-9. Novo usuario passa a acessar o escopo associado ao seu perfil.
-10. Admins tambem podem promover ou remover permissao de administrador de outros usuarios pela lista de membros.
-11. A API bloqueia alteracao da propria permissao de administrador.
+1. Cliente autenticado como admin envia `POST /api/users`.
+2. Backend valida que o solicitante e admin.
+3. Backend cria o usuario.
+4. Se for membro comum, backend grava associacoes em `user_chapters`.
+5. Se for admin, backend associa o usuario a todos os capitulos.
+6. Novo usuario passa a acessar o escopo associado ao seu perfil.
+7. Admins podem promover ou remover permissao de administrador por `PATCH /api/users/:id`.
+8. A API bloqueia alteracao da propria permissao de administrador.
 
 ## 6.8 Importacao e exportacao de rascunho
 
@@ -383,7 +377,7 @@ Observacao:
 ## 7.1 Rotas visiveis
 
 - `/` - gerador principal de atas
-- `/atas` - biblioteca de atas salvas e administracao de membros
+- `/atas` - biblioteca de atas salvas
 
 ## 7.2 Gerador principal
 
@@ -418,7 +412,6 @@ Areas principais:
 - link `Abrir no gerador`
 - botao `Renomear`
 - botao `Excluir`
-- painel de membros para administradores
 
 Comportamento importante:
 
@@ -428,8 +421,7 @@ Comportamento importante:
 - exclusao remove a ata e seus anexos por cascade no Postgres/Prisma
 - membros comuns veem apenas seus capitulos
 - admins veem todos os capitulos
-- admins podem tornar outro usuario admin ou remover permissao de admin
-- a propria permissao de admin do usuario logado nao pode ser alterada pela UI/API
+- a pagina `/atas` nao exibe cadastro/listagem de membros
 
 ## 7.4 Tema visual
 
@@ -1234,8 +1226,8 @@ Possiveis causas:
 Acoes:
 
 1. Entrar como admin.
-2. Conferir lista de membros em `/atas`.
-3. Criar novo membro com o capitulo correto.
+2. Conferir membros por `GET /api/users`.
+3. Criar ou ajustar o membro com o capitulo correto pelas APIs de usuarios.
 4. Fazer logout/login do membro.
 
 ## 18.4 Ata nao gera PDF pela pagina `/atas`

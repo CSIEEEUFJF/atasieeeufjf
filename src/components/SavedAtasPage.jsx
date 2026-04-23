@@ -23,16 +23,6 @@ function formatDate(value) {
   return new Date(value).toLocaleString("pt-BR");
 }
 
-function createMemberForm(defaultChapter = "") {
-  return {
-    chapters: defaultChapter ? [defaultChapter] : [],
-    isAdmin: false,
-    name: "",
-    password: "",
-    username: "",
-  };
-}
-
 function createFormFromStoredAta(ata) {
   const savedForm = ata.form || {};
   const attachmentsById = new Map(
@@ -118,19 +108,14 @@ function SavedAtasPage() {
   });
   const [chapters, setChapters] = useState([]);
   const [atas, setAtas] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [memberForm, setMemberForm] = useState(createMemberForm);
   const [status, setStatus] = useState({
     tone: "idle",
     text: "Carregando suas atas salvas.",
   });
   const [isLoadingAtas, setIsLoadingAtas] = useState(false);
-  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
-  const [isCreatingMember, setIsCreatingMember] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [generatingId, setGeneratingId] = useState(null);
   const [renamingId, setRenamingId] = useState(null);
-  const [updatingAdminId, setUpdatingAdminId] = useState(null);
   const [generationProgressForm, setGenerationProgressForm] = useState(null);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
 
@@ -173,7 +158,6 @@ function SavedAtasPage() {
           user: payload.user || null,
         });
         setChapters(Array.isArray(payload.chapters) ? payload.chapters : []);
-        setMemberForm(createMemberForm(payload.user?.chapters?.[0] || ""));
       } catch (error) {
         if (active) {
           setAuth({
@@ -201,9 +185,6 @@ function SavedAtasPage() {
     }
 
     loadAtas();
-    if (auth.user.isAdmin) {
-      loadUsers();
-    }
   }, [auth.user]);
 
   const nextTheme = theme === "dark" ? "light" : "dark";
@@ -253,141 +234,6 @@ function SavedAtasPage() {
       });
     } finally {
       setIsLoadingAtas(false);
-    }
-  }
-
-  async function loadUsers() {
-    setIsLoadingUsers(true);
-    try {
-      const response = await fetch("/api/users", { cache: "no-store" });
-      if (!response.ok) {
-        throw new Error(await readApiError(response, "Nao foi possivel carregar membros."));
-      }
-
-      const payload = await response.json();
-      setUsers(Array.isArray(payload.users) ? payload.users : []);
-    } catch (error) {
-      setStatus({
-        tone: "error",
-        text: error.message || "Nao foi possivel carregar membros.",
-      });
-    } finally {
-      setIsLoadingUsers(false);
-    }
-  }
-
-  function updateMemberField(field, value) {
-    setMemberForm((current) => ({ ...current, [field]: value }));
-  }
-
-  function toggleMemberChapter(chapterKey) {
-    setMemberForm((current) => {
-      const selected = new Set(current.chapters);
-      if (selected.has(chapterKey)) {
-        selected.delete(chapterKey);
-      } else {
-        selected.add(chapterKey);
-      }
-
-      return {
-        ...current,
-        chapters: [...selected],
-      };
-    });
-  }
-
-  async function handleCreateMember(event) {
-    event.preventDefault();
-    setIsCreatingMember(true);
-    setStatus({
-      tone: "loading",
-      text: memberForm.isAdmin ? "Cadastrando novo administrador." : "Cadastrando membro do capitulo.",
-    });
-
-    try {
-      const response = await fetch("/api/users", {
-        body: JSON.stringify(memberForm),
-        headers: {
-          "Content-Type": "application/json",
-        },
-        method: "POST",
-      });
-
-      if (!response.ok) {
-        throw new Error(await readApiError(response, "Nao foi possivel cadastrar o membro."));
-      }
-
-      setMemberForm(createMemberForm(accessibleChapters[0]?.key || ""));
-      await loadUsers();
-      setStatus({
-        tone: "success",
-        text: memberForm.isAdmin
-          ? "Administrador cadastrado com acesso a todos os capitulos."
-          : "Membro cadastrado e associado ao(s) capitulo(s).",
-      });
-    } catch (error) {
-      setStatus({
-        tone: "error",
-        text: error.message || "Nao foi possivel cadastrar o membro.",
-      });
-    } finally {
-      setIsCreatingMember(false);
-    }
-  }
-
-  async function handleToggleAdmin(user) {
-    if (user.id === auth.user.id) {
-      setStatus({
-        tone: "error",
-        text: "Voce nao pode alterar sua propria permissao de administrador.",
-      });
-      return;
-    }
-
-    const nextIsAdmin = !user.isAdmin;
-    const confirmed = window.confirm(
-      nextIsAdmin
-        ? `Tornar ${user.name} administrador?`
-        : `Remover permissao de administrador de ${user.name}?`,
-    );
-    if (!confirmed) {
-      return;
-    }
-
-    setUpdatingAdminId(user.id);
-    setStatus({
-      tone: "loading",
-      text: "Atualizando permissao de administrador.",
-    });
-
-    try {
-      const response = await fetch(`/api/users/${user.id}`, {
-        body: JSON.stringify({ isAdmin: nextIsAdmin }),
-        headers: {
-          "Content-Type": "application/json",
-        },
-        method: "PATCH",
-      });
-
-      if (!response.ok) {
-        throw new Error(await readApiError(response, "Nao foi possivel atualizar o usuario."));
-      }
-
-      const payload = await response.json();
-      setUsers((current) =>
-        current.map((item) => (item.id === user.id ? payload.user || item : item)),
-      );
-      setStatus({
-        tone: "success",
-        text: "Permissao de administrador atualizada.",
-      });
-    } catch (error) {
-      setStatus({
-        tone: "error",
-        text: error.message || "Nao foi possivel atualizar o usuario.",
-      });
-    } finally {
-      setUpdatingAdminId(null);
     }
   }
 
@@ -776,133 +622,6 @@ function SavedAtasPage() {
           </div>
         </section>
 
-        {auth.user.isAdmin ? (
-          <section className="panel members-panel">
-            <div className="panel-header">
-              <div>
-                <p className="panel-kicker">Membros</p>
-                <h2>Acessos por capítulo</h2>
-              </div>
-              <button className="soft-button" onClick={loadUsers} disabled={isLoadingUsers}>
-                Atualizar membros
-              </button>
-            </div>
-
-            <div className="members-layout">
-              <form className="member-form" onSubmit={handleCreateMember}>
-                <label className="field">
-                  <span>Nome</span>
-                  <input
-                    value={memberForm.name}
-                    onChange={(event) => updateMemberField("name", event.target.value)}
-                    autoComplete="name"
-                  />
-                </label>
-
-                <label className="field">
-                  <span>Nome de usuário</span>
-                  <input
-                    value={memberForm.username}
-                    onChange={(event) => updateMemberField("username", event.target.value)}
-                    autoComplete="username"
-                  />
-                </label>
-
-                <label className="field">
-                  <span>Senha inicial</span>
-                  <input
-                    type="password"
-                    value={memberForm.password}
-                    onChange={(event) => updateMemberField("password", event.target.value)}
-                    autoComplete="new-password"
-                  />
-                </label>
-
-                <label className="member-admin-toggle">
-                  <input
-                    type="checkbox"
-                    checked={memberForm.isAdmin}
-                    onChange={(event) => updateMemberField("isAdmin", event.target.checked)}
-                  />
-                  <span>
-                    <strong>Criar como administrador</strong>
-                    <small>Admins podem gerenciar membros e acessam todos os capitulos.</small>
-                  </span>
-                </label>
-
-                <div className="chapter-checklist">
-                  <span>Capítulos permitidos</span>
-                  {chapters.map((chapter) => (
-                    <label key={chapter.key}>
-                      <input
-                        type="checkbox"
-                        checked={memberForm.chapters.includes(chapter.key)}
-                        disabled={memberForm.isAdmin}
-                        onChange={() => toggleMemberChapter(chapter.key)}
-                      />
-                      <strong>{chapter.key}</strong>
-                      <small>{chapter.label}</small>
-                    </label>
-                  ))}
-                </div>
-
-                <button className="primary-button" disabled={isCreatingMember}>
-                  {isCreatingMember
-                    ? "Cadastrando..."
-                    : memberForm.isAdmin
-                      ? "Cadastrar admin"
-                      : "Cadastrar membro"}
-                </button>
-              </form>
-
-              <div className="member-list">
-                {users.length ? (
-                  users.map((user) => (
-                    <div className="member-row" key={user.id}>
-                      <div className="member-row-header">
-                        <div>
-                          <strong>{user.name}</strong>
-                          <span>@{user.username}</span>
-                        </div>
-                        <button
-                          className="soft-button member-permission-button"
-                          type="button"
-                          onClick={() => handleToggleAdmin(user)}
-                          disabled={user.id === auth.user.id || updatingAdminId === user.id}
-                          title={
-                            user.id === auth.user.id
-                              ? "Voce nao pode alterar sua propria permissao"
-                              : user.isAdmin
-                                ? "Remover permissao de administrador"
-                                : "Tornar administrador"
-                          }
-                        >
-                          {updatingAdminId === user.id
-                            ? "Atualizando..."
-                            : user.id === auth.user.id
-                              ? "Seu acesso"
-                              : user.isAdmin
-                                ? "Remover admin"
-                                : "Tornar admin"}
-                        </button>
-                      </div>
-                      <div className="member-chips">
-                        {user.isAdmin ? <span>Admin</span> : null}
-                        {user.chapters.map((chapter) => (
-                          <span key={chapter}>{chapter}</span>
-                        ))}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="empty-state">
-                    Nenhum membro carregado ainda.
-                  </div>
-                )}
-              </div>
-            </div>
-          </section>
-        ) : null}
       </main>
     </div>
   );
