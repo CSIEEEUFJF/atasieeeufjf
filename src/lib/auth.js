@@ -26,6 +26,33 @@ function chapterKeyFromRelation(chapter) {
   return typeof chapter === "string" ? chapter : chapter?.chapterKey;
 }
 
+function sanitizeCargo(value) {
+  return String(value || "").trim().slice(0, 180);
+}
+
+function normalizeChapterRoles(chapterRoles) {
+  if (!chapterRoles || typeof chapterRoles !== "object" || Array.isArray(chapterRoles)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(chapterRoles)
+      .map(([chapterKey, cargo]) => [String(chapterKey || "").trim(), sanitizeCargo(cargo)])
+      .filter(([chapterKey, cargo]) => CHAPTER_KEYS.includes(chapterKey) && cargo),
+  );
+}
+
+function rolesForChapters(chapterRoles, chapterKeys, fallbackCargo = "") {
+  const roles = normalizeChapterRoles(chapterRoles);
+  const fallback = sanitizeCargo(fallbackCargo);
+
+  return Object.fromEntries(
+    chapterKeys
+      .map((chapterKey) => [chapterKey, roles[chapterKey] || fallback])
+      .filter(([, cargo]) => cargo),
+  );
+}
+
 function publicUser(row) {
   if (!row) {
     return null;
@@ -33,6 +60,7 @@ function publicUser(row) {
 
   return {
     cargo: row.cargo || "",
+    chapterRoles: normalizeChapterRoles(row.chapterRoles),
     chapters: Array.isArray(row.chapters)
       ? row.chapters.map(chapterKeyFromRelation).filter(Boolean)
       : [],
@@ -110,13 +138,17 @@ export function isChapterMember(user, chapterKey) {
   return Boolean(user?.chapters?.includes(chapterKey));
 }
 
-export async function createUser({ cargo, chapters, email, name, password, username }, options = {}) {
+export async function createUser(
+  { cargo, chapterRoles, chapters, email, name, password, username },
+  options = {},
+) {
   const cleanUsername = normalizeUsername(username || email);
   const cleanName = String(name || "").trim();
-  const cleanCargo = String(cargo || "").trim().slice(0, 180);
+  const cleanCargo = sanitizeCargo(cargo);
   const cleanPassword = String(password || "");
   const isAdmin = Boolean(options.isAdmin);
   const userChapters = normalizeChapterKeys(chapters, { allowAll: isAdmin });
+  const cleanChapterRoles = rolesForChapters(chapterRoles, userChapters, cleanCargo);
 
   if (!cleanName) {
     throw new Error("Informe o nome do usuario.");
@@ -141,6 +173,7 @@ export async function createUser({ cargo, chapters, email, name, password, usern
         create: userChapters.map((chapterKey) => ({ chapterKey })),
       },
       cargo: cleanCargo,
+      chapterRoles: cleanChapterRoles,
       email: internalEmailForUsername(cleanUsername),
       isAdmin,
       name: cleanName,
@@ -256,7 +289,14 @@ export async function updateUserManagement(currentUser, targetUserId, payload = 
   const chaptersToCreate = nextChapters.filter((chapterKey) => !currentChapters.has(chapterKey));
   const chaptersToDelete = [...currentChapters].filter((chapterKey) => !nextChapters.includes(chapterKey));
   const cleanName = typeof payload.name === "string" ? payload.name.trim() : targetUser.name;
-  const cleanCargo = typeof payload.cargo === "string" ? payload.cargo.trim().slice(0, 180) : targetUser.cargo;
+  const nextCargo = typeof payload.cargo === "string" ? sanitizeCargo(payload.cargo) : targetUser.cargo;
+  const nextChapterRoles = rolesForChapters(
+    Object.prototype.hasOwnProperty.call(payload, "chapterRoles")
+      ? payload.chapterRoles
+      : targetUser.chapterRoles,
+    nextChapters,
+    "",
+  );
 
   if (!cleanName) {
     throw new Error("Informe o nome do usuario.");
@@ -264,7 +304,8 @@ export async function updateUserManagement(currentUser, targetUserId, payload = 
 
   const updatedUser = await getPrisma().user.update({
     data: {
-      cargo: cleanCargo,
+      cargo: nextCargo,
+      chapterRoles: nextChapterRoles,
       chapters: chaptersToCreate.length || chaptersToDelete.length
         ? {
             create: chaptersToCreate.map((chapterKey) => ({ chapterKey })),

@@ -160,6 +160,19 @@ async function readApiError(response, fallback) {
   }
 }
 
+function memberCargoForSociety(member, society) {
+  const roles = member?.chapterRoles && typeof member.chapterRoles === "object"
+    ? member.chapterRoles
+    : {};
+  const hasSpecificRoles = Object.keys(roles).length > 0;
+
+  if (Object.prototype.hasOwnProperty.call(roles, society)) {
+    return roles[society] || "";
+  }
+
+  return hasSpecificRoles ? "" : member?.cargo || "";
+}
+
 function baixarArquivo(blob, fileName) {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
@@ -678,7 +691,7 @@ function App() {
       membros: [
         ...current.membros,
         {
-          cargo: selectedMember.cargo || "",
+          cargo: memberCargoForSociety(selectedMember, current.sociedade),
           id: crypto.randomUUID(),
           nome: selectedMember.name,
         },
@@ -1157,13 +1170,17 @@ function App() {
                   onChange={(event) => setSelectedRegisteredMemberId(event.target.value)}
                 >
                   <option value="">Selecione um membro</option>
-                  {memberOptions.map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {member.name}{member.cargo ? ` - ${member.cargo}` : ""}
-                    </option>
-                  ))}
+                  {memberOptions.map((member) => {
+                    const societyCargo = memberCargoForSociety(member, form.sociedade);
+
+                    return (
+                      <option key={member.id} value={member.id}>
+                        {member.name}{societyCargo ? ` - ${societyCargo}` : ""}
+                      </option>
+                    );
+                  })}
                 </select>
-                <small>O cargo vem da página de gestão de membros.</small>
+                <small>O cargo vem da gestão de membros para a sociedade selecionada.</small>
               </label>
               <button className="soft-button" type="button" onClick={handleAddRegisteredMember}>
                 Adicionar selecionado

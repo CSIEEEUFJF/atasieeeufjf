@@ -4,6 +4,17 @@ import { useEffect, useState } from "react";
 
 import UserPasswordDialog from "./UserPasswordDialog";
 
+const ROLE_OPTIONS = [
+  "Presidente",
+  "Vice-presidente",
+  "Secretario",
+  "Tesoureiro",
+  "Diretor",
+  "Coordenador",
+  "Representante",
+  "Membro",
+];
+
 async function readApiError(response, fallback) {
   try {
     const payload = await response.json();
@@ -24,9 +35,38 @@ function createMemberForm(defaultChapter = "") {
   };
 }
 
+function normalizeChapterRoles(chapterRoles) {
+  if (!chapterRoles || typeof chapterRoles !== "object" || Array.isArray(chapterRoles)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(chapterRoles)
+      .map(([chapterKey, cargo]) => [chapterKey, String(cargo || "").trim()])
+      .filter(([, cargo]) => cargo),
+  );
+}
+
+function createChapterRolesDraft(user) {
+  const roles = normalizeChapterRoles(user.chapterRoles);
+  const fallbackCargo = user.cargo || "";
+  const hasSpecificRoles = Object.keys(roles).length > 0;
+  const userChapters = Array.isArray(user.chapters) ? user.chapters : [];
+
+  return Object.fromEntries(
+    userChapters.map((chapterKey) => [
+      chapterKey,
+      roles[chapterKey] || (hasSpecificRoles ? "" : fallbackCargo),
+    ]),
+  );
+}
+
 function createUserDraft(user) {
+  const chapterRoles = createChapterRolesDraft(user);
+
   return {
-    cargo: user.cargo || "",
+    cargo: Object.values(chapterRoles).find(Boolean) || user.cargo || "",
+    chapterRoles,
     chapters: Array.isArray(user.chapters) ? user.chapters : [],
     isAdmin: Boolean(user.isAdmin),
     name: user.name || "",
@@ -35,6 +75,33 @@ function createUserDraft(user) {
 
 function hydrateDrafts(users) {
   return Object.fromEntries(users.map((user) => [user.id, createUserDraft(user)]));
+}
+
+function roleOptionsFor(value) {
+  const cleanValue = String(value || "").trim();
+  if (!cleanValue || ROLE_OPTIONS.includes(cleanValue)) {
+    return ROLE_OPTIONS;
+  }
+
+  return [...ROLE_OPTIONS, cleanValue];
+}
+
+function selectedChaptersForDraft(draft, chapters) {
+  return draft.isAdmin ? chapters.map((chapter) => chapter.key) : draft.chapters || [];
+}
+
+function chapterRolesForPayload(draft, selectedChapters) {
+  const selected = new Set(selectedChapters);
+  const roles = normalizeChapterRoles(draft.chapterRoles);
+
+  return Object.fromEntries(
+    Object.entries(roles).filter(([chapterKey]) => selected.has(chapterKey)),
+  );
+}
+
+function primaryCargoFromRoles(chapterRoles, selectedChapters, fallback = "") {
+  const roles = normalizeChapterRoles(chapterRoles);
+  return selectedChapters.map((chapterKey) => roles[chapterKey]).find(Boolean) || fallback || "";
 }
 
 export default function MembersPage() {
@@ -196,9 +263,35 @@ export default function MembersPage() {
     setUserDrafts((current) => {
       const draft = current[userId] || {};
       const selected = new Set(draft.chapters || []);
+      const chapterRoles = { ...(draft.chapterRoles || {}) };
       if (selected.has(chapterKey)) {
         selected.delete(chapterKey);
+        delete chapterRoles[chapterKey];
       } else {
+        selected.add(chapterKey);
+        chapterRoles[chapterKey] = chapterRoles[chapterKey] || draft.cargo || "";
+      }
+
+      return {
+        ...current,
+        [userId]: {
+          ...draft,
+          chapterRoles,
+          chapters: [...selected],
+        },
+      };
+    });
+  }
+
+  function updateUserDraftChapterRole(userId, chapterKey, cargo) {
+    setUserDrafts((current) => {
+      const draft = current[userId] || {};
+      const chapterRoles = {
+        ...(draft.chapterRoles || {}),
+        [chapterKey]: cargo,
+      };
+      const selected = new Set(draft.chapters || []);
+      if (cargo) {
         selected.add(chapterKey);
       }
 
@@ -206,6 +299,8 @@ export default function MembersPage() {
         ...current,
         [userId]: {
           ...draft,
+          cargo: primaryCargoFromRoles(chapterRoles, [...selected], ""),
+          chapterRoles,
           chapters: [...selected],
         },
       };
@@ -253,9 +348,12 @@ export default function MembersPage() {
 
   async function handleSaveUser(user) {
     const draft = userDrafts[user.id] || createUserDraft(user);
+    const selectedChapters = selectedChaptersForDraft(draft, chapters);
+    const chapterRoles = chapterRolesForPayload(draft, selectedChapters);
     const payload = {
-      cargo: draft.cargo,
-      chapters: draft.isAdmin ? chapters.map((chapter) => chapter.key) : draft.chapters,
+      cargo: primaryCargoFromRoles(chapterRoles, selectedChapters, ""),
+      chapterRoles,
+      chapters: selectedChapters,
       name: draft.name,
     };
 
@@ -281,11 +379,14 @@ export default function MembersPage() {
 
       const data = await response.json();
       setUsers((current) => current.map((item) => (item.id === user.id ? data.user || item : item)));
+      if (user.id === auth.user.id && data.user) {
+        setAuth((current) => ({ ...current, user: data.user }));
+      }
       setUserDrafts((current) => ({
         ...current,
         [user.id]: createUserDraft(data.user || user),
       }));
-      setStatus({ tone: "success", text: "Membro atualizado." });
+      setStatus({ tone: "success", text: "Usuario atualizado." });
     } catch (error) {
       setStatus({
         tone: "error",
@@ -394,8 +495,8 @@ export default function MembersPage() {
             <p className="panel-kicker">Acessos</p>
             <h1>Gestao de membros</h1>
             <p>
-              Cadastre usuarios, defina cargo/função e controle acesso por capitulo.
-              O cargo cadastrado aparece como sugestao no gerador de atas.
+              Cadastre usuarios, defina cargo/função por sociedade e controle acesso por capitulo.
+              O cargo cadastrado aparece no gerador conforme a sociedade escolhida.
             </p>
           </div>
           <div className={`status-box tone-${status.tone}`}>
@@ -433,12 +534,18 @@ export default function MembersPage() {
               </label>
 
               <label className="field">
-                <span>Cargo / função</span>
-                <input
+                <span>Cargo / função padrão</span>
+                <select
                   value={memberForm.cargo}
                   onChange={(event) => updateMemberField("cargo", event.target.value)}
-                  placeholder="Ex.: Presidente, Secretário, Membro"
-                />
+                >
+                  <option value="">Sem cargo definido</option>
+                  {ROLE_OPTIONS.map((role) => (
+                    <option key={role} value={role}>
+                      {role}
+                    </option>
+                  ))}
+                </select>
               </label>
 
               <label className="field">
@@ -505,6 +612,8 @@ export default function MembersPage() {
                 users.map((user) => {
                   const draft = userDrafts[user.id] || createUserDraft(user);
                   const isSelf = user.id === auth.user.id;
+                  const selectedChapterKeys = selectedChaptersForDraft(draft, chapters);
+                  const selectedChapterCount = selectedChapterKeys.length;
 
                   return (
                     <div className="member-row" key={user.id}>
@@ -513,11 +622,11 @@ export default function MembersPage() {
                           <strong>{user.name}</strong>
                           <span>@{user.username}</span>
                         </div>
-                        <div className="member-chips">
-                          {user.isAdmin ? <span>Admin</span> : null}
-                          {user.chapters.map((chapter) => (
-                            <span key={chapter}>{chapter}</span>
-                          ))}
+                        <div className="member-row-meta">
+                          {user.isAdmin ? <span className="member-pill">Admin</span> : null}
+                          <span className="member-pill member-pill-muted">
+                            {selectedChapterCount} sociedade(s)
+                          </span>
                         </div>
                       </div>
 
@@ -527,15 +636,6 @@ export default function MembersPage() {
                           <input
                             value={draft.name}
                             onChange={(event) => updateUserDraft(user.id, "name", event.target.value)}
-                          />
-                        </label>
-
-                        <label className="field">
-                          <span>Cargo / função</span>
-                          <input
-                            value={draft.cargo}
-                            onChange={(event) => updateUserDraft(user.id, "cargo", event.target.value)}
-                            placeholder="Sem cargo cadastrado"
                           />
                         </label>
 
@@ -553,21 +653,65 @@ export default function MembersPage() {
                         </label>
                       </div>
 
-                      <div className="chapter-checklist compact">
-                        <span>Capitulos</span>
-                        {chapters.map((chapter) => (
-                          <label key={chapter.key}>
-                            <input
-                              type="checkbox"
-                              checked={draft.isAdmin || draft.chapters.includes(chapter.key)}
-                              disabled={draft.isAdmin}
-                              onChange={() => toggleUserDraftChapter(user.id, chapter.key)}
-                            />
-                            <strong>{chapter.key}</strong>
-                            <small>{chapter.label}</small>
-                          </label>
-                        ))}
-                      </div>
+                      <details className="member-society-editor">
+                        <summary>
+                          <span>Sociedades</span>
+                          <small>
+                            {selectedChapterCount
+                              ? `${selectedChapterCount} habilitada(s). Clique para editar acesso e cargo.`
+                              : "Clique para habilitar sociedades e cargos."}
+                          </small>
+                        </summary>
+
+                        <div className="chapter-role-grid">
+                          {chapters.map((chapter) => {
+                            const chapterEnabled = draft.isAdmin || draft.chapters.includes(chapter.key);
+                            const roleValue = draft.chapterRoles?.[chapter.key] || "";
+
+                            return (
+                              <div
+                                className={`chapter-role-row ${chapterEnabled ? "is-enabled" : ""}`}
+                                key={chapter.key}
+                              >
+                                <label className="chapter-role-access">
+                                  <input
+                                    type="checkbox"
+                                    checked={chapterEnabled}
+                                    disabled={draft.isAdmin}
+                                    onChange={() => toggleUserDraftChapter(user.id, chapter.key)}
+                                  />
+                                  <span>
+                                    <strong>{chapter.key}</strong>
+                                    <small>{chapter.label}</small>
+                                  </span>
+                                </label>
+
+                                <label className="field chapter-role-field">
+                                  <span>Cargo em {chapter.key}</span>
+                                  <select
+                                    value={roleValue}
+                                    disabled={!chapterEnabled}
+                                    onChange={(event) =>
+                                      updateUserDraftChapterRole(
+                                        user.id,
+                                        chapter.key,
+                                        event.target.value,
+                                      )
+                                    }
+                                  >
+                                    <option value="">Sem cargo</option>
+                                    {roleOptionsFor(roleValue).map((role) => (
+                                      <option key={role} value={role}>
+                                        {role}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </details>
 
                       <div className="inline-actions">
                         <button
@@ -576,7 +720,7 @@ export default function MembersPage() {
                           onClick={() => handleSaveUser(user)}
                           disabled={savingUserId === user.id}
                         >
-                          {savingUserId === user.id ? "Salvando..." : "Salvar alteracoes"}
+                          {savingUserId === user.id ? "Salvando..." : "Salvar neste usuario"}
                         </button>
                       </div>
                     </div>

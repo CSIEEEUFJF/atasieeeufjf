@@ -38,7 +38,7 @@ export async function PATCH(request, context) {
 
   try {
     const payload = await request.json();
-    const hasKnownField = ["cargo", "chapters", "isAdmin", "name"].some((field) =>
+    const hasKnownField = ["cargo", "chapterRoles", "chapters", "isAdmin", "name"].some((field) =>
       Object.prototype.hasOwnProperty.call(payload, field),
     );
 

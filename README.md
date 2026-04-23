@@ -34,7 +34,7 @@ Funciona hoje:
 - APIs para cadastro de novos administradores por administradores
 - APIs para edicao de permissao de administrador de outros usuarios
 - pagina `/membros` visivel para gestao de membros por admins
-- cargo/função cadastrado por usuario
+- cargo/função cadastrado por sociedade no usuario
 - associacao de membros a capitulos especificos
 - isolamento de atas por capitulo no backend
 - formulario web para criar atas
@@ -177,7 +177,7 @@ Arquivos principais:
 - formulario completo da ata
 - selecao de capitulo permitido ao usuario
 - cadastro de membros presentes
-- selecao de membros cadastrados com cargo preenchido automaticamente
+- selecao de membros cadastrados com cargo preenchido automaticamente conforme a sociedade da ata
 - cadastro de pautas e resultados
 - anexos opcionais
 - importacao/exportacao de rascunho JSON
@@ -351,11 +351,11 @@ Parametros atuais:
 1. Admin abre `/membros`.
 2. Cliente autenticado como admin envia `POST /api/users`.
 3. Backend valida que o solicitante e admin.
-4. Backend cria o usuario com nome, nome de usuario, cargo/função e senha inicial.
+4. Backend cria o usuario com nome, nome de usuario, cargo/função padrao e senha inicial.
 5. Se for membro comum, backend grava associacoes em `user_chapters`.
 6. Se for admin, backend associa o usuario a todos os capitulos.
 7. Novo usuario passa a acessar o escopo associado ao seu perfil.
-8. Admins podem editar nome, cargo, capitulos e permissao por `PATCH /api/users/:id`.
+8. Admins podem editar nome, cargos por sociedade, capitulos e permissao por `PATCH /api/users/:id`.
 9. A API bloqueia alteracao da propria permissao de administrador.
 
 ## 6.8 Importacao e exportacao de rascunho
@@ -405,7 +405,7 @@ Comportamento importante:
 
 - capitulos indisponiveis para o usuario nao aparecem
 - seletor de membros usa `GET /api/users?scope=accessible`
-- ao escolher um membro cadastrado, nome e cargo/função sao preenchidos na presenca
+- ao escolher um membro cadastrado, nome e cargo/função da sociedade selecionada sao preenchidos na presenca
 - o bloco `Status` do painel de geracao aparece somente depois do clique em `Gerar PDF`
 - se uma ata e aberta via `/?ata=<id>`, o formulario carrega automaticamente
 - se uma ata aberta for salva novamente, a API usa `PUT /api/atas/:id`
@@ -439,18 +439,18 @@ Comportamento importante:
 Areas principais:
 
 - cadastro de novo membro
-- campo `Cargo / função`
-- controle de capitulos permitidos
+- campo `Cargo / função padrao` no cadastro
+- caixa expansivel `Sociedades` para controlar capitulos permitidos e cargos por sociedade
 - opcao para criar ou remover permissao de admin
 - lista de usuarios cadastrados
-- edicao de nome, cargo, capitulos e permissao de admin
+- edicao de nome, cargos por sociedade, capitulos e permissao de admin
 
 Comportamento importante:
 
 - apenas admins acessam `/membros`
 - admins nao podem remover a propria permissao de administrador
 - usuario admin recebe acesso a todos os capitulos
-- o cargo salvo aparece no seletor de membros do gerador de atas
+- o cargo salvo para a sociedade selecionada aparece no seletor de membros do gerador de atas
 
 ## 7.5 Tema visual
 
@@ -531,7 +531,7 @@ Payload:
 
 - lista usuarios dos capitulos acessiveis ao usuario autenticado
 - admins recebem todos os usuarios
-- usado pelo gerador para preencher membros presentes com nome e cargo
+- usado pelo gerador para preencher membros presentes com nome e cargo da sociedade selecionada
 
 `POST /api/users`
 
@@ -540,12 +540,16 @@ Payload:
 - associa o membro aos capitulos informados
 - se `isAdmin` for `true`, associa o usuario a todos os capitulos
 - aceita `cargo` para preencher a funcao padrao do usuario
+- aceita `chapterRoles` para gravar cargos especificos por sociedade
 
 Payload:
 
 ```json
 {
   "cargo": "Secretario",
+  "chapterRoles": {
+    "CS": "Secretario"
+  },
   "name": "Membro CS",
   "username": "membro.cs",
   "password": "123456",
@@ -556,9 +560,9 @@ Payload:
 
 `PATCH /api/users/:id`
 
-- edita nome, cargo, capitulos e permissao de administrador
+- edita nome, cargo padrao, cargos por sociedade, capitulos e permissao de administrador
 - exige usuario admin
-- recebe campos como `{ "name": "Novo nome", "cargo": "Presidente", "chapters": ["CS"], "isAdmin": true }`
+- recebe campos como `{ "name": "Novo nome", "cargo": "Presidente", "chapterRoles": { "CS": "Presidente" }, "chapters": ["CS"], "isAdmin": true }`
 - quando promove para admin, garante acesso a todos os capitulos
 - bloqueia alteracao da propria permissao de administrador
 
@@ -654,6 +658,7 @@ Campos principais:
 - `id`
 - `name`
 - `cargo`
+- `chapter_roles`
 - `username`
 - `email`
 - `password_hash`
@@ -667,6 +672,8 @@ Observacoes:
 - a autenticacao usa `username`
 - `email` foi mantido internamente como campo unico auxiliar
 - novos usuarios recebem email interno no formato `<username>@local.atas-ieee`
+- `cargo` funciona como fallback legado
+- `chapter_roles` guarda um objeto JSON com cargos por chave de sociedade, por exemplo `{ "CS": "Presidente" }`
 
 ## 9.3 Tabela `sessions`
 
@@ -1117,7 +1124,7 @@ Depois de mudancas importantes, validar:
 8. login por nome de usuario
 9. logout
 10. cadastro de membro em `/membros`
-11. edicao de cargo/função do membro
+11. edicao de cargo/função por sociedade do membro
 12. associacao de membro a um unico capitulo
 13. promocao/remocao de permissao de admin para outro usuario
 14. bloqueio de edicao da propria permissao de admin
