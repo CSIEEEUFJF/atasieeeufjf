@@ -32,11 +32,14 @@ async function readApiError(response, fallback) {
 
 function createMemberForm(defaultChapter = "") {
   return {
+    bio: "",
     cargo: "Membro",
     chapters: defaultChapter ? [defaultChapter] : [],
     isAdmin: false,
+    isPublic: false,
     name: "",
     password: "",
+    photoUrl: "",
     username: "",
   };
 }
@@ -81,11 +84,14 @@ function createUserDraft(user) {
   const chapterRoles = createChapterRolesDraft(user);
 
   return {
+    bio: user.bio || "",
     cargo: Object.values(chapterRoles).find(Boolean) || user.cargo || "",
     chapterRoles,
     chapters: Array.isArray(user.chapters) ? user.chapters : [],
     isAdmin: Boolean(user.isAdmin),
+    isPublic: Boolean(user.isPublic),
     name: user.name || "",
+    photoUrl: user.photoUrl || "",
   };
 }
 
@@ -354,12 +360,15 @@ export default function MembersPage() {
       const response = await fetch("/api/users", {
         body: JSON.stringify({
           ...memberForm,
+          bio: memberForm.bio,
           cargo: selectedRole,
           chapterRoles: Object.fromEntries(
             selectedChapters.map((chapterKey) => [chapterKey, selectedRole]),
           ),
           chapters: selectedChapters,
           isAdmin: isAdmin ? memberForm.isAdmin : false,
+          isPublic: isAdmin ? memberForm.isPublic : false,
+          photoUrl: memberForm.photoUrl,
         }),
         headers: {
           "Content-Type": "application/json",
@@ -402,10 +411,13 @@ export default function MembersPage() {
     const selectedChapters = selectedChaptersForDraft(draft, chapters);
     const chapterRoles = chapterRolesForPayload(draft, selectedChapters);
     const payload = {
+      bio: draft.bio,
       cargo: primaryCargoFromRoles(chapterRoles, selectedChapters, ""),
       chapterRoles,
       chapters: selectedChapters,
+      isPublic: Boolean(draft.isPublic),
       name: draft.name,
+      photoUrl: draft.photoUrl,
     };
 
     if (user.id !== auth.user.id) {
@@ -610,18 +622,54 @@ export default function MembersPage() {
                 />
               </label>
 
+              <label className="field">
+                <span>URL da foto</span>
+                <input
+                  value={memberForm.photoUrl}
+                  onChange={(event) => updateMemberField("photoUrl", event.target.value)}
+                  placeholder="https://... ou /assets/..."
+                  inputMode="url"
+                />
+                <small>Use uma URL pública para aparecer no site do Ramo.</small>
+              </label>
+
+              <label className="field">
+                <span>Mini biografia</span>
+                <textarea
+                  value={memberForm.bio}
+                  onChange={(event) => updateMemberField("bio", event.target.value)}
+                  rows={4}
+                  maxLength={600}
+                  placeholder="Resumo curto da atuação no Ramo."
+                />
+              </label>
+
               {isAdmin ? (
-                <label className="member-admin-toggle">
-                  <input
-                    type="checkbox"
-                    checked={memberForm.isAdmin}
-                    onChange={(event) => updateMemberField("isAdmin", event.target.checked)}
-                  />
-                  <span>
-                    <strong>Criar como administrador</strong>
-                    <small>Admins podem gerenciar membros e acessam todos os capitulos.</small>
-                  </span>
-                </label>
+                <>
+                  <label className="member-admin-toggle">
+                    <input
+                      type="checkbox"
+                      checked={memberForm.isPublic}
+                      onChange={(event) => updateMemberField("isPublic", event.target.checked)}
+                    />
+                    <span>
+                      <strong>Publicar no site do Ramo</strong>
+                      <small>Mostra foto, cargo e mini biografia na seção de membros.</small>
+                    </span>
+                  </label>
+
+                  <label className="member-admin-toggle">
+                    <input
+                      type="checkbox"
+                      checked={memberForm.isAdmin}
+                      onChange={(event) => updateMemberField("isAdmin", event.target.checked)}
+                    />
+                    <span>
+                      <strong>Criar como administrador</strong>
+                      <small>Admins podem gerenciar membros e acessam todos os capitulos.</small>
+                    </span>
+                  </label>
+                </>
               ) : null}
 
               <div className="chapter-checklist">
@@ -693,6 +741,38 @@ export default function MembersPage() {
                               value={draft.name}
                               onChange={(event) => updateUserDraft(user.id, "name", event.target.value)}
                             />
+                          </label>
+
+                          <label className="field">
+                            <span>URL da foto</span>
+                            <input
+                              value={draft.photoUrl}
+                              onChange={(event) => updateUserDraft(user.id, "photoUrl", event.target.value)}
+                              placeholder="https://... ou /assets/..."
+                              inputMode="url"
+                            />
+                          </label>
+
+                          <label className="field member-edit-bio">
+                            <span>Mini biografia</span>
+                            <textarea
+                              value={draft.bio}
+                              onChange={(event) => updateUserDraft(user.id, "bio", event.target.value)}
+                              rows={4}
+                              maxLength={600}
+                            />
+                          </label>
+
+                          <label className="member-admin-toggle compact">
+                            <input
+                              type="checkbox"
+                              checked={draft.isPublic}
+                              onChange={(event) => updateUserDraft(user.id, "isPublic", event.target.checked)}
+                            />
+                            <span>
+                              <strong>Publicado no site</strong>
+                              <small>Exibe este membro na seção pública do Ramo.</small>
+                            </span>
                           </label>
 
                           <label className="member-admin-toggle compact">

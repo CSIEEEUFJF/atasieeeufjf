@@ -38,9 +38,16 @@ export async function PATCH(request, context) {
 
   try {
     const payload = await request.json();
-    const hasKnownField = ["cargo", "chapterRoles", "chapters", "isAdmin", "name"].some((field) =>
-      Object.prototype.hasOwnProperty.call(payload, field),
-    );
+    const hasKnownField = [
+      "bio",
+      "cargo",
+      "chapterRoles",
+      "chapters",
+      "isAdmin",
+      "isPublic",
+      "name",
+      "photoUrl",
+    ].some((field) => Object.prototype.hasOwnProperty.call(payload, field));
 
     if (!hasKnownField) {
       return NextResponse.json(

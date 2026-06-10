@@ -11,6 +11,9 @@ model User {
   name         String
   cargo        String        @default("")
   chapterRoles Json          @default("{}") @map("chapter_roles")
+  bio          String        @default("")
+  photoUrl     String        @default("") @map("photo_url")
+  isPublic     Boolean       @default(false) @map("is_public")
   username     String        @unique
   email        String        @unique
   passwordHash String        @map("password_hash")

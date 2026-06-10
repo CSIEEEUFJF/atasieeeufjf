@@ -54,6 +54,24 @@ function sanitizeCargo(value) {
   return String(value || "").trim().slice(0, 180);
 }
 
+function sanitizeProfileText(value, maxLength = 600) {
+  return String(value || "").trim().slice(0, maxLength);
+}
+
+function sanitizeProfileUrl(value) {
+  const cleanValue = String(value || "").trim().slice(0, 500);
+  if (!cleanValue) {
+    return "";
+  }
+
+  try {
+    const url = new URL(cleanValue);
+    return ["http:", "https:"].includes(url.protocol) ? url.toString() : "";
+  } catch {
+    return cleanValue.startsWith("/") ? cleanValue : "";
+  }
+}
+
 function normalizeMemberRole(value, fallback = "") {
   const cleanValue = sanitizeCargo(value);
   if (!cleanValue) {
@@ -134,12 +152,15 @@ function publicUser(row) {
     ? row.chapters.map(chapterKeyFromRelation).filter(Boolean)
     : [];
   const user = {
+    bio: row.bio || "",
     cargo,
     chapterRoles,
     chapters,
     id: row.id,
     isAdmin: Boolean(row.isAdmin),
+    isPublic: Boolean(row.isPublic),
     name: row.name,
+    photoUrl: row.photoUrl || "",
     username: row.username,
   };
   const manageableChapters = getManageableChapterKeys(user);
@@ -163,11 +184,40 @@ function publicMemberOption(row, chapterKey = "") {
     : {};
 
   return {
+    bio: row.bio || "",
     cargo: normalizeMemberRole(row.cargo, row.cargo || ""),
     chapterRoles: chapterKey ? selectedRole : roles,
     id: row.id,
+    isPublic: Boolean(row.isPublic),
     name: row.name,
+    photoUrl: row.photoUrl || "",
     usesChapterRoles: hasSpecificRoles,
+  };
+}
+
+function publicSiteMember(row) {
+  const user = publicUser(row);
+  if (!user?.isPublic) {
+    return null;
+  }
+
+  const roleByChapter = Object.entries(user.chapterRoles || {})
+    .map(([chapterKey, cargo]) => ({
+      chapter: chapterKey,
+      chapterLabel: SOCIEDADE_LABELS[chapterKey] || chapterKey,
+      role: cargo || user.cargo || "Membro",
+    }))
+    .filter((item) => item.role);
+
+  return {
+    bio: user.bio,
+    chapterLabels: user.chapters.map((chapterKey) => SOCIEDADE_LABELS[chapterKey] || chapterKey),
+    chapters: user.chapters,
+    id: user.id,
+    name: user.name,
+    photoUrl: user.photoUrl,
+    role: roleByChapter[0]?.role || user.cargo || "Membro",
+    roles: roleByChapter,
   };
 }
 
@@ -245,14 +295,17 @@ export function isChapterMember(user, chapterKey) {
 }
 
 export async function createUser(
-  { cargo, chapterRoles, chapters, email, name, password, username },
+  { bio, cargo, chapterRoles, chapters, email, isPublic, name, password, photoUrl, username },
   options = {},
 ) {
   const cleanUsername = normalizeUsername(username || email);
   const cleanName = String(name || "").trim();
   const cleanCargo = normalizeMemberRole(cargo, "Membro");
+  const cleanBio = sanitizeProfileText(bio);
+  const cleanPhotoUrl = sanitizeProfileUrl(photoUrl);
   const cleanPassword = String(password || "");
   const isAdmin = Boolean(options.isAdmin);
+  const shouldPublish = Boolean(options.allowPublicProfile && isPublic);
   const userChapters = normalizeChapterKeys(chapters, { allowAll: isAdmin });
   const cleanChapterRoles = rolesForChapters(chapterRoles, userChapters, cleanCargo);
 
@@ -275,6 +328,7 @@ export async function createUser(
   const { passwordHash, passwordSalt } = hashPassword(cleanPassword);
   const user = await getPrisma().user.create({
     data: {
+      bio: cleanBio,
       chapters: {
         create: userChapters.map((chapterKey) => ({ chapterKey })),
       },
@@ -282,9 +336,11 @@ export async function createUser(
       chapterRoles: cleanChapterRoles,
       email: internalEmailForUsername(cleanUsername),
       isAdmin,
+      isPublic: shouldPublish,
       name: cleanName,
       passwordHash,
       passwordSalt,
+      photoUrl: cleanPhotoUrl,
       username: cleanUsername,
     },
     include: { chapters: true },
@@ -386,13 +442,26 @@ export async function listManageableUsers(user) {
     .map((item) => limitPublicUserToChapters(item, manageableChapters));
 }
 
+export async function listPublicSiteMembers() {
+  const users = await getPrisma().user.findMany({
+    include: { chapters: true },
+    orderBy: { name: "asc" },
+    where: { isPublic: true },
+  });
+
+  return users.map(publicSiteMember).filter(Boolean);
+}
+
 export async function createUserFromManagement(currentUser, payload = {}) {
   if (!canManageMembers(currentUser)) {
     throw new Error("Voce nao tem permissao para gerenciar membros.");
   }
 
   if (currentUser.isAdmin) {
-    return createUser(payload, { isAdmin: Boolean(payload.isAdmin) });
+    return createUser(payload, {
+      allowPublicProfile: true,
+      isAdmin: Boolean(payload.isAdmin),
+    });
   }
 
   if (payload.isAdmin) {
@@ -419,8 +488,9 @@ export async function createUserFromManagement(currentUser, payload = {}) {
       cargo: "Membro",
       chapterRoles: memberRoles,
       chapters: requestedChapters,
+      isPublic: false,
     },
-    { isAdmin: false },
+    { allowPublicProfile: false, isAdmin: false },
   );
 }
 
@@ -501,6 +571,15 @@ export async function updateUserManagement(currentUser, targetUserId, payload = 
   const nextCargo = typeof payload.cargo === "string"
     ? normalizeMemberRole(payload.cargo, "Membro")
     : normalizeMemberRole(targetUser.cargo, "Membro");
+  const nextBio = typeof payload.bio === "string"
+    ? sanitizeProfileText(payload.bio)
+    : targetUser.bio || "";
+  const nextPhotoUrl = typeof payload.photoUrl === "string"
+    ? sanitizeProfileUrl(payload.photoUrl)
+    : targetUser.photoUrl || "";
+  const nextIsPublic = typeof payload.isPublic === "boolean"
+    ? Boolean(payload.isPublic)
+    : Boolean(targetUser.isPublic);
   const nextChapterRoles = rolesForChapters(
     Object.prototype.hasOwnProperty.call(payload, "chapterRoles")
       ? payload.chapterRoles
@@ -515,6 +594,7 @@ export async function updateUserManagement(currentUser, targetUserId, payload = 
 
   const updatedUser = await getPrisma().user.update({
     data: {
+      bio: nextBio,
       cargo: nextCargo,
       chapterRoles: nextChapterRoles,
       chapters: chaptersToCreate.length || chaptersToDelete.length
@@ -524,7 +604,9 @@ export async function updateUserManagement(currentUser, targetUserId, payload = 
           }
         : undefined,
       isAdmin: shouldBeAdmin,
+      isPublic: nextIsPublic,
       name: cleanName,
+      photoUrl: nextPhotoUrl,
     },
     include: { chapters: true },
     where: { id: targetUserId },
