@@ -51,16 +51,18 @@ model UserChapter {
 }
 
 model SiteMember {
-  id        Int      @id @default(autoincrement())
-  name      String
-  role      String   @default("Membro")
-  chapters  Json     @default("[]")
-  bio       String   @default("")
-  photoUrl  String   @default("") @map("photo_url")
-  isPublic  Boolean  @default(true) @map("is_public")
-  position  Int      @default(0)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id             Int      @id @default(autoincrement())
+  name           String
+  role           String   @default("Membro")
+  chapters       Json     @default("[]")
+  bio            String   @default("")
+  photoUrl       String   @default("") @map("photo_url")
+  photoPositionX Int      @default(50) @map("photo_position_x")
+  photoPositionY Int      @default(50) @map("photo_position_y")
+  isPublic       Boolean  @default(true) @map("is_public")
+  position       Int      @default(0)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   @@index([isPublic, position, name], map: "idx_site_members_public_order")
   @@map("site_members")

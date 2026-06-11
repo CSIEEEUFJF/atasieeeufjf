@@ -28,10 +28,45 @@ function sanitizeText(value, maxLength = 600) {
   return value.replace(/\s+/g, " ").trim().slice(0, maxLength);
 }
 
+function getGoogleDriveFileId(value) {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+    const isGoogleDriveUrl = [
+      "docs.google.com",
+      "drive.google.com",
+      "drive.usercontent.google.com",
+    ].includes(host);
+
+    if (!isGoogleDriveUrl) {
+      return "";
+    }
+
+    const queryId = url.searchParams.get("id")?.trim();
+    if (queryId) {
+      return queryId;
+    }
+
+    const fileMatch = url.pathname.match(/\/file\/d\/([^/]+)/);
+    return fileMatch?.[1] ? decodeURIComponent(fileMatch[1]).trim() : "";
+  } catch {
+    return "";
+  }
+}
+
+function googleDriveThumbnailUrl(fileId) {
+  return `https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w1000`;
+}
+
 function sanitizeUrl(value) {
   const cleanValue = sanitizeText(value, 500);
   if (!cleanValue) {
     return "";
+  }
+
+  const googleDriveFileId = getGoogleDriveFileId(cleanValue);
+  if (googleDriveFileId) {
+    return googleDriveThumbnailUrl(googleDriveFileId);
   }
 
   try {
@@ -40,6 +75,15 @@ function sanitizeUrl(value) {
   } catch {
     return cleanValue.startsWith("/") ? cleanValue : "";
   }
+}
+
+function sanitizePercentage(value, fallback = 50) {
+  const numberValue = Number(value);
+  if (!Number.isFinite(numberValue)) {
+    return fallback;
+  }
+
+  return Math.min(100, Math.max(0, Math.round(numberValue)));
 }
 
 function normalizeRole(role) {
@@ -68,7 +112,9 @@ function publicSiteMember(row) {
     id: row.id,
     isPublic: Boolean(row.isPublic),
     name: row.name,
-    photoUrl: row.photoUrl || "",
+    photoUrl: sanitizeUrl(row.photoUrl),
+    photoPositionX: sanitizePercentage(row.photoPositionX),
+    photoPositionY: sanitizePercentage(row.photoPositionY),
     position: row.position || 0,
     role: normalizeRole(row.role),
   };
@@ -92,6 +138,8 @@ function sanitizeSiteMemberPayload(payload = {}) {
     isPublic: typeof payload.isPublic === "boolean" ? Boolean(payload.isPublic) : true,
     name: cleanName,
     photoUrl: sanitizeUrl(payload.photoUrl),
+    photoPositionX: sanitizePercentage(payload.photoPositionX),
+    photoPositionY: sanitizePercentage(payload.photoPositionY),
     position: Number.isSafeInteger(Number(payload.position)) ? Number(payload.position) : 0,
     role: normalizeRole(payload.role || payload.cargo),
   };
@@ -121,6 +169,14 @@ function sanitizePartialSiteMemberPayload(payload = {}) {
 
   if (Object.prototype.hasOwnProperty.call(payload, "photoUrl")) {
     data.photoUrl = sanitizeUrl(payload.photoUrl);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, "photoPositionX")) {
+    data.photoPositionX = sanitizePercentage(payload.photoPositionX);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, "photoPositionY")) {
+    data.photoPositionY = sanitizePercentage(payload.photoPositionY);
   }
 
   if (Object.prototype.hasOwnProperty.call(payload, "position")) {
