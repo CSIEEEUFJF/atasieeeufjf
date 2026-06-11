@@ -502,11 +502,9 @@ export default function MembersPage() {
     <div className="app-shell">
       <header className="site-nav">
         <a href="/" className="site-brand" aria-label="Ir para o gerador">
-          <span className="site-brand-badge" aria-hidden="true">
-            AT
-          </span>
+          <span className="site-brand-badge" aria-hidden="true" />
           <span className="site-brand-lockup">
-            <span className="site-brand-text">Atas IEEE</span>
+            <span className="site-brand-text">Sistema de Atas</span>
             <span className="site-brand-meta">Gestao de membros</span>
           </span>
         </a>

@@ -1,8 +1,15 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Atas IEEE",
-  description: "Gerador web de atas IEEE com templates LaTeX por sociedade.",
+  title: "Sistema de Atas - IEEE UFJF",
+  description: "Sistema interno de atas do Ramo Estudantil IEEE UFJF.",
+  icons: {
+    icon: [
+      { url: "/ramo-ieee-ufjf-blue.svg", type: "image/svg+xml" },
+      { url: "/ramo-ieee-ufjf.png", type: "image/png" },
+    ],
+    apple: "/ramo-ieee-ufjf.png",
+  },
 };
 
 export default function RootLayout({ children }) {

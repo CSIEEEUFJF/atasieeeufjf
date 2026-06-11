@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { compileAtaPdfInBrowser } from "../lib/swiftlatex-client";
+import { formatForwardStatus, forwardGeneratedPdf } from "../lib/pdf-forward-client";
 import PdfGenerationProgress from "./PdfGenerationProgress";
 import UserPasswordDialog from "./UserPasswordDialog";
 
@@ -353,10 +354,39 @@ function SavedAtasPage() {
         form,
         outputName: payload.ata.outputName || payload.ata.title || "ata_preenchida",
       });
+
+      setStatus({
+        tone: "loading",
+        text: "PDF gerado. Enviando ao servidor JS.",
+      });
+
+      let forwardMessage = "PDF enviado ao servidor JS.";
+      let forwardTone = "success";
+      try {
+        const forwardResult = await forwardGeneratedPdf({
+          fileName: result.fileName,
+          metadata: {
+            ataId: payload.ata.id,
+            fileName: result.fileName,
+            outputName: payload.ata.outputName,
+            sociedade: form.sociedade,
+            source: "atas-salvas",
+            targetFolder: `/atas/${form.sociedade}`,
+            title: payload.ata.title || form.titulo,
+          },
+          pdf: result.pdf,
+        });
+        forwardMessage = formatForwardStatus(forwardResult);
+      } catch (forwardError) {
+        forwardTone = "error";
+        forwardMessage =
+          forwardError.message || "Nao foi possivel enviar o PDF ao servidor JS.";
+      }
+
       baixarArquivo(result.pdf, result.fileName);
       setStatus({
-        tone: "success",
-        text: "PDF gerado a partir da ata salva. O download foi iniciado.",
+        tone: forwardTone,
+        text: `PDF gerado a partir da ata salva. O download foi iniciado. ${forwardMessage}`,
       });
     } catch (error) {
       const message =
@@ -445,11 +475,9 @@ function SavedAtasPage() {
     <div className="app-shell">
       <header className="site-nav">
         <a href="/" className="site-brand" aria-label="Ir para o gerador">
-          <span className="site-brand-badge" aria-hidden="true">
-            AT
-          </span>
+          <span className="site-brand-badge" aria-hidden="true" />
           <span className="site-brand-lockup">
-            <span className="site-brand-text">Atas IEEE</span>
+            <span className="site-brand-text">Sistema de Atas</span>
             <span className="site-brand-meta">Banco de atas por capítulo</span>
           </span>
         </a>

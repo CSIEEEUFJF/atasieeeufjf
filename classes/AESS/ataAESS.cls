@@ -105,7 +105,7 @@
 \begin{center}
 \begin{tabular}{p{2.7cm} p{9.6cm} p{3.4cm}}
     
-  \centering\raisebox{0pt}{\includegraphics[width=3cm]{imagens/IEEE_logo.png}} &
+  \centering\raisebox{0pt}{\includegraphics[width=2.15cm]{imagens/ramo-ieee-ufjf.png}} &
     
    
     \centering
@@ -113,7 +113,7 @@
     {\Large \textbf{\color{aessblue}Capítulo AESS}}\\
     {\large \textbf{\color{aessgray}Ramo Estudantil IEEE – UFJF}}\\[2pt]
     {\small Universidade Federal de Juiz de Fora – MG, Brasil}\\[-2pt]
-    {\small https://edu.ieee.org/br-ufjf/}&
+    {\small https://ieeeufjf.com.br/}&
     
   
     \centering\raisebox{0pt}{\includegraphics[width=3.2cm]{imagens/AESS_logo.jpg}}

@@ -105,7 +105,7 @@
 \begin{center}
 \begin{tabular}{p{2.7cm} p{10cm} p{3cm}}
 
-  \centering\raisebox{0pt}{\includegraphics[width=3cm]{imagens/IEEE_logo.png}} &
+  \centering\raisebox{0pt}{\includegraphics[width=2.15cm]{imagens/ramo-ieee-ufjf.png}} &
 
 
     \centering
@@ -113,7 +113,7 @@
     {\Large \textbf{\color{mttsblue}Capítulo MTT-S}}\\
     {\large \textbf{\color{mttslightblue}Ramo Estudantil IEEE – UFJF}}\\[2pt]
     {\small Universidade Federal de Juiz de Fora – MG, Brasil}\\[-2pt]
-    {\small https://edu.ieee.org/br-ufjf/}&
+    {\small https://ieeeufjf.com.br/}&
 
 
     \centering\raisebox{0pt}{\includegraphics[width=2.45cm]{imagens/MTTS_logo.png}}

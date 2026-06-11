@@ -104,14 +104,14 @@
 \begin{center}
 \begin{tabular}{p{2.7cm} p{10cm} p{3cm}}
     
-  \centering\raisebox{0pt}{\includegraphics[width=3cm]{imagens/IEEE_logo.png}} &
+  \centering\raisebox{0pt}{\includegraphics[width=2.15cm]{imagens/ramo-ieee-ufjf.png}} &
     
     \centering
     \vspace{-1.4cm}
     {\Large \textbf{\color{iasgreen}Capítulo IAS}}\\[2pt]
     {\large \textbf{\color{iasblack}Ramo Estudantil IEEE – UFJF}}\\[2pt]
     {\small Universidade Federal de Juiz de Fora – MG, Brasil}\\[-2pt]
-    {\small https://edu.ieee.org/br-ufjf/}&
+    {\small https://ieeeufjf.com.br/}&
     
   
     \centering\includegraphics[width=3cm]{imagens/IAS_logo-eps-converted-to.pdf}

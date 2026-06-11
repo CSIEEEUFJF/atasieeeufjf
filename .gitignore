@@ -24,6 +24,8 @@ classes/*/ata_*.fls
 classes/*/ata_*.log
 classes/*/ata_*.synctex.gz
 texlive/cache/
+ata-receiver/data/
+atas-recebidas/
 .tmp_*/
 chrome-dom*.txt
 next-swiftlatex-debug*.log

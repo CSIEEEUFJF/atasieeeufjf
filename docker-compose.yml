@@ -1,0 +1,15 @@
+services:
+  ata-receiver:
+    build:
+      context: ./ata-receiver
+    container_name: ata-receiver
+    environment:
+      ATAS_DIR: /atas
+      MAX_PDF_BYTES: ${ATA_RECEIVER_MAX_PDF_BYTES:-26214400}
+      PORT: 3001
+      RECEIVE_TOKEN: ${ATA_RECEIVER_TOKEN:-}
+    ports:
+      - "${ATA_RECEIVER_PORT:-3001}:3001"
+    restart: unless-stopped
+    volumes:
+      - ${ATA_RECEIVER_DATA_DIR:-./atas-recebidas}:/atas

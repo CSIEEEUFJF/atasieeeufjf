@@ -104,17 +104,17 @@
 \begin{center}
 \begin{tabular}{p{2.7cm} p{10cm} p{3cm}}
     
-  \centering\raisebox{0pt}{\includegraphics[width=3cm]{imagens/IEEE_logo.png}} &
+  \centering\raisebox{0pt}{\includegraphics[width=2.15cm]{imagens/ramo-ieee-ufjf.png}} &
     
    
     \centering
     \vspace{-1.6cm}
     {\large \textbf{\color{ieeeblue}Ramo Estudantil IEEE – UFJF}}\\[2pt]
     {\small Universidade Federal de Juiz de Fora – MG, Brasil}\\[-2pt]
-    {\small https://edu.ieee.org/br-ufjf/}&
+    {\small https://ieeeufjf.com.br/}&
     
   
-    \centering\raisebox{-20pt}{\includegraphics[width=3cm]{imagens/IEEEufjfazul.png}}
+    \centering\raisebox{-20pt}{\includegraphics[width=2.85cm]{imagens/IEEE_logo.png}}
 \end{tabular}
 \end{center}
 \vspace{-0.8cm}
