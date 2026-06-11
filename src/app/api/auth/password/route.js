@@ -5,6 +5,7 @@ import {
   changeOwnPassword,
   getCurrentUser,
   isSameOriginRequest,
+  noStoreHeaders,
   rateLimitResponse,
 } from "../../../../lib/auth";
 
@@ -12,7 +13,10 @@ export const runtime = "nodejs";
 
 export async function POST(request) {
   if (!isSameOriginRequest(request)) {
-    return NextResponse.json({ detail: "Origem invalida." }, { status: 403 });
+    return NextResponse.json(
+      { detail: "Origem invalida." },
+      { headers: noStoreHeaders(), status: 403 },
+    );
   }
 
   const rateLimit = checkAuthRateLimit(request, "password");
@@ -23,17 +27,20 @@ export async function POST(request) {
 
   const user = await getCurrentUser();
   if (!user) {
-    return NextResponse.json({ detail: "Autenticacao necessaria." }, { status: 401 });
+    return NextResponse.json(
+      { detail: "Autenticacao necessaria." },
+      { headers: noStoreHeaders(), status: 401 },
+    );
   }
 
   try {
     const { currentPassword, newPassword } = await request.json();
     await changeOwnPassword(user.id, currentPassword, newPassword);
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true }, { headers: noStoreHeaders() });
   } catch (error) {
     return NextResponse.json(
       { detail: error.message || "Nao foi possivel alterar a senha." },
-      { status: 400 },
+      { headers: noStoreHeaders(), status: 400 },
     );
   }
 }

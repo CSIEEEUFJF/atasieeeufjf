@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { getCurrentUser, isSameOriginRequest } from "../../../../../lib/auth";
+import {
+  getCurrentUser,
+  isSameOriginRequest,
+  noStoreHeaders,
+} from "../../../../../lib/auth";
 import {
   deleteSiteMember,
   updateSiteMember,
@@ -14,12 +18,18 @@ function parseId(value) {
 }
 
 function unauthorized() {
-  return NextResponse.json({ detail: "Autenticacao necessaria." }, { status: 401 });
+  return NextResponse.json(
+    { detail: "Autenticacao necessaria." },
+    { headers: noStoreHeaders(), status: 401 },
+  );
 }
 
 export async function PATCH(request, context) {
   if (!isSameOriginRequest(request)) {
-    return NextResponse.json({ detail: "Origem invalida." }, { status: 403 });
+    return NextResponse.json(
+      { detail: "Origem invalida." },
+      { headers: noStoreHeaders(), status: 403 },
+    );
   }
 
   const currentUser = await getCurrentUser();
@@ -30,24 +40,30 @@ export async function PATCH(request, context) {
   const params = await context.params;
   const memberId = parseId(params.id);
   if (!memberId) {
-    return NextResponse.json({ detail: "Membro invalido." }, { status: 400 });
+    return NextResponse.json(
+      { detail: "Membro invalido." },
+      { headers: noStoreHeaders(), status: 400 },
+    );
   }
 
   try {
     const payload = await request.json();
     const member = await updateSiteMember(currentUser, memberId, payload);
-    return NextResponse.json({ member });
+    return NextResponse.json({ member }, { headers: noStoreHeaders() });
   } catch (error) {
     return NextResponse.json(
       { detail: error.message || "Nao foi possivel atualizar o membro do site." },
-      { status: 400 },
+      { headers: noStoreHeaders(), status: 400 },
     );
   }
 }
 
 export async function DELETE(request, context) {
   if (!isSameOriginRequest(request)) {
-    return NextResponse.json({ detail: "Origem invalida." }, { status: 403 });
+    return NextResponse.json(
+      { detail: "Origem invalida." },
+      { headers: noStoreHeaders(), status: 403 },
+    );
   }
 
   const currentUser = await getCurrentUser();
@@ -58,15 +74,21 @@ export async function DELETE(request, context) {
   const params = await context.params;
   const memberId = parseId(params.id);
   if (!memberId) {
-    return NextResponse.json({ detail: "Membro invalido." }, { status: 400 });
+    return NextResponse.json(
+      { detail: "Membro invalido." },
+      { headers: noStoreHeaders(), status: 400 },
+    );
   }
 
   try {
-    return NextResponse.json(await deleteSiteMember(currentUser, memberId));
+    return NextResponse.json(
+      await deleteSiteMember(currentUser, memberId),
+      { headers: noStoreHeaders() },
+    );
   } catch (error) {
     return NextResponse.json(
       { detail: error.message || "Nao foi possivel remover o membro do site." },
-      { status: 400 },
+      { headers: noStoreHeaders(), status: 400 },
     );
   }
 }

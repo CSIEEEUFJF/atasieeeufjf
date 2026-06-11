@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { getCurrentUser, isSameOriginRequest } from "../../../../lib/auth";
+import {
+  getCurrentUser,
+  isSameOriginRequest,
+  noStoreHeaders,
+} from "../../../../lib/auth";
 import {
   createSiteMember,
   listManagedSiteMembers,
@@ -9,11 +13,17 @@ import {
 export const runtime = "nodejs";
 
 function forbidden(message = "Apenas gestores podem administrar membros do site.") {
-  return NextResponse.json({ detail: message }, { status: 403 });
+  return NextResponse.json(
+    { detail: message },
+    { headers: noStoreHeaders(), status: 403 },
+  );
 }
 
 function unauthorized() {
-  return NextResponse.json({ detail: "Autenticacao necessaria." }, { status: 401 });
+  return NextResponse.json(
+    { detail: "Autenticacao necessaria." },
+    { headers: noStoreHeaders(), status: 401 },
+  );
 }
 
 export async function GET() {
@@ -23,7 +33,10 @@ export async function GET() {
   }
 
   try {
-    return NextResponse.json({ members: await listManagedSiteMembers(currentUser) });
+    return NextResponse.json(
+      { members: await listManagedSiteMembers(currentUser) },
+      { headers: noStoreHeaders() },
+    );
   } catch (error) {
     return forbidden(error.message);
   }
@@ -31,7 +44,10 @@ export async function GET() {
 
 export async function POST(request) {
   if (!isSameOriginRequest(request)) {
-    return NextResponse.json({ detail: "Origem invalida." }, { status: 403 });
+    return NextResponse.json(
+      { detail: "Origem invalida." },
+      { headers: noStoreHeaders(), status: 403 },
+    );
   }
 
   const currentUser = await getCurrentUser();
@@ -42,11 +58,14 @@ export async function POST(request) {
   try {
     const payload = await request.json();
     const member = await createSiteMember(currentUser, payload);
-    return NextResponse.json({ member }, { status: 201 });
+    return NextResponse.json(
+      { member },
+      { headers: noStoreHeaders(), status: 201 },
+    );
   } catch (error) {
     return NextResponse.json(
       { detail: error.message || "Nao foi possivel cadastrar o membro do site." },
-      { status: 400 },
+      { headers: noStoreHeaders(), status: 400 },
     );
   }
 }
