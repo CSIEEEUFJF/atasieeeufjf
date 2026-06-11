@@ -11,9 +11,6 @@ model User {
   name         String
   cargo        String        @default("")
   chapterRoles Json          @default("{}") @map("chapter_roles")
-  bio          String        @default("")
-  photoUrl     String        @default("") @map("photo_url")
-  isPublic     Boolean       @default(false) @map("is_public")
   username     String        @unique
   email        String        @unique
   passwordHash String        @map("password_hash")
@@ -51,6 +48,22 @@ model UserChapter {
   @@id([userId, chapterKey])
   @@index([chapterKey], map: "idx_user_chapters_chapter")
   @@map("user_chapters")
+}
+
+model SiteMember {
+  id        Int      @id @default(autoincrement())
+  name      String
+  role      String   @default("Membro")
+  chapters  Json     @default("[]")
+  bio       String   @default("")
+  photoUrl  String   @default("") @map("photo_url")
+  isPublic  Boolean  @default(true) @map("is_public")
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([isPublic, position, name], map: "idx_site_members_public_order")
+  @@map("site_members")
 }
 
 model Ata {

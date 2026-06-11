@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { listPublicSiteMembers } from "../../../lib/auth";
+import { listPublicSiteMembers } from "../../../lib/site-members";
 
 export const runtime = "nodejs";
 
