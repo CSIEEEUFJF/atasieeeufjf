@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 
 import {
+  checkAuthRateLimit,
   createSession,
   createUser,
   hasUsers,
   isSameOriginRequest,
+  rateLimitResponse,
   setSessionCookie,
 } from "../../../../lib/auth";
 
@@ -13,6 +15,12 @@ export const runtime = "nodejs";
 export async function POST(request) {
   if (!isSameOriginRequest(request)) {
     return NextResponse.json({ detail: "Origem invalida." }, { status: 403 });
+  }
+
+  const rateLimit = checkAuthRateLimit(request, "setup");
+  if (rateLimit.limited) {
+    const { body, init } = rateLimitResponse(rateLimit.retryAfterSeconds);
+    return NextResponse.json(body, init);
   }
 
   if (await hasUsers()) {

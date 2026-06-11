@@ -12,8 +12,16 @@ import { getPrisma, nowDate } from "./db";
 export const SESSION_COOKIE = "atas_ieee_session";
 
 const SESSION_DAYS = 14;
+const MAX_ACTIVE_SESSIONS_PER_USER = 5;
 const PASSWORD_KEY_LENGTH = 64;
-const MIN_PASSWORD_LENGTH = 6;
+const MIN_PASSWORD_LENGTH = 10;
+const LOGIN_FAILURE_LIMIT = 5;
+const LOGIN_LOCK_MINUTES = 15;
+const RATE_LIMITS = {
+  login: { limit: 12, windowMs: 10 * 60 * 1000 },
+  password: { limit: 8, windowMs: 10 * 60 * 1000 },
+  setup: { limit: 5, windowMs: 60 * 60 * 1000 },
+};
 const CHAPTER_KEYS = Object.keys(SOCIEDADES);
 export const MEMBER_ROLE_OPTIONS = [
   "Membro",
@@ -32,11 +40,82 @@ const MEMBER_ROLE_ALIASES = {
   "Membros": "Membro",
 };
 
+const globalForSecurity = globalThis;
+
+if (!globalForSecurity.atasAuthRateLimits) {
+  globalForSecurity.atasAuthRateLimits = new Map();
+}
+
+export class AuthSecurityError extends Error {
+  constructor(message, status = 400, retryAfterSeconds = 0) {
+    super(message);
+    this.name = "AuthSecurityError";
+    this.status = status;
+    this.retryAfterSeconds = retryAfterSeconds;
+  }
+}
+
 function normalizeUsername(username) {
   return String(username || "")
     .trim()
     .toLowerCase()
     .replace(/\s+/g, ".");
+}
+
+function getRequestOrigin(request) {
+  const url = new URL(request.url);
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  const forwardedProto = request.headers.get("x-forwarded-proto");
+  const host = forwardedHost || url.host;
+  const protocol = forwardedProto || url.protocol.replace(":", "");
+
+  return `${protocol}://${host}`;
+}
+
+function getClientIp(request) {
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  if (forwardedFor) {
+    return forwardedFor.split(",")[0].trim();
+  }
+
+  return request.headers.get("x-real-ip") || "local";
+}
+
+export function checkAuthRateLimit(request, scope) {
+  const config = RATE_LIMITS[scope] || RATE_LIMITS.login;
+  const now = Date.now();
+  const key = `${scope}:${getClientIp(request)}`;
+  const attempts = (globalForSecurity.atasAuthRateLimits.get(key) || [])
+    .filter((timestamp) => now - timestamp < config.windowMs);
+
+  if (attempts.length >= config.limit) {
+    const retryAfterMs = config.windowMs - (now - attempts[0]);
+    return {
+      limited: true,
+      retryAfterSeconds: Math.max(1, Math.ceil(retryAfterMs / 1000)),
+    };
+  }
+
+  attempts.push(now);
+  globalForSecurity.atasAuthRateLimits.set(key, attempts);
+  return { limited: false, retryAfterSeconds: 0 };
+}
+
+export function rateLimitResponse(retryAfterSeconds) {
+  return {
+    body: { detail: "Muitas tentativas. Aguarde alguns minutos e tente novamente." },
+    init: {
+      headers: noStoreHeaders({ "Retry-After": String(retryAfterSeconds) }),
+      status: 429,
+    },
+  };
+}
+
+export function noStoreHeaders(headers = {}) {
+  return {
+    "Cache-Control": "no-store",
+    ...headers,
+  };
 }
 
 function internalEmailForUsername(username) {
@@ -214,6 +293,17 @@ function verifyPassword(password, salt, expectedHash) {
   return crypto.timingSafeEqual(actual, expected);
 }
 
+function validatePasswordPolicy(password, label = "A senha") {
+  const cleanPassword = String(password || "");
+  if (cleanPassword.length < MIN_PASSWORD_LENGTH) {
+    throw new Error(`${label} precisa ter pelo menos ${MIN_PASSWORD_LENGTH} caracteres.`);
+  }
+
+  if (!/[a-z]/.test(cleanPassword) || !/[A-Z]/.test(cleanPassword) || !/[0-9]/.test(cleanPassword)) {
+    throw new Error(`${label} precisa incluir letras maiusculas, minusculas e numeros.`);
+  }
+}
+
 export function isUniqueConstraintError(error) {
   return error?.code === "P2002";
 }
@@ -264,9 +354,7 @@ export async function createUser(
     throw new Error("Informe um nome de usuario com 3 a 40 caracteres, usando letras, numeros, ponto, hifen ou underline.");
   }
 
-  if (cleanPassword.length < MIN_PASSWORD_LENGTH) {
-    throw new Error(`A senha precisa ter pelo menos ${MIN_PASSWORD_LENGTH} caracteres.`);
-  }
+  validatePasswordPolicy(cleanPassword, "A senha");
 
   if (!userChapters.length) {
     throw new Error("Associe o usuario a pelo menos um capitulo.");
@@ -300,8 +388,45 @@ export async function verifyCredentials(username, password) {
     where: { username: cleanUsername },
   });
 
-  if (!row || !verifyPassword(String(password || ""), row.passwordSalt, row.passwordHash)) {
+  if (!row) {
     return null;
+  }
+
+  const currentTime = nowDate();
+  if (row.lockedUntil && row.lockedUntil > currentTime) {
+    throw new AuthSecurityError(
+      "Muitas tentativas invalidas. Aguarde alguns minutos e tente novamente.",
+      429,
+      Math.max(1, Math.ceil((row.lockedUntil.getTime() - currentTime.getTime()) / 1000)),
+    );
+  }
+
+  if (!verifyPassword(String(password || ""), row.passwordSalt, row.passwordHash)) {
+    const failedLoginCount = Number(row.failedLoginCount || 0) + 1;
+    const shouldLock = failedLoginCount >= LOGIN_FAILURE_LIMIT;
+    const lockedUntil = shouldLock
+      ? new Date(Date.now() + LOGIN_LOCK_MINUTES * 60 * 1000)
+      : null;
+
+    await getPrisma().user.update({
+      data: {
+        failedLoginCount: shouldLock ? 0 : failedLoginCount,
+        lockedUntil,
+      },
+      where: { id: row.id },
+    });
+
+    return null;
+  }
+
+  if (row.failedLoginCount || row.lockedUntil) {
+    await getPrisma().user.update({
+      data: {
+        failedLoginCount: 0,
+        lockedUntil: null,
+      },
+      where: { id: row.id },
+    });
   }
 
   return publicUser(row);
@@ -309,9 +434,7 @@ export async function verifyCredentials(username, password) {
 
 export async function changeOwnPassword(userId, currentPassword, newPassword) {
   const cleanPassword = String(newPassword || "");
-  if (cleanPassword.length < MIN_PASSWORD_LENGTH) {
-    throw new Error(`A nova senha precisa ter pelo menos ${MIN_PASSWORD_LENGTH} caracteres.`);
-  }
+  validatePasswordPolicy(cleanPassword, "A nova senha");
 
   const user = await getPrisma().user.findUnique({
     where: { id: userId },
@@ -541,14 +664,29 @@ export async function createSession(userId) {
   const createdAt = nowDate();
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
 
-  await getPrisma().session.create({
-    data: {
-      createdAt,
-      expiresAt,
-      lastSeenAt: createdAt,
-      tokenHash,
-      userId,
-    },
+  await getPrisma().$transaction(async (tx) => {
+    await tx.session.create({
+      data: {
+        createdAt,
+        expiresAt,
+        lastSeenAt: createdAt,
+        tokenHash,
+        userId,
+      },
+    });
+
+    const staleSessions = await tx.session.findMany({
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+      skip: MAX_ACTIVE_SESSIONS_PER_USER,
+      where: { userId },
+    });
+
+    if (staleSessions.length) {
+      await tx.session.deleteMany({
+        where: { id: { in: staleSessions.map((session) => session.id) } },
+      });
+    }
   });
 
   return { expiresAt: expiresAt.toISOString(), token };
@@ -609,11 +747,14 @@ export async function getCurrentUser() {
 }
 
 export function setSessionCookie(response, token, expiresAt) {
+  const expires = new Date(expiresAt);
   response.cookies.set({
-    expires: new Date(expiresAt),
+    expires,
     httpOnly: true,
+    maxAge: Math.max(0, Math.floor((expires.getTime() - Date.now()) / 1000)),
     name: SESSION_COOKIE,
     path: "/",
+    priority: "high",
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     value: token,
@@ -624,8 +765,10 @@ export function clearSessionCookie(response) {
   response.cookies.set({
     expires: new Date(0),
     httpOnly: true,
+    maxAge: 0,
     name: SESSION_COOKIE,
     path: "/",
+    priority: "high",
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     value: "",
@@ -633,11 +776,27 @@ export function clearSessionCookie(response) {
 }
 
 export function isSameOriginRequest(request) {
+  const expectedOrigin = getRequestOrigin(request);
   const origin = request.headers.get("origin");
-  if (!origin) {
-    return true;
+  if (origin && origin !== expectedOrigin) {
+    return false;
   }
 
-  const url = new URL(request.url);
-  return origin === `${url.protocol}//${url.host}`;
+  const referer = request.headers.get("referer");
+  if (referer) {
+    try {
+      if (new URL(referer).origin !== expectedOrigin) {
+        return false;
+      }
+    } catch {
+      return false;
+    }
+  }
+
+  const fetchSite = request.headers.get("sec-fetch-site");
+  if (fetchSite && !["same-origin", "same-site", "none"].includes(fetchSite)) {
+    return false;
+  }
+
+  return true;
 }
