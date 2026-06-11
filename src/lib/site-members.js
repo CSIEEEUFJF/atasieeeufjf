@@ -86,6 +86,15 @@ function sanitizePercentage(value, fallback = 50) {
   return Math.min(100, Math.max(0, Math.round(numberValue)));
 }
 
+function sanitizePhotoZoom(value, fallback = 100) {
+  const numberValue = Number(value);
+  if (!Number.isFinite(numberValue)) {
+    return fallback;
+  }
+
+  return Math.min(200, Math.max(100, Math.round(numberValue)));
+}
+
 function normalizeRole(role) {
   const cleanRole = sanitizeText(role, 80);
   const canonical = MEMBER_ROLE_ALIASES[cleanRole] || cleanRole;
@@ -115,6 +124,7 @@ function publicSiteMember(row) {
     photoUrl: sanitizeUrl(row.photoUrl),
     photoPositionX: sanitizePercentage(row.photoPositionX),
     photoPositionY: sanitizePercentage(row.photoPositionY),
+    photoZoom: sanitizePhotoZoom(row.photoZoom),
     position: row.position || 0,
     role: normalizeRole(row.role),
   };
@@ -140,6 +150,7 @@ function sanitizeSiteMemberPayload(payload = {}) {
     photoUrl: sanitizeUrl(payload.photoUrl),
     photoPositionX: sanitizePercentage(payload.photoPositionX),
     photoPositionY: sanitizePercentage(payload.photoPositionY),
+    photoZoom: sanitizePhotoZoom(payload.photoZoom),
     position: Number.isSafeInteger(Number(payload.position)) ? Number(payload.position) : 0,
     role: normalizeRole(payload.role || payload.cargo),
   };
@@ -177,6 +188,10 @@ function sanitizePartialSiteMemberPayload(payload = {}) {
 
   if (Object.prototype.hasOwnProperty.call(payload, "photoPositionY")) {
     data.photoPositionY = sanitizePercentage(payload.photoPositionY);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, "photoZoom")) {
+    data.photoZoom = sanitizePhotoZoom(payload.photoZoom);
   }
 
   if (Object.prototype.hasOwnProperty.call(payload, "position")) {
