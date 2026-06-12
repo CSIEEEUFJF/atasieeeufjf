@@ -23,6 +23,20 @@ async function createForwardSession(metadata) {
   return payload;
 }
 
+export function buildPdfFileNameFromTitle(title, fallbackFileName = "ata.pdf") {
+  const fallbackStem = String(fallbackFileName || "ata.pdf").replace(/\.pdf$/i, "");
+  const stem = String(title || fallbackStem)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^0-9A-Za-z._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^[-.]+|[-.]+$/g, "");
+
+  return `${stem || "ata"}.pdf`;
+}
+
 export async function forwardGeneratedPdf({ fileName, metadata = {}, pdf }) {
   const session = await createForwardSession({
     ...metadata,
@@ -74,6 +88,18 @@ export async function forwardGeneratedPdf({ fileName, metadata = {}, pdf }) {
 }
 
 export function formatForwardStatus(result) {
+  if (result?.duplicate && result?.updated) {
+    return result.fileName
+      ? `PDF existente atualizado no servidor como ${result.fileName}.`
+      : "PDF existente atualizado no servidor.";
+  }
+
+  if (result?.duplicate) {
+    return result.fileName
+      ? `PDF ja existia no servidor como ${result.fileName}.`
+      : "PDF ja existia no servidor.";
+  }
+
   if (result?.forwarded) {
     return result.targetFolder
       ? `PDF enviado ao servidor JS em ${result.targetFolder}.`

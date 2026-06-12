@@ -3,7 +3,11 @@
 import { useEffect, useState } from "react";
 
 import { compileAtaPdfInBrowser } from "../lib/swiftlatex-client";
-import { formatForwardStatus, forwardGeneratedPdf } from "../lib/pdf-forward-client";
+import {
+  buildPdfFileNameFromTitle,
+  formatForwardStatus,
+  forwardGeneratedPdf,
+} from "../lib/pdf-forward-client";
 import PdfGenerationProgress from "./PdfGenerationProgress";
 import UserPasswordDialog from "./UserPasswordDialog";
 
@@ -360,19 +364,22 @@ function SavedAtasPage() {
         text: "PDF gerado. Enviando ao servidor JS.",
       });
 
+      const ataTitle = payload.ata.title || form.titulo || payload.ata.outputName || "ata_preenchida";
+      const pdfFileName = buildPdfFileNameFromTitle(ataTitle, result.fileName);
       let forwardMessage = "PDF enviado ao servidor JS.";
       let forwardTone = "success";
       try {
         const forwardResult = await forwardGeneratedPdf({
-          fileName: result.fileName,
+          fileName: pdfFileName,
           metadata: {
             ataId: payload.ata.id,
-            fileName: result.fileName,
+            fileName: pdfFileName,
+            originalGeneratedFileName: result.fileName,
             outputName: payload.ata.outputName,
             sociedade: form.sociedade,
             source: "atas-salvas",
             targetFolder: `/atas/${form.sociedade}`,
-            title: payload.ata.title || form.titulo,
+            title: ataTitle,
           },
           pdf: result.pdf,
         });
@@ -383,7 +390,7 @@ function SavedAtasPage() {
           forwardError.message || "Nao foi possivel enviar o PDF ao servidor JS.";
       }
 
-      baixarArquivo(result.pdf, result.fileName);
+      baixarArquivo(result.pdf, pdfFileName);
       setStatus({
         tone: forwardTone,
         text: `PDF gerado a partir da ata salva. O download foi iniciado. ${forwardMessage}`,

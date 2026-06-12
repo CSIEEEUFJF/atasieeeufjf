@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import express from "express";
@@ -71,11 +71,30 @@ function sanitizeSegment(value, fallback) {
 }
 
 function sanitizeFileName(value) {
-  const parsed = path.parse(String(value || "ata.pdf"));
+  const safeValue = String(value || "ata.pdf").replace(/[\\/]+/g, "-");
+  const parsed = path.parse(safeValue);
   const stem = sanitizeSegment(parsed.name, `ata-${Date.now()}`);
   const ext = parsed.ext.toLowerCase() === ".pdf" ? ".pdf" : ".pdf";
 
   return `${stem}${ext}`;
+}
+
+function getPreferredFileName({ fileName, metadata }) {
+  return sanitizeFileName(metadata.title || metadata.titulo || metadata.fileName || fileName);
+}
+
+function getDedupeKey({ chapter, metadata }) {
+  const ataId = String(metadata.ataId || metadata.id || "").trim();
+  if (ataId) {
+    return `ata:${chapter}:${ataId}`;
+  }
+
+  const title = sanitizeSegment(metadata.title || metadata.titulo || metadata.fileName, "");
+  if (title) {
+    return `title:${chapter}:${title.toLowerCase()}`;
+  }
+
+  return "";
 }
 
 function getChapter({ body, metadata }) {
@@ -96,6 +115,138 @@ function assertInsideBaseDir(targetPath) {
   if (relative.startsWith("..") || path.isAbsolute(relative)) {
     throw new Error("Caminho de destino invalido.");
   }
+}
+
+async function fileExists(targetPath) {
+  try {
+    await access(targetPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function readMetadata(metadataPath) {
+  try {
+    return parseJson(await readFile(metadataPath, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+function metadataMatchesDedupeKey({ chapter, dedupeKey, metadata }) {
+  if (!dedupeKey) {
+    return false;
+  }
+
+  return (
+    metadata.dedupeKey === dedupeKey
+    || getDedupeKey({ chapter, metadata }) === dedupeKey
+  );
+}
+
+async function findExistingAta({ chapter, chapterDir, dedupeKey }) {
+  if (!dedupeKey) {
+    return null;
+  }
+
+  let entries = [];
+  try {
+    entries = await readdir(chapterDir, { withFileTypes: true });
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      return null;
+    }
+    throw error;
+  }
+
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith(".metadata.json")) {
+      continue;
+    }
+
+    const metadataPath = path.join(chapterDir, entry.name);
+    const metadata = await readMetadata(metadataPath);
+    if (!metadataMatchesDedupeKey({ chapter, dedupeKey, metadata })) {
+      continue;
+    }
+
+    const pdfPath = metadataPath.replace(/\.metadata\.json$/i, ".pdf");
+    return {
+      fileName: path.basename(pdfPath),
+      metadata,
+      metadataPath,
+      pdfPath,
+    };
+  }
+
+  return null;
+}
+
+async function getAvailablePdfPath({ chapterDir, dedupeKey, preferredFileName }) {
+  const safeFileName = sanitizeFileName(preferredFileName);
+  const firstPdfPath = path.join(chapterDir, safeFileName);
+  assertInsideBaseDir(firstPdfPath);
+
+  if (!(await fileExists(firstPdfPath))) {
+    return {
+      finalFileName: safeFileName,
+      pdfPath: firstPdfPath,
+    };
+  }
+
+  const parsed = path.parse(safeFileName);
+  const suffix = crypto
+    .createHash("sha256")
+    .update(dedupeKey || `${Date.now()}-${crypto.randomBytes(4).toString("hex")}`)
+    .digest("hex")
+    .slice(0, 8);
+  const fallbackFileName = `${parsed.name}-${suffix}.pdf`;
+  const fallbackPdfPath = path.join(chapterDir, fallbackFileName);
+  assertInsideBaseDir(fallbackPdfPath);
+
+  return {
+    finalFileName: fallbackFileName,
+    pdfPath: fallbackPdfPath,
+  };
+}
+
+async function maybeRenameExistingAta({ chapter, existing, metadata, preferredFileName }) {
+  const desiredFileName = sanitizeFileName(preferredFileName);
+  const desiredPdfPath = path.join(path.dirname(existing.pdfPath), desiredFileName);
+  const desiredMetadataPath = desiredPdfPath.replace(/\.pdf$/i, ".metadata.json");
+  assertInsideBaseDir(desiredPdfPath);
+  assertInsideBaseDir(desiredMetadataPath);
+
+  if (path.resolve(existing.pdfPath) === path.resolve(desiredPdfPath)) {
+    return existing;
+  }
+
+  if (await fileExists(desiredPdfPath)) {
+    return existing;
+  }
+
+  await rename(existing.pdfPath, desiredPdfPath);
+  await rename(existing.metadataPath, desiredMetadataPath);
+
+  const updatedMetadata = {
+    ...existing.metadata,
+    ...metadata,
+    capitulo: chapter,
+    chapter,
+    duplicateReceivedAt: new Date().toISOString(),
+    fileName: desiredFileName,
+    originalFileName: existing.metadata.originalFileName || metadata.fileName || desiredFileName,
+    targetFolder: `/atas/${chapter}`,
+  };
+  await writeFile(desiredMetadataPath, JSON.stringify(updatedMetadata, null, 2));
+
+  return {
+    fileName: desiredFileName,
+    metadata: updatedMetadata,
+    metadataPath: desiredMetadataPath,
+    pdfPath: desiredPdfPath,
+  };
 }
 
 function timingSafeEqualString(left, right) {
@@ -141,15 +292,54 @@ async function savePdf({ chapter, fileName, metadata, pdfBuffer }) {
   assertInsideBaseDir(chapterDir);
   await mkdir(chapterDir, { recursive: true });
 
-  const safeFileName = sanitizeFileName(fileName);
-  const uniquePrefix = new Date().toISOString().replace(/[:.]/g, "-");
-  const randomSuffix = crypto.randomBytes(4).toString("hex");
-  const finalFileName = `${uniquePrefix}-${randomSuffix}-${safeFileName}`;
-  const pdfPath = path.join(chapterDir, finalFileName);
-  assertInsideBaseDir(pdfPath);
+  const preferredFileName = getPreferredFileName({ fileName, metadata });
+  const dedupeKey = getDedupeKey({ chapter, metadata });
+  const pdfSha256 = crypto.createHash("sha256").update(pdfBuffer).digest("hex");
+  const existing = await findExistingAta({ chapter, chapterDir, dedupeKey });
+  if (existing) {
+    const renamedExisting = await maybeRenameExistingAta({
+      chapter,
+      existing,
+      metadata,
+      preferredFileName,
+    });
+    const pdfChanged = renamedExisting.metadata.pdfSha256 !== pdfSha256;
+    if (pdfChanged) {
+      await writeFile(renamedExisting.pdfPath, pdfBuffer);
+    }
+
+    const updatedMetadata = {
+      ...renamedExisting.metadata,
+      ...metadata,
+      capitulo: chapter,
+      chapter,
+      dedupeKey,
+      duplicateReceivedAt: new Date().toISOString(),
+      fileName: renamedExisting.fileName,
+      originalFileName: renamedExisting.metadata.originalFileName || fileName,
+      pdfSha256,
+      targetFolder: `/atas/${chapter}`,
+      updatedAt: pdfChanged ? new Date().toISOString() : renamedExisting.metadata.updatedAt,
+    };
+    await writeFile(renamedExisting.metadataPath, JSON.stringify(updatedMetadata, null, 2));
+
+    return {
+      duplicate: true,
+      finalFileName: renamedExisting.fileName,
+      metadataPath: renamedExisting.metadataPath,
+      pdfPath: renamedExisting.pdfPath,
+      updated: pdfChanged,
+    };
+  }
+
+  const { finalFileName, pdfPath } = await getAvailablePdfPath({
+    chapterDir,
+    dedupeKey,
+    preferredFileName,
+  });
 
   const metadataPath = pdfPath.replace(/\.pdf$/i, ".metadata.json");
-  await writeFile(pdfPath, pdfBuffer);
+  await writeFile(pdfPath, pdfBuffer, { flag: "wx" });
   await writeFile(
     metadataPath,
     JSON.stringify(
@@ -157,7 +347,10 @@ async function savePdf({ chapter, fileName, metadata, pdfBuffer }) {
         ...metadata,
         capitulo: chapter,
         chapter,
+        dedupeKey,
+        fileName: finalFileName,
         originalFileName: fileName,
+        pdfSha256,
         savedAt: new Date().toISOString(),
         targetFolder: `/atas/${chapter}`,
       },
@@ -166,7 +359,7 @@ async function savePdf({ chapter, fileName, metadata, pdfBuffer }) {
     ),
   );
 
-  return { finalFileName, metadataPath, pdfPath };
+  return { duplicate: false, finalFileName, metadataPath, pdfPath, updated: false };
 }
 
 function requireToken(request, response, next) {
@@ -227,13 +420,15 @@ app.post("/atas/pdf", requireToken, upload.single("pdf"), async (request, respon
       pdfBuffer: request.file.buffer,
     });
 
-    response.status(201).json({
+    response.status(saved.duplicate ? 200 : 201).json({
       capitulo: chapter,
       chapter,
+      duplicate: saved.duplicate,
       fileName: saved.finalFileName,
       ok: true,
       path: saved.pdfPath,
       targetFolder: `/atas/${chapter}`,
+      updated: saved.updated,
     });
   } catch (error) {
     next(error);

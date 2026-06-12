@@ -6,7 +6,11 @@ import {
   compileAtaPdfInBrowser,
   preloadSwiftLatexForSociety,
 } from "../lib/swiftlatex-client";
-import { formatForwardStatus, forwardGeneratedPdf } from "../lib/pdf-forward-client";
+import {
+  buildPdfFileNameFromTitle,
+  formatForwardStatus,
+  forwardGeneratedPdf,
+} from "../lib/pdf-forward-client";
 import PdfGenerationProgress from "./PdfGenerationProgress";
 import UserPasswordDialog from "./UserPasswordDialog";
 
@@ -867,14 +871,16 @@ function App() {
         text: "PDF gerado. Enviando ao servidor JS.",
       });
 
+      const pdfFileName = buildPdfFileNameFromTitle(ataTitle, result.fileName);
       let forwardMessage = "PDF enviado ao servidor JS.";
       let forwardTone = "success";
       try {
         const forwardResult = await forwardGeneratedPdf({
-          fileName: result.fileName,
+          fileName: pdfFileName,
           metadata: {
             ataId: savedAta?.id || activeAtaId,
-            fileName: result.fileName,
+            fileName: pdfFileName,
+            originalGeneratedFileName: result.fileName,
             outputName,
             sociedade: form.sociedade,
             source: "gerador",
@@ -890,7 +896,7 @@ function App() {
           forwardError.message || "Nao foi possivel enviar o PDF ao servidor JS.";
       }
 
-      baixarArquivo(result.pdf, result.fileName);
+      baixarArquivo(result.pdf, pdfFileName);
       setStatus({
         tone: forwardTone,
         text: `Ata salva com sucesso. PDF gerado no navegador e download iniciado. ${forwardMessage}`,

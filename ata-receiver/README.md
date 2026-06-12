@@ -19,7 +19,12 @@ O servidor salva sempre em:
 /atas/[CAPITULO]
 ```
 
-Tambem grava um arquivo `.metadata.json` ao lado do PDF.
+O nome do PDF usa o titulo da ata enviado em `metadata.title`. Tambem grava um
+arquivo `.metadata.json` ao lado do PDF.
+
+Para evitar copias duplicadas, o servidor usa `metadata.ataId` como chave da ata.
+Se o mesmo `ataId` chegar novamente, ele reutiliza o arquivo existente: se o PDF
+for identico, nao regrava; se o conteudo mudar, atualiza o mesmo arquivo.
 
 ## Rodar com Docker
 
