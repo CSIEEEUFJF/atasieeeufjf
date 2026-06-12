@@ -1,55 +1,14 @@
 import { NextResponse } from "next/server";
 
+import {
+  buildStorageMetadata,
+  getForwardToken,
+  getForwardUrl,
+  parseMetadataValue,
+  summarizeResponseText,
+} from "../../../lib/pdf-forward-server";
+
 export const runtime = "nodejs";
-
-const MAX_DETAIL_LENGTH = 800;
-const DEFAULT_CHAPTER = "Ramo";
-
-function getForwardUrl() {
-  return process.env.PDF_FORWARD_URL || process.env.PDF_UPLOAD_URL || "";
-}
-
-function getForwardToken() {
-  return process.env.PDF_FORWARD_TOKEN || process.env.PDF_UPLOAD_TOKEN || "";
-}
-
-function parseMetadata(value) {
-  if (typeof value !== "string" || !value.trim()) {
-    return {};
-  }
-
-  try {
-    const parsed = JSON.parse(value);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function normalizeChapter(value) {
-  const cleanValue = String(value || "")
-    .trim()
-    .replace(/\s+/g, "-")
-    .replace(/[^0-9A-Za-z._-]+/g, "")
-    .replace(/^\.+|\.+$/g, "");
-
-  return cleanValue && cleanValue !== "." && cleanValue !== ".." ? cleanValue : DEFAULT_CHAPTER;
-}
-
-function buildStorageMetadata(metadata) {
-  const chapter = normalizeChapter(metadata.sociedade || metadata.chapter || metadata.capitulo);
-
-  return {
-    ...metadata,
-    capitulo: chapter,
-    chapter,
-    targetFolder: `/atas/${chapter}`,
-  };
-}
-
-function summarizeResponseText(text) {
-  return String(text || "").trim().slice(0, MAX_DETAIL_LENGTH);
-}
 
 export async function POST(request) {
   const forwardUrl = getForwardUrl().trim();
@@ -79,7 +38,7 @@ export async function POST(request) {
     );
   }
 
-  const metadata = buildStorageMetadata(parseMetadata(incomingForm.get("metadata")));
+  const metadata = buildStorageMetadata(parseMetadataValue(incomingForm.get("metadata")));
   const fileName = String(metadata.fileName || pdf.name || "ata.pdf");
   const outgoingForm = new FormData();
   outgoingForm.append("pdf", pdf, fileName);

@@ -5,6 +5,7 @@ services:
     container_name: ata-receiver
     environment:
       ATAS_DIR: /atas
+      CORS_ORIGIN: ${ATA_RECEIVER_CORS_ORIGIN:-*}
       MAX_PDF_BYTES: ${ATA_RECEIVER_MAX_PDF_BYTES:-26214400}
       PORT: 3001
       RECEIVE_TOKEN: ${ATA_RECEIVER_TOKEN:-}

@@ -28,6 +28,7 @@ docker build -t ata-receiver ./ata-receiver
 docker run --rm \
   -p 3001:3001 \
   -v "$PWD/atas-recebidas:/atas" \
+  -e CORS_ORIGIN="*" \
   -e RECEIVE_TOKEN="troque-este-token" \
   ata-receiver
 ```
@@ -47,9 +48,14 @@ No sistema principal, configure:
 ```env
 PDF_FORWARD_URL="https://save.ieeeufjf.com.br/atas/pdf"
 PDF_FORWARD_TOKEN="troque-este-token"
+PDF_FORWARD_TOKEN_TTL_SECONDS="300"
 ```
 
-Se `RECEIVE_TOKEN` ficar vazio, o servidor aceita requisições sem token.
+No receiver, configure o mesmo valor em `ATA_RECEIVER_TOKEN`/`RECEIVE_TOKEN`.
+O app principal usa esse segredo apenas para criar um token temporario; o PDF e enviado
+direto do navegador para este servidor.
+
+Se `RECEIVE_TOKEN` ficar vazio, o servidor aceita requisicoes sem token.
 
 ## Rodar localmente
 

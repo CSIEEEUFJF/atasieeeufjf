@@ -16,6 +16,7 @@ const upload = multer({
 const PORT = Number(process.env.PORT || 3001);
 const ATAS_DIR = path.resolve(process.env.ATAS_DIR || "/atas");
 const RECEIVE_TOKEN = String(process.env.RECEIVE_TOKEN || "").trim();
+const CORS_ORIGIN = String(process.env.CORS_ORIGIN || "*").trim();
 
 function parseJson(value) {
   if (typeof value !== "string" || !value.trim()) {
@@ -28,6 +29,33 @@ function parseJson(value) {
   } catch {
     return {};
   }
+}
+
+function getAllowedOrigin(origin) {
+  if (!CORS_ORIGIN || CORS_ORIGIN === "*") {
+    return "*";
+  }
+
+  const allowedOrigins = CORS_ORIGIN.split(",").map((item) => item.trim()).filter(Boolean);
+  return allowedOrigins.includes(origin) ? origin : allowedOrigins[0] || "";
+}
+
+function applyCors(request, response, next) {
+  const allowedOrigin = getAllowedOrigin(request.get("origin") || "");
+  if (allowedOrigin) {
+    response.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+  }
+  response.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+  response.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  response.setHeader("Access-Control-Expose-Headers", "Content-Type");
+  response.setHeader("Vary", "Origin");
+
+  if (request.method === "OPTIONS") {
+    response.sendStatus(204);
+    return;
+  }
+
+  next();
 }
 
 function sanitizeSegment(value, fallback) {
@@ -70,6 +98,44 @@ function assertInsideBaseDir(targetPath) {
   }
 }
 
+function timingSafeEqualString(left, right) {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+
+  return (
+    leftBuffer.length === rightBuffer.length
+    && crypto.timingSafeEqual(leftBuffer, rightBuffer)
+  );
+}
+
+function verifySignedToken(token) {
+  if (!RECEIVE_TOKEN || !token.startsWith("v1.")) {
+    return null;
+  }
+
+  const parts = token.split(".");
+  if (parts.length !== 3) {
+    return null;
+  }
+
+  const [, payload, signature] = parts;
+  const expectedSignature = crypto
+    .createHmac("sha256", RECEIVE_TOKEN)
+    .update(payload)
+    .digest("base64url");
+
+  if (!timingSafeEqualString(signature, expectedSignature)) {
+    return null;
+  }
+
+  const parsedPayload = parseJson(Buffer.from(payload, "base64url").toString("utf8"));
+  if (!parsedPayload.exp || Number(parsedPayload.exp) < Math.floor(Date.now() / 1000)) {
+    return null;
+  }
+
+  return parsedPayload;
+}
+
 async function savePdf({ chapter, fileName, metadata, pdfBuffer }) {
   const chapterDir = path.join(ATAS_DIR, chapter);
   assertInsideBaseDir(chapterDir);
@@ -109,14 +175,28 @@ function requireToken(request, response, next) {
     return;
   }
 
-  const expected = `Bearer ${RECEIVE_TOKEN}`;
-  if (request.get("authorization") !== expected) {
+  const authorization = String(request.get("authorization") || "");
+  const bearerPrefix = "Bearer ";
+  const receivedToken = authorization.startsWith(bearerPrefix)
+    ? authorization.slice(bearerPrefix.length)
+    : "";
+
+  if (timingSafeEqualString(receivedToken, RECEIVE_TOKEN)) {
+    next();
+    return;
+  }
+
+  const signedTokenPayload = verifySignedToken(receivedToken);
+  if (!signedTokenPayload) {
     response.status(401).json({ detail: "Token invalido." });
     return;
   }
 
+  request.uploadTokenPayload = signedTokenPayload;
   next();
 }
+
+app.use(applyCors);
 
 app.get("/health", (_request, response) => {
   response.json({ ok: true, service: "ata-receiver" });
@@ -131,6 +211,14 @@ app.post("/atas/pdf", requireToken, upload.single("pdf"), async (request, respon
 
     const metadata = parseJson(request.body.metadata);
     const chapter = getChapter({ body: request.body, metadata });
+    if (
+      request.uploadTokenPayload?.chapter
+      && request.uploadTokenPayload.chapter !== chapter
+    ) {
+      response.status(403).json({ detail: "Token nao corresponde ao capitulo enviado." });
+      return;
+    }
+
     const fileName = metadata.fileName || request.file.originalname || "ata.pdf";
     const saved = await savePdf({
       chapter,
