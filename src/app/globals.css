@@ -640,6 +640,39 @@ html[data-theme="dark"] .password-dialog {
   width: auto;
 }
 
+.demo-contact-dialog {
+  width: min(100%, 560px);
+}
+
+.demo-contact-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.demo-contact-list a {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-soft);
+  color: inherit;
+  text-decoration: none;
+}
+
+.demo-contact-list span {
+  color: var(--ieee-blue);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.demo-contact-list strong {
+  color: var(--text-strong);
+}
+
 .inline-message {
   padding: 12px 14px;
   border-radius: var(--radius-md);
@@ -2150,6 +2183,18 @@ html[data-theme="dark"] .pdf-progress {
 .home-action-grid .board-action-card {
   min-height: 148px;
   padding: 22px 24px;
+}
+
+.demo-contact-cta {
+  display: flex;
+  justify-content: center;
+  margin-top: 18px;
+}
+
+.demo-contact-cta .primary-button {
+  width: min(100%, 760px);
+  justify-content: center;
+  text-align: center;
 }
 
 .board-page-main .internal-hero--simple {

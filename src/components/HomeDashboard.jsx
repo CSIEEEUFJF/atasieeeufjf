@@ -124,6 +124,7 @@ export default function HomeDashboard({ demoMode = false } = {}) {
   const [isSavingPhoto, setIsSavingPhoto] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [isDemoContactOpen, setIsDemoContactOpen] = useState(false);
 
   useEffect(() => {
     const savedTheme = window.localStorage.getItem("atas-ieee-theme");
@@ -480,6 +481,41 @@ export default function HomeDashboard({ demoMode = false } = {}) {
       {!demoMode && isPasswordDialogOpen ?(
         <UserPasswordDialog user={auth.user} onClose={() => setIsPasswordDialogOpen(false)} />
       ) : null}
+      {demoMode && isDemoContactOpen ?(
+        <div className="dialog-backdrop" role="presentation">
+          <section
+            className="password-dialog demo-contact-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="demo-contact-dialog-title"
+          >
+            <div className="password-dialog-header">
+              <div>
+                <span>Contato</span>
+                <h2 id="demo-contact-dialog-title">CS IEEE UFJF</h2>
+              </div>
+              <button
+                className="text-button"
+                type="button"
+                onClick={() => setIsDemoContactOpen(false)}
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="demo-contact-list">
+              <a href="mailto:ieee.csufjf@gmail.com">
+                <span>E-mail</span>
+                <strong>ieee.csufjf@gmail.com</strong>
+              </a>
+              <a href="https://www.instagram.com/ieeecs.ufjf" target="_blank" rel="noreferrer">
+                <span>Instagram</span>
+                <strong>@ieeecs.ufjf</strong>
+              </a>
+            </div>
+          </section>
+        </div>
+      ) : null}
       {!demoMode && isPhotoDialogOpen ?(
         <div className="dialog-backdrop" role="presentation">
           <section
@@ -687,6 +723,18 @@ export default function HomeDashboard({ demoMode = false } = {}) {
             </a>
           ))}
         </section>
+
+        {demoMode ?(
+          <section className="demo-contact-cta">
+            <button
+              className="primary-button"
+              type="button"
+              onClick={() => setIsDemoContactOpen(true)}
+            >
+              Gostou do sistema e quer implementar no seu Ramo? Entre em contato conosco!
+            </button>
+          </section>
+        ) : null}
       </main>
     </div>
   );
