@@ -414,7 +414,7 @@ function SavedAtasPage() {
 
   function handleSavedAtaAction(ata) {
     if (Number(ata.attachmentCount || 0) > 0) {
-      window.location.href = `/?ata=${ata.id}`;
+      window.location.href = `/atas/nova?ata=${ata.id}`;
       return;
     }
 

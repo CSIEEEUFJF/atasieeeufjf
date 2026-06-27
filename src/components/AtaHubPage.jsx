@@ -76,7 +76,7 @@ export default function AtaHubPage() {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
     } finally {
-      window.location.href = "/atas/nova";
+      window.location.href = "/";
     }
   }
 
@@ -110,8 +110,8 @@ export default function AtaHubPage() {
           <p className="panel-kicker">Atas</p>
           <h1>Acesse sua conta</h1>
           <p>Entre para consultar o banco de atas ou criar uma nova ata.</p>
-          <a className="primary-button standalone-link" href="/atas/nova">
-            Entrar e criar ata
+          <a className="primary-button standalone-link" href="/atas/nova?next=%2F">
+            Entrar no sistema
           </a>
         </section>
       </div>

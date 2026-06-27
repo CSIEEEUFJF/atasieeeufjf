@@ -753,6 +753,10 @@ function App() {
         tone: "success",
         text: "Acesso liberado.",
       });
+      const nextPath = new URLSearchParams(window.location.search).get("next");
+      if (nextPath?.startsWith("/") && !nextPath.startsWith("//")) {
+        window.location.href = nextPath;
+      }
     } catch (error) {
       setAuthMessage({
         tone: "error",

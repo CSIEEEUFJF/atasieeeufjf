@@ -97,7 +97,7 @@ export default function HomeDashboard() {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
     } finally {
-      window.location.href = "/atas/nova";
+      window.location.href = "/";
     }
   }
 
@@ -113,7 +113,7 @@ export default function HomeDashboard() {
           <p className="panel-kicker">Sistema interno</p>
           <h1>Acesse sua conta</h1>
           <p>Entre para acessar tarefas, calendário, atas e área da diretoria.</p>
-          <a className="primary-button standalone-link" href="/atas/nova">
+          <a className="primary-button standalone-link" href="/atas/nova?next=%2F">
             Entrar no sistema
           </a>
         </section>
