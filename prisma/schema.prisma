@@ -91,13 +91,16 @@ model SiteProject {
 }
 
 model SiteHomePhoto {
-  id        Int      @id @default(autoincrement())
-  title     String   @default("")
-  imageUrl  String   @map("image_url")
-  isPublic  Boolean  @default(true) @map("is_public")
-  position  Int      @default(0)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id             Int      @id @default(autoincrement())
+  title          String   @default("")
+  imageUrl       String   @map("image_url")
+  photoPositionX Int      @default(50) @map("photo_position_x")
+  photoPositionY Int      @default(50) @map("photo_position_y")
+  photoZoom      Int      @default(100) @map("photo_zoom")
+  isPublic       Boolean  @default(true) @map("is_public")
+  position       Int      @default(0)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   @@index([isPublic, position, id], map: "idx_site_home_photos_public_order")
   @@map("site_home_photos")

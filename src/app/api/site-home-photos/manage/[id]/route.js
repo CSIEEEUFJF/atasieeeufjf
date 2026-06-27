@@ -5,7 +5,7 @@ import {
   isSameOriginRequest,
   noStoreHeaders,
 } from "../../../../../lib/auth";
-import { deleteHomePhoto } from "../../../../../lib/site-home-photos";
+import { deleteHomePhoto, updateHomePhoto } from "../../../../../lib/site-home-photos";
 
 export const runtime = "nodejs";
 
@@ -48,6 +48,38 @@ export async function DELETE(request, { params }) {
   } catch (error) {
     return NextResponse.json(
       { detail: error.message || "Não foi possível excluir a foto." },
+      { headers: noStoreHeaders(), status: 400 },
+    );
+  }
+}
+
+export async function PATCH(request, { params }) {
+  if (!isSameOriginRequest(request)) {
+    return NextResponse.json(
+      { detail: "Origem inválida." },
+      { headers: noStoreHeaders(), status: 403 },
+    );
+  }
+
+  const currentUser = await getCurrentUser();
+  if (!currentUser) {
+    return unauthorized();
+  }
+
+  const id = parseId(await params);
+  if (!id) {
+    return NextResponse.json(
+      { detail: "Foto inválida." },
+      { headers: noStoreHeaders(), status: 400 },
+    );
+  }
+
+  try {
+    const photo = await updateHomePhoto(currentUser, id, await request.json());
+    return NextResponse.json({ photo }, { headers: noStoreHeaders() });
+  } catch (error) {
+    return NextResponse.json(
+      { detail: error.message || "Não foi possível atualizar a foto." },
       { headers: noStoreHeaders(), status: 400 },
     );
   }

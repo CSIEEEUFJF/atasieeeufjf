@@ -7,8 +7,22 @@ import UserPasswordDialog from "./UserPasswordDialog";
 import { DEMO_USER } from "./demo-data";
 
 const DEFAULT_HOME_PHOTOS = [
-  { id: "default-login", imageUrl: "/login-ramo.jpg", title: "Ramo IEEE UFJF" },
-  { id: "default-home-2", imageUrl: "/home-ramo-2.jpg", title: "Atividade do Ramo" },
+  {
+    id: "default-login",
+    imageUrl: "/login-ramo.jpg",
+    photoPositionX: 50,
+    photoPositionY: 50,
+    photoZoom: 100,
+    title: "Ramo IEEE UFJF",
+  },
+  {
+    id: "default-home-2",
+    imageUrl: "/home-ramo-2.jpg",
+    photoPositionX: 50,
+    photoPositionY: 50,
+    photoZoom: 100,
+    title: "Atividade do Ramo",
+  },
 ];
 
 async function readApiError(response, fallback) {
@@ -35,6 +49,28 @@ function fileToDataUrl(file) {
     reader.onerror = () => reject(new Error("Não foi possível ler a imagem."));
     reader.readAsDataURL(file);
   });
+}
+
+function createPhotoForm(photo = {}) {
+  return {
+    id: photo.id || null,
+    imageUrl: photo.imageUrl || "",
+    photoPositionX: photo.photoPositionX ?? 50,
+    photoPositionY: photo.photoPositionY ?? 50,
+    photoZoom: photo.photoZoom ?? 100,
+    title: photo.title || "",
+  };
+}
+
+function photoFrameStyle(photo = {}) {
+  const positionX = photo.photoPositionX ?? 50;
+  const positionY = photo.photoPositionY ?? 50;
+
+  return {
+    objectPosition: `${positionX}% ${positionY}%`,
+    transform: `scale(${(photo.photoZoom ?? 100) / 100})`,
+    transformOrigin: `${positionX}% ${positionY}%`,
+  };
 }
 
 function ThemeToggle({ theme, onToggle }) {
@@ -74,7 +110,7 @@ export default function HomeDashboard({ demoMode = false } = {}) {
   const [homePhotos, setHomePhotos] = useState(DEFAULT_HOME_PHOTOS);
   const [homePhotoIndex, setHomePhotoIndex] = useState(0);
   const [isPhotoDialogOpen, setIsPhotoDialogOpen] = useState(false);
-  const [photoForm, setPhotoForm] = useState({ imageUrl: "", title: "" });
+  const [photoForm, setPhotoForm] = useState(createPhotoForm);
   const [photoMessage, setPhotoMessage] = useState("");
   const [isSavingPhoto, setIsSavingPhoto] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
@@ -298,28 +334,45 @@ export default function HomeDashboard({ demoMode = false } = {}) {
   async function handleCreatePhoto(event) {
     event.preventDefault();
     setIsSavingPhoto(true);
-    setPhotoMessage("Salvando foto.");
+    setPhotoMessage(photoForm.id ?"Atualizando foto." : "Salvando foto.");
 
     try {
-      const response = await fetch("/api/site-home-photos/manage", {
+      const isEditing = Number.isSafeInteger(Number(photoForm.id));
+      const response = await fetch(
+        isEditing ?`/api/site-home-photos/manage/${photoForm.id}` : "/api/site-home-photos/manage",
+        {
         body: JSON.stringify(photoForm),
         headers: { "Content-Type": "application/json" },
-        method: "POST",
-      });
+          method: isEditing ?"PATCH" : "POST",
+        },
+      );
 
       if (!response.ok) {
-        throw new Error(await readApiError(response, "Não foi possível cadastrar a foto."));
+        throw new Error(await readApiError(response, "Não foi possível salvar a foto."));
       }
 
       const payload = await response.json();
-      setHomePhotos((current) => [...current, payload.photo].filter(Boolean));
-      setPhotoForm({ imageUrl: "", title: "" });
-      setPhotoMessage("Foto adicionada ao slideshow.");
+      setHomePhotos((current) => {
+        if (!isEditing) {
+          return [...current, payload.photo].filter(Boolean);
+        }
+
+        return current.map((photo) => (Number(photo.id) === Number(photoForm.id) ?payload.photo : photo));
+      });
+      setPhotoForm(createPhotoForm());
+      setPhotoMessage(isEditing ?"Foto atualizada." : "Foto adicionada ao slideshow.");
     } catch (error) {
-      setPhotoMessage(error.message || "Não foi possível cadastrar a foto.");
+      setPhotoMessage(error.message || "Não foi possível salvar a foto.");
     } finally {
       setIsSavingPhoto(false);
     }
+  }
+
+  function editPhoto(photo) {
+    setPhotoForm(createPhotoForm(photo));
+    setPhotoMessage(Number.isSafeInteger(Number(photo.id))
+      ?"Ajuste o enquadramento e salve."
+      : "Fotos padrão podem ser ajustadas nesta sessão; para salvar, adicione uma nova foto.");
   }
 
   async function deletePhoto(photo) {
@@ -378,6 +431,7 @@ export default function HomeDashboard({ demoMode = false } = {}) {
   const visibleActions = actions.filter((action) => (
     demoMode || !action.href.endsWith("/diretoria") || auth.user.canManageMembers
   ));
+  const isEditingManagedPhoto = Number.isSafeInteger(Number(photoForm.id));
 
   return (
     <div className="app-shell">
@@ -462,7 +516,61 @@ export default function HomeDashboard({ demoMode = false } = {}) {
               </label>
 
               {photoForm.imageUrl ?(
-                <img className="home-photo-preview" src={photoForm.imageUrl} alt="" />
+                <>
+                  <div className="home-photo-preview">
+                    <img src={photoForm.imageUrl} alt="" style={photoFrameStyle(photoForm)} />
+                  </div>
+
+                  <div className="home-photo-controls">
+                    <label className="field">
+                      <span>Posição horizontal</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={photoForm.photoPositionX}
+                        onChange={(event) =>
+                          setPhotoForm((current) => ({
+                            ...current,
+                            photoPositionX: Number(event.target.value),
+                          }))
+                        }
+                      />
+                    </label>
+
+                    <label className="field">
+                      <span>Posição vertical</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={photoForm.photoPositionY}
+                        onChange={(event) =>
+                          setPhotoForm((current) => ({
+                            ...current,
+                            photoPositionY: Number(event.target.value),
+                          }))
+                        }
+                      />
+                    </label>
+
+                    <label className="field">
+                      <span>Zoom</span>
+                      <input
+                        type="range"
+                        min="100"
+                        max="220"
+                        value={photoForm.photoZoom}
+                        onChange={(event) =>
+                          setPhotoForm((current) => ({
+                            ...current,
+                            photoZoom: Number(event.target.value),
+                          }))
+                        }
+                      />
+                    </label>
+                  </div>
+                </>
               ) : null}
 
               {photoMessage ?(
@@ -473,15 +581,30 @@ export default function HomeDashboard({ demoMode = false } = {}) {
               ) : null}
 
               <button className="primary-button" disabled={isSavingPhoto || !photoForm.imageUrl}>
-                {isSavingPhoto ?"Salvando..." : "Adicionar foto"}
+                {isSavingPhoto
+                  ?"Salvando..."
+                  : isEditingManagedPhoto
+                    ?"Salvar enquadramento"
+                    : photoForm.id
+                      ?"Salvar como nova foto"
+                    : "Adicionar foto"}
               </button>
             </form>
 
             <div className="home-photo-manage-list">
               {homePhotos.map((photo) => (
                 <article className="home-photo-manage-item" key={photo.id}>
-                  <img src={photo.imageUrl} alt="" />
+                  <div className="home-photo-manage-thumb">
+                    <img src={photo.imageUrl} alt="" style={photoFrameStyle(photo)} />
+                  </div>
                   <span>{photo.title || "Foto do Ramo"}</span>
+                  <button
+                    className="text-button"
+                    type="button"
+                    onClick={() => editPhoto(photo)}
+                  >
+                    Editar
+                  </button>
                   <button
                     className="text-button danger"
                     type="button"
@@ -505,6 +628,7 @@ export default function HomeDashboard({ demoMode = false } = {}) {
                 src={photo.imageUrl}
                 alt={photo.title || "Foto do Ramo IEEE UFJF"}
                 key={photo.id}
+                style={photoFrameStyle(photo)}
               />
             ))}
           </div>
