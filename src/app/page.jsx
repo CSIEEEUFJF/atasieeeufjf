@@ -1,5 +1,5 @@
-import AtaApp from "../components/AtaApp";
+import HomeDashboard from "../components/HomeDashboard";
 
 export default function HomePage() {
-  return <AtaApp />;
+  return <HomeDashboard />;
 }

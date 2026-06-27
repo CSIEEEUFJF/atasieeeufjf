@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 
 import {
   getChapterOptions,
@@ -22,7 +22,7 @@ export async function GET() {
       { headers: noStoreHeaders() },
     );
   } catch (error) {
-    console.error("Falha ao consultar autenticacao.", error);
+    console.error("Falha ao consultar autenticação.", error);
 
     return NextResponse.json(
       {

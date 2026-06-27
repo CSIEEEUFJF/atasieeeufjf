@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 
 import {
   checkAuthRateLimit,
@@ -39,7 +39,7 @@ export async function POST(request) {
     return NextResponse.json({ ok: true }, { headers: noStoreHeaders() });
   } catch (error) {
     return NextResponse.json(
-      { detail: error.message || "Nao foi possivel alterar a senha." },
+      { detail: error.message || "Não foi possível alterar a senha." },
       { headers: noStoreHeaders(), status: 400 },
     );
   }

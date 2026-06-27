@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 
 import {
   canManageMembers,
@@ -14,7 +14,7 @@ export const runtime = "nodejs";
 
 function forbidden() {
   return NextResponse.json(
-    { detail: "Apenas administradores ou gestores de capitulo podem gerenciar membros." },
+    { detail: "Apenas administradores ou gestores de capítulo podem gerenciar membros." },
     { status: 403 },
   );
 }
@@ -62,8 +62,8 @@ export async function POST(request) {
     return NextResponse.json(
       {
         detail: duplicateUsername
-          ? "Ja existe um membro com este nome de usuario."
-          : error.message || "Nao foi possivel criar o usuario.",
+          ?"Já existe um membro com este nome de usuário."
+          : error.message || "Não foi possível criar o usuário.",
       },
       { status: 400 },
     );

@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+﻿import { cookies } from "next/headers";
 import crypto from "node:crypto";
 
 import {
@@ -124,7 +124,7 @@ function internalEmailForUsername(username) {
 
 function chapterKeyFromRelation(chapter) {
   return normalizarSociedadeChave(
-    typeof chapter === "string" ? chapter : chapter?.chapterKey,
+    typeof chapter === "string" ?chapter : chapter?.chapterKey,
     "",
   );
 }
@@ -140,7 +140,7 @@ function normalizeMemberRole(value, fallback = "") {
   }
 
   const canonical = MEMBER_ROLE_ALIASES[cleanValue] || cleanValue;
-  return MEMBER_ROLE_OPTIONS.includes(canonical) ? canonical : fallback;
+  return MEMBER_ROLE_OPTIONS.includes(canonical) ?canonical : fallback;
 }
 
 function normalizeChapterRoles(chapterRoles) {
@@ -182,6 +182,18 @@ function roleForChapter(user, chapterKey) {
   return normalizeMemberRole(user?.cargo, "Membro");
 }
 
+export function getUserRoleForChapter(user, chapterKey) {
+  return roleForChapter(user, chapterKey);
+}
+
+export function isRamoBoardMember(user) {
+  if (!user) {
+    return false;
+  }
+
+  return Boolean(user.isAdmin) || roleForChapter(user, "Ramo") !== "Membro";
+}
+
 export function getManageableChapterKeys(user) {
   if (!user) {
     return [];
@@ -192,7 +204,7 @@ export function getManageableChapterKeys(user) {
   }
 
   const userChapters = Array.isArray(user.chapters)
-    ? user.chapters.map((chapter) => normalizarSociedadeChave(chapter, "")).filter(Boolean)
+    ?user.chapters.map((chapter) => normalizarSociedadeChave(chapter, "")).filter(Boolean)
     : [];
 
   return userChapters.filter((chapterKey) => roleForChapter(user, chapterKey) !== "Membro");
@@ -210,7 +222,7 @@ function publicUser(row) {
   const cargo = normalizeMemberRole(row.cargo, row.cargo || "");
   const chapterRoles = normalizeChapterRoles(row.chapterRoles);
   const chapters = Array.isArray(row.chapters)
-    ? row.chapters.map(chapterKeyFromRelation).filter(Boolean)
+    ?row.chapters.map(chapterKeyFromRelation).filter(Boolean)
     : [];
   const user = {
     cargo,
@@ -252,7 +264,7 @@ function normalizeChapterKeys(chapters, { allowAll = false } = {}) {
     return CHAPTER_KEYS;
   }
 
-  const requested = Array.isArray(chapters) ? chapters : [];
+  const requested = Array.isArray(chapters) ?chapters : [];
   const valid = new Set(CHAPTER_KEYS);
   return [
     ...new Set(
@@ -297,7 +309,7 @@ function validatePasswordPolicy(password, label = "A senha") {
   }
 
   if (!/[a-z]/.test(cleanPassword) || !/[A-Z]/.test(cleanPassword) || !/[0-9]/.test(cleanPassword)) {
-    throw new Error(`${label} precisa incluir letras maiusculas, minusculas e numeros.`);
+    throw new Error(`${label} precisa incluir letras maiusculas, minusculas e números.`);
   }
 }
 
@@ -344,17 +356,17 @@ export async function createUser(
   const cleanChapterRoles = rolesForChapters(chapterRoles, userChapters, cleanCargo);
 
   if (!cleanName) {
-    throw new Error("Informe o nome do usuario.");
+    throw new Error("Informe o nome do usuário.");
   }
 
   if (!cleanUsername || !/^[a-z0-9._-]{3,40}$/.test(cleanUsername)) {
-    throw new Error("Informe um nome de usuario com 3 a 40 caracteres, usando letras, numeros, ponto, hifen ou underline.");
+    throw new Error("Informe um nome de usuário com 3 a 40 caracteres, usando letras, números, ponto, hífen ou underline.");
   }
 
   validatePasswordPolicy(cleanPassword, "A senha");
 
   if (!userChapters.length) {
-    throw new Error("Associe o usuario a pelo menos um capitulo.");
+    throw new Error("Associe o usuário a pelo menos um capítulo.");
   }
 
   const { passwordHash, passwordSalt } = hashPassword(cleanPassword);
@@ -402,12 +414,12 @@ export async function verifyCredentials(username, password) {
     const failedLoginCount = Number(row.failedLoginCount || 0) + 1;
     const shouldLock = failedLoginCount >= LOGIN_FAILURE_LIMIT;
     const lockedUntil = shouldLock
-      ? new Date(Date.now() + LOGIN_LOCK_MINUTES * 60 * 1000)
+      ?new Date(Date.now() + LOGIN_LOCK_MINUTES * 60 * 1000)
       : null;
 
     await getPrisma().user.update({
       data: {
-        failedLoginCount: shouldLock ? 0 : failedLoginCount,
+        failedLoginCount: shouldLock ?0 : failedLoginCount,
         lockedUntil,
       },
       where: { id: row.id },
@@ -508,7 +520,7 @@ export async function listManageableUsers(user) {
 
 export async function createUserFromManagement(currentUser, payload = {}) {
   if (!canManageMembers(currentUser)) {
-    throw new Error("Voce nao tem permissao para gerenciar membros.");
+    throw new Error("Você não tem permissão para gerenciar membros.");
   }
 
   if (currentUser.isAdmin) {
@@ -528,7 +540,7 @@ export async function createUserFromManagement(currentUser, payload = {}) {
   );
 
   if (!requestedChapters.length || hasInvalidChapter) {
-    throw new Error("Voce so pode cadastrar membros nos capitulos que gerencia.");
+    throw new Error("Você só pode cadastrar membros nos capítulos que gerencia.");
   }
 
   const memberRoles = Object.fromEntries(
@@ -548,9 +560,9 @@ export async function createUserFromManagement(currentUser, payload = {}) {
 
 export async function listVisibleUsers(user, chapterKey = "") {
   const accessibleChapters = Array.isArray(user?.chapters)
-    ? user.chapters.filter((chapter) => CHAPTER_KEYS.includes(chapter))
+    ?user.chapters.filter((chapter) => CHAPTER_KEYS.includes(chapter))
     : [];
-  const requestedChapters = normalizeChapterKeys(chapterKey ? [chapterKey] : []);
+  const requestedChapters = normalizeChapterKeys(chapterKey ?[chapterKey] : []);
 
   if (chapterKey && !requestedChapters.length) {
     return [];
@@ -564,10 +576,13 @@ export async function listVisibleUsers(user, chapterKey = "") {
     return [];
   }
 
+  const isRamoContext = requestedChapters.includes("Ramo");
   const visibleChapters = requestedChapters.length
-    ? requestedChapters
+    ?isRamoContext && isRamoBoardMember(user)
+      ?CHAPTER_KEYS
+      : requestedChapters
     : user.isAdmin
-      ? CHAPTER_KEYS
+      ?CHAPTER_KEYS
       : accessibleChapters;
 
   const users = await getPrisma().user.findMany({
@@ -588,7 +603,7 @@ export async function listVisibleUsers(user, chapterKey = "") {
 export async function updateUserManagement(currentUser, targetUserId, payload = {}) {
   const hasAdminUpdate = typeof payload.isAdmin === "boolean";
   if (hasAdminUpdate && currentUser.id === targetUserId) {
-    throw new Error("Voce nao pode alterar sua propria permissao de administrador.");
+    throw new Error("Você não pode alterar sua própria permissão de administrador.");
   }
 
   const targetUser = await getPrisma().user.findUnique({
@@ -600,7 +615,7 @@ export async function updateUserManagement(currentUser, targetUserId, payload = 
     return null;
   }
 
-  const shouldBeAdmin = hasAdminUpdate ? Boolean(payload.isAdmin) : Boolean(targetUser.isAdmin);
+  const shouldBeAdmin = hasAdminUpdate ?Boolean(payload.isAdmin) : Boolean(targetUser.isAdmin);
   const currentChapters = new Set(
     targetUser.chapters
       .map((chapter) => normalizarSociedadeChave(chapter.chapterKey, ""))
@@ -608,31 +623,31 @@ export async function updateUserManagement(currentUser, targetUserId, payload = 
   );
   const requestedChapters = normalizeChapterKeys(payload.chapters, { allowAll: shouldBeAdmin });
   const nextChapters = requestedChapters.length
-    ? requestedChapters
+    ?requestedChapters
     : [...currentChapters].filter((chapterKey) => CHAPTER_KEYS.includes(chapterKey));
 
   if (!nextChapters.length) {
-    throw new Error("Associe o usuario a pelo menos um capitulo.");
+    throw new Error("Associe o usuário a pelo menos um capítulo.");
   }
 
   const chaptersToCreate = nextChapters.filter((chapterKey) => !currentChapters.has(chapterKey));
   const chaptersToDelete = targetUser.chapters
     .map((chapter) => chapter.chapterKey)
     .filter((chapterKey) => !nextChapters.includes(normalizarSociedadeChave(chapterKey, "")));
-  const cleanName = typeof payload.name === "string" ? payload.name.trim() : targetUser.name;
+  const cleanName = typeof payload.name === "string" ?payload.name.trim() : targetUser.name;
   const nextCargo = typeof payload.cargo === "string"
-    ? normalizeMemberRole(payload.cargo, "Membro")
+    ?normalizeMemberRole(payload.cargo, "Membro")
     : normalizeMemberRole(targetUser.cargo, "Membro");
   const nextChapterRoles = rolesForChapters(
     Object.prototype.hasOwnProperty.call(payload, "chapterRoles")
-      ? payload.chapterRoles
+      ?payload.chapterRoles
       : targetUser.chapterRoles,
     nextChapters,
     "",
   );
 
   if (!cleanName) {
-    throw new Error("Informe o nome do usuario.");
+    throw new Error("Informe o nome do usuário.");
   }
 
   const updatedUser = await getPrisma().user.update({
@@ -640,7 +655,7 @@ export async function updateUserManagement(currentUser, targetUserId, payload = 
       cargo: nextCargo,
       chapterRoles: nextChapterRoles,
       chapters: chaptersToCreate.length || chaptersToDelete.length
-        ? {
+        ?{
             create: chaptersToCreate.map((chapterKey) => ({ chapterKey })),
             deleteMany: chaptersToDelete.map((chapterKey) => ({ chapterKey })),
           }

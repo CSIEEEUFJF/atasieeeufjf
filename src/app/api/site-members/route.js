@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 
 import { listPublicSiteMembers } from "../../../lib/site-members";
 
@@ -25,10 +25,10 @@ export async function GET() {
       { headers: corsHeaders },
     );
   } catch (error) {
-    console.error("Falha ao listar membros publicos.", error);
+    console.error("Falha ao listar membros públicos.", error);
 
     return NextResponse.json(
-      { detail: "Nao foi possivel carregar membros publicos." },
+      { detail: "Não foi possível carregar membros públicos." },
       { headers: corsHeaders, status: 503 },
     );
   }

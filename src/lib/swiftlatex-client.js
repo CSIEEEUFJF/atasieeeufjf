@@ -1,4 +1,4 @@
-const SWIFTLATEX_SCRIPTS = [
+﻿const SWIFTLATEX_SCRIPTS = [
   "/swiftlatex/PdfTeXEngine.js",
 ];
 
@@ -62,7 +62,135 @@ function escaparLatex(textoBruto) {
     .join(" \\\\ ");
 }
 
+function dividirCargoCapitulo(cargo) {
+  const match = texto(cargo).match(/^(.+?)-([A-Za-z0-9]+)$/);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    cargo: match[1].trim(),
+    capitulo: match[2].trim(),
+  };
+}
+
+function ehCargoDiretoria(cargo) {
+  const cargoLimpo = texto(cargo);
+  return Boolean(cargoLimpo && cargoLimpo !== "Membro");
+}
+
+function ehPresidenteDeOutroCapitulo(cargo, capitulo, sociedade) {
+  return texto(cargo) === "Presidente" && texto(capitulo) && capitulo !== sociedade && capitulo !== "Ramo";
+}
+
+function ehDiretoriaDoCapituloAtual(cargo, capitulo, sociedade) {
+  return ehCargoDiretoria(cargo) && texto(capitulo) === sociedade && sociedade !== "Ramo";
+}
+
+function formatarCargoCapitulo(cargo, capitulo) {
+  const cargoLimpo = texto(cargo);
+  const capituloLimpo = texto(capitulo);
+
+  if (!cargoLimpo || cargoLimpo === "Membro" || !capituloLimpo) {
+    return cargoLimpo;
+  }
+
+  return `${cargoLimpo}-${capituloLimpo}`;
+}
+
+function prioridadeMembroAta(membro, sociedade) {
+  const cargoDividido = dividirCargoCapitulo(membro.cargo);
+  const capitulo = texto(membro.boardChapter) || cargoDividido?.capitulo || (ehCargoDiretoria(membro.cargo) ? sociedade : "");
+
+  if (sociedade !== "Ramo") {
+    if (ehDiretoriaDoCapituloAtual(cargoDividido?.cargo || membro.cargo, capitulo, sociedade)) return 1;
+    return ehPresidenteDeOutroCapitulo(cargoDividido?.cargo || membro.cargo, capitulo, sociedade) ?1 : 2;
+  }
+
+  if (capitulo === "Ramo") {
+    return 0;
+  }
+
+  if (cargoDividido || ehCargoDiretoria(membro.cargo) || membro.isBoardRole) {
+    return 1;
+  }
+
+  return 2;
+}
+
+function normalizarMembroAta(membro, sociedade) {
+  const cargoDividido = dividirCargoCapitulo(membro.cargo);
+
+  if (cargoDividido) {
+    if (sociedade !== "Ramo" && ehDiretoriaDoCapituloAtual(cargoDividido.cargo, cargoDividido.capitulo, sociedade)) {
+      return {
+        ...membro,
+        cargo: cargoDividido.cargo,
+      };
+    }
+
+    if (sociedade !== "Ramo" && !ehPresidenteDeOutroCapitulo(cargoDividido.cargo, cargoDividido.capitulo, sociedade)) {
+      return {
+        ...membro,
+        cargo: "Membro",
+      };
+    }
+
+    return {
+      ...membro,
+      cargo: formatarCargoCapitulo(cargoDividido.cargo, cargoDividido.capitulo),
+    };
+  }
+
+  if (ehCargoDiretoria(membro.cargo) || membro.isBoardRole) {
+    const capitulo = texto(membro.boardChapter) || sociedade;
+    if (sociedade !== "Ramo" && ehDiretoriaDoCapituloAtual(membro.cargo, capitulo, sociedade)) {
+      return {
+        ...membro,
+        cargo: texto(membro.cargo),
+      };
+    }
+
+    if (sociedade !== "Ramo" && !ehPresidenteDeOutroCapitulo(membro.cargo, capitulo, sociedade)) {
+      return {
+        ...membro,
+        cargo: "Membro",
+      };
+    }
+
+    return {
+      ...membro,
+      cargo: formatarCargoCapitulo(membro.cargo, capitulo),
+    };
+  }
+
+  return {
+    ...membro,
+    cargo: "Membro",
+  };
+}
+
+function prepararMembrosAta(membros, sociedade) {
+  return Array.isArray(membros)
+    ?membros
+      .map((membro) => ({
+        ...normalizarMembroAta(membro, sociedade),
+        nome: texto(membro.nome),
+      }))
+      .filter((membro) => membro.nome || texto(membro.cargo))
+      .sort((membroA, membroB) => {
+        const prioridade = prioridadeMembroAta(membroA, sociedade) - prioridadeMembroAta(membroB, sociedade);
+        if (prioridade !== 0) {
+          return prioridade;
+        }
+
+        return texto(membroA.nome).localeCompare(texto(membroB.nome), "pt-BR");
+      })
+    : [];
+}
+
 function renderizarTex(documentclass, dados, anexosPreparados) {
+  const membros = prepararMembrosAta(dados.membros, dados.sociedade);
   const linhas = [
     `\\documentclass{${documentclass}}`,
     "",
@@ -79,7 +207,7 @@ function renderizarTex(documentclass, dados, anexosPreparados) {
     "\\begin{membros}",
   ];
 
-  for (const [indice, membro] of dados.membros.entries()) {
+  for (const [indice, membro] of membros.entries()) {
     linhas.push(
       "    \\membro"
       + `{${indice + 1}}`
@@ -163,7 +291,7 @@ async function ensureRuntimeLoaded() {
         typeof window === "undefined"
         || typeof window.PdfTeXEngine !== "function"
       ) {
-        throw new Error("SwiftLaTeX nao ficou disponivel no navegador.");
+        throw new Error("SwiftLaTeX não ficou disponível no navegador.");
       }
     })().catch((error) => {
       runtimePromise = undefined;
@@ -223,7 +351,7 @@ async function fetchSocietyBundle(sociedade) {
         );
 
         if (!response.ok) {
-          let detail = `Nao foi possivel carregar o template da sociedade (${response.status}).`;
+          let detail = `Não foi possível carregar o template da sociedade (${response.status}).`;
           try {
             const payload = await response.json();
             detail = payload.detail || detail;
@@ -262,7 +390,7 @@ async function ensurePdftexMapBytes() {
         failures.push(`${url}: ${response.status}`);
       }
 
-      throw new Error(`Nao foi possivel carregar pdftex.map (${failures.join("; ")}).`);
+      throw new Error(`Não foi possível carregar pdftex.map (${failures.join("; ")}).`);
     })().catch((error) => {
       pdftexMapBytesPromise = undefined;
       throw new Error(normalizarMensagemSwiftlatex(error, "Falha ao carregar pdftex.map."));
@@ -330,7 +458,7 @@ async function writeProjectFiles(engine, files) {
   for (const file of files) {
     engine.writeMemFSFile(
       file.path,
-      file.encoding === "base64" ? decodeBase64(file.content) : file.content,
+      file.encoding === "base64" ?decodeBase64(file.content) : file.content,
     );
   }
 }
@@ -366,7 +494,13 @@ export async function compileAtaPdfInBrowser({ form, outputName }) {
     data_elaboracao: form.data_elaboracao,
     data_reuniao: form.data_reuniao,
     local_reuniao: form.local_reuniao,
-    membros: form.membros.map(({ cargo, nome }) => ({ cargo, nome })),
+    sociedade: form.sociedade,
+    membros: form.membros.map(({ boardChapter, cargo, isBoardRole, nome }) => ({
+      boardChapter,
+      cargo,
+      isBoardRole,
+      nome,
+    })),
     pautas: splitLines(form.pautasText),
     resultados: splitLines(form.resultadosText),
   };

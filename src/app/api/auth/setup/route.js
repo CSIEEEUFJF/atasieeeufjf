@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 
 import {
   checkAuthRateLimit,
@@ -29,7 +29,7 @@ export async function POST(request) {
 
   if (await hasUsers()) {
     return NextResponse.json(
-      { detail: "A configuracao inicial ja foi concluida." },
+      { detail: "A configuração inicial já foi concluída." },
       { headers: noStoreHeaders(), status: 409 },
     );
   }
@@ -46,7 +46,7 @@ export async function POST(request) {
     return response;
   } catch (error) {
     return NextResponse.json(
-      { detail: error.message || "Nao foi possivel criar o usuario inicial." },
+      { detail: error.message || "Não foi possível criar o usuário inicial." },
       { headers: noStoreHeaders(), status: 400 },
     );
   }

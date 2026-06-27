@@ -1,7 +1,8 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 
+import LoadingBall from "./LoadingBall";
 import UserPasswordDialog from "./UserPasswordDialog";
 
 const ROLE_OPTIONS = [
@@ -33,7 +34,7 @@ async function readApiError(response, fallback) {
 function createMemberForm(defaultChapter = "") {
   return {
     cargo: "Membro",
-    chapters: defaultChapter ? [defaultChapter] : [],
+    chapters: defaultChapter ?[defaultChapter] : [],
     isAdmin: false,
     name: "",
     password: "",
@@ -48,7 +49,7 @@ function normalizeRole(value, fallback = "Membro") {
   }
 
   const canonical = ROLE_ALIASES[cleanValue] || cleanValue;
-  return ROLE_OPTIONS.includes(canonical) ? canonical : fallback;
+  return ROLE_OPTIONS.includes(canonical) ?canonical : fallback;
 }
 
 function normalizeChapterRoles(chapterRoles) {
@@ -67,12 +68,12 @@ function createChapterRolesDraft(user) {
   const roles = normalizeChapterRoles(user.chapterRoles);
   const fallbackCargo = normalizeRole(user.cargo, "Membro");
   const hasSpecificRoles = Object.keys(roles).length > 0;
-  const userChapters = Array.isArray(user.chapters) ? user.chapters : [];
+  const userChapters = Array.isArray(user.chapters) ?user.chapters : [];
 
   return Object.fromEntries(
     userChapters.map((chapterKey) => [
       chapterKey,
-      roles[chapterKey] || (hasSpecificRoles ? "" : fallbackCargo),
+      roles[chapterKey] || (hasSpecificRoles ?"" : fallbackCargo),
     ]),
   );
 }
@@ -83,7 +84,7 @@ function createUserDraft(user) {
   return {
     cargo: Object.values(chapterRoles).find(Boolean) || user.cargo || "",
     chapterRoles,
-    chapters: Array.isArray(user.chapters) ? user.chapters : [],
+    chapters: Array.isArray(user.chapters) ?user.chapters : [],
     isAdmin: Boolean(user.isAdmin),
     name: user.name || "",
   };
@@ -95,11 +96,11 @@ function hydrateDrafts(users) {
 
 function roleOptionsFor(value) {
   const cleanValue = normalizeRole(value, "");
-  return cleanValue && !ROLE_OPTIONS.includes(cleanValue) ? [...ROLE_OPTIONS, cleanValue] : ROLE_OPTIONS;
+  return cleanValue && !ROLE_OPTIONS.includes(cleanValue) ?[...ROLE_OPTIONS, cleanValue] : ROLE_OPTIONS;
 }
 
 function selectedChaptersForDraft(draft, chapters) {
-  return draft.isAdmin ? chapters.map((chapter) => chapter.key) : draft.chapters || [];
+  return draft.isAdmin ?chapters.map((chapter) => chapter.key) : draft.chapters || [];
 }
 
 function chapterRolesForPayload(draft, selectedChapters) {
@@ -129,7 +130,7 @@ export default function MembersPage() {
   const [userDrafts, setUserDrafts] = useState({});
   const [status, setStatus] = useState({
     tone: "idle",
-    text: "Carregando gestao de membros.",
+    text: "Carregando gestão de membros.",
   });
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [isCreatingMember, setIsCreatingMember] = useState(false);
@@ -161,7 +162,7 @@ export default function MembersPage() {
       try {
         const response = await fetch("/api/auth/me", { cache: "no-store" });
         if (!response.ok) {
-          throw new Error("Nao foi possivel verificar a autenticacao.");
+          throw new Error("Não foi possível verificar a autenticação.");
         }
 
         const payload = await response.json();
@@ -170,9 +171,9 @@ export default function MembersPage() {
         }
 
         const currentUser = payload.user || null;
-        const chapterOptions = Array.isArray(payload.chapters) ? payload.chapters : [];
+        const chapterOptions = Array.isArray(payload.chapters) ?payload.chapters : [];
         const defaultChapter = currentUser?.isAdmin
-          ? currentUser?.chapters?.[0] || chapterOptions[0]?.key || ""
+          ?currentUser?.chapters?.[0] || chapterOptions[0]?.key || ""
           : currentUser?.manageableChapters?.[0] || "";
         setAuth({
           loading: false,
@@ -190,7 +191,7 @@ export default function MembersPage() {
           });
           setStatus({
             tone: "error",
-            text: error.message || "Nao foi possivel verificar a autenticacao.",
+            text: error.message || "Não foi possível verificar a autenticação.",
           });
         }
       }
@@ -208,18 +209,18 @@ export default function MembersPage() {
     }
   }, [auth.user]);
 
-  const nextTheme = theme === "dark" ? "light" : "dark";
+  const nextTheme = theme === "dark" ?"light" : "dark";
   const isAdmin = Boolean(auth.user?.isAdmin);
   const manageableChapterKeys = Array.isArray(auth.user?.manageableChapters)
-    ? auth.user.manageableChapters
+    ?auth.user.manageableChapters
     : [];
   const visibleChapters = isAdmin
-    ? chapters
+    ?chapters
     : chapters.filter((chapter) => manageableChapterKeys.includes(chapter.key));
   const defaultManagedChapter = visibleChapters[0]?.key || "";
 
   function toggleTheme() {
-    setTheme((current) => (current === "dark" ? "light" : "dark"));
+    setTheme((current) => (current === "dark" ?"light" : "dark"));
   }
 
   async function loadUsers() {
@@ -229,18 +230,18 @@ export default function MembersPage() {
     try {
       const response = await fetch("/api/users", { cache: "no-store" });
       if (!response.ok) {
-        throw new Error(await readApiError(response, "Nao foi possivel carregar membros."));
+        throw new Error(await readApiError(response, "Não foi possível carregar membros."));
       }
 
       const payload = await response.json();
-      const nextUsers = Array.isArray(payload.users) ? payload.users : [];
+      const nextUsers = Array.isArray(payload.users) ?payload.users : [];
       setUsers(nextUsers);
       setUserDrafts(hydrateDrafts(nextUsers));
       setStatus({ tone: "success", text: "Membros atualizados." });
     } catch (error) {
       setStatus({
         tone: "error",
-        text: error.message || "Nao foi possivel carregar membros.",
+        text: error.message || "Não foi possível carregar membros.",
       });
     } finally {
       setIsLoadingUsers(false);
@@ -292,7 +293,7 @@ export default function MembersPage() {
         delete chapterRoles[chapterKey];
       } else {
         selected.add(chapterKey);
-        chapterRoles[chapterKey] = chapterRoles[chapterKey] || draft.cargo || "";
+        chapterRoles[chapterKey] = chapterRoles[chapterKey] || "Membro";
       }
 
       return {
@@ -334,12 +335,12 @@ export default function MembersPage() {
     event.preventDefault();
     const allowedChapters = new Set(visibleChapters.map((chapter) => chapter.key));
     const selectedChapters = memberForm.chapters.filter((chapterKey) => allowedChapters.has(chapterKey));
-    const selectedRole = isAdmin ? normalizeRole(memberForm.cargo) : "Membro";
+    const selectedRole = "Membro";
 
     if (!selectedChapters.length) {
       setStatus({
         tone: "error",
-        text: "Selecione pelo menos um capitulo que voce pode gerenciar.",
+        text: "Selecione pelo menos um capítulo que você pode gerenciar.",
       });
       return;
     }
@@ -347,7 +348,7 @@ export default function MembersPage() {
     setIsCreatingMember(true);
     setStatus({
       tone: "loading",
-      text: isAdmin && memberForm.isAdmin ? "Cadastrando novo administrador." : "Cadastrando membro.",
+      text: isAdmin && memberForm.isAdmin ?"Cadastrando novo administrador." : "Cadastrando membro.",
     });
 
     try {
@@ -359,7 +360,7 @@ export default function MembersPage() {
             selectedChapters.map((chapterKey) => [chapterKey, selectedRole]),
           ),
           chapters: selectedChapters,
-          isAdmin: isAdmin ? memberForm.isAdmin : false,
+          isAdmin: isAdmin ?memberForm.isAdmin : false,
         }),
         headers: {
           "Content-Type": "application/json",
@@ -368,7 +369,7 @@ export default function MembersPage() {
       });
 
       if (!response.ok) {
-        throw new Error(await readApiError(response, "Nao foi possivel cadastrar o membro."));
+        throw new Error(await readApiError(response, "Não foi possível cadastrar o membro."));
       }
 
       setMemberForm(createMemberForm(defaultManagedChapter));
@@ -376,13 +377,13 @@ export default function MembersPage() {
       setStatus({
         tone: "success",
         text: isAdmin && memberForm.isAdmin
-          ? "Administrador cadastrado com acesso a todos os capitulos."
+          ?"Administrador cadastrado com acesso a todos os capítulos."
           : "Membro cadastrado.",
       });
     } catch (error) {
       setStatus({
         tone: "error",
-        text: error.message || "Nao foi possivel cadastrar o membro.",
+        text: error.message || "Não foi possível cadastrar o membro.",
       });
     } finally {
       setIsCreatingMember(false);
@@ -393,7 +394,7 @@ export default function MembersPage() {
     if (!isAdmin) {
       setStatus({
         tone: "error",
-        text: "Apenas administradores podem editar usuarios existentes.",
+        text: "Apenas administradores podem editar usuários existentes.",
       });
       return;
     }
@@ -425,11 +426,11 @@ export default function MembersPage() {
       });
 
       if (!response.ok) {
-        throw new Error(await readApiError(response, "Nao foi possivel atualizar o membro."));
+        throw new Error(await readApiError(response, "Não foi possível atualizar o membro."));
       }
 
       const data = await response.json();
-      setUsers((current) => current.map((item) => (item.id === user.id ? data.user || item : item)));
+      setUsers((current) => current.map((item) => (item.id === user.id ?data.user || item : item)));
       if (user.id === auth.user.id && data.user) {
         setAuth((current) => ({ ...current, user: data.user }));
       }
@@ -437,11 +438,11 @@ export default function MembersPage() {
         ...current,
         [user.id]: createUserDraft(data.user || user),
       }));
-      setStatus({ tone: "success", text: "Usuario atualizado." });
+      setStatus({ tone: "success", text: "Usuário atualizado." });
     } catch (error) {
       setStatus({
         tone: "error",
-        text: error.message || "Nao foi possivel atualizar o membro.",
+        text: error.message || "Não foi possível atualizar o membro.",
       });
     } finally {
       setSavingUserId(null);
@@ -455,27 +456,18 @@ export default function MembersPage() {
       data-theme-current={theme}
       onClick={toggleTheme}
       aria-pressed={theme === "dark"}
-      aria-label={`Alternar para tema ${nextTheme === "dark" ? "escuro" : "claro"}`}
-      title={`Trocar para tema ${nextTheme === "dark" ? "escuro" : "claro"}`}
+      aria-label={`Alternar para tema ${nextTheme === "dark" ?"escuro" : "claro"}`}
+      title={`Trocar para tema ${nextTheme === "dark" ?"escuro" : "claro"}`}
     >
       <span className="theme-toggle__icon" aria-hidden="true" />
       <span className="theme-toggle__label">
-        {theme === "dark" ? "Tema escuro" : "Tema claro"}
+        {theme === "dark" ?"Tema escuro" : "Tema claro"}
       </span>
     </button>
   );
 
   if (auth.loading) {
-    return (
-      <div className="app-shell auth-shell">
-        {themeToggleButton}
-        <section className="hero-panel auth-card">
-          <p className="panel-kicker">Membros</p>
-          <h1>Carregando gestao</h1>
-          <p>Verificando sua sessao antes de abrir o painel de membros.</p>
-        </section>
-      </div>
-    );
+    return <LoadingBall />;
   }
 
   if (!auth.user || !auth.user.canManageMembers) {
@@ -484,14 +476,14 @@ export default function MembersPage() {
         {themeToggleButton}
         <section className="hero-panel auth-card">
           <p className="panel-kicker">Membros</p>
-          <h1>Acesso de gestao necessario</h1>
+          <h1>Acesso de gestão necessario</h1>
           <p>
             {auth.setupRequired
-              ? "Crie o primeiro usuario pelo gerador antes de gerenciar membros."
-              : "Entre com um administrador ou gestor de capitulo para gerenciar membros."}
+              ?"Crie o primeiro usuário antes de gerenciar membros."
+              : "Entre com um administrador ou gestor de capítulo para gerenciar membros."}
           </p>
-          <a className="primary-button standalone-link" href="/">
-            Ir para o gerador
+          <a className="primary-button standalone-link" href="/atas/nova">
+            Entrar no sistema
           </a>
         </section>
       </div>
@@ -501,18 +493,20 @@ export default function MembersPage() {
   return (
     <div className="app-shell">
       <header className="site-nav">
-        <a href="/" className="site-brand" aria-label="Ir para o gerador">
+        <a href="/diretoria/membros" className="site-brand" aria-label="Ir para membros da diretoria">
           <span className="site-brand-badge" aria-hidden="true" />
           <span className="site-brand-lockup">
-            <span className="site-brand-text">Sistema de Atas</span>
-            <span className="site-brand-meta">Gestao de membros</span>
+            <span className="site-brand-text">Sistema Interno - IEEE UFJF</span>
+            <span className="site-brand-meta">Gestão de membros</span>
           </span>
         </a>
 
         <ul className="nav-links">
-          <li><a href="/">Gerador</a></li>
-          <li><a href="/atas">Atas salvas</a></li>
-          <li><a href="/membros" aria-current="page">Membros</a></li>
+          <li><a href="/">Início</a></li>
+          <li><a href="/atas">Atas</a></li>
+          <li><a href="/tarefas">Tarefas</a></li>
+          <li><a href="/calendario">Calendário</a></li>
+          <li><a href="/diretoria" aria-current="page">Diretoria</a></li>
         </ul>
 
         <div className="topbar-actions">
@@ -531,7 +525,7 @@ export default function MembersPage() {
       </header>
 
       {themeToggleButton}
-      {isPasswordDialogOpen ? (
+      {isPasswordDialogOpen ?(
         <UserPasswordDialog
           user={auth.user}
           onClose={() => setIsPasswordDialogOpen(false)}
@@ -542,10 +536,10 @@ export default function MembersPage() {
         <section className="hero-panel members-hero">
           <div>
             <p className="panel-kicker">Acessos</p>
-            <h1>Gestao de membros</h1>
+            <h1>Gestão de membros</h1>
             <p>
-              Cadastre usuarios, defina cargo/função por sociedade e controle acesso por capitulo.
-              Gestores de capitulo podem cadastrar novos membros nos capitulos que gerenciam.
+              Cadastre usuários, defina cargo/função por sociedade e controle acesso por capítulo.
+              Gestores de capítulo podem cadastrar novos membros nos capítulos que gerenciam.
             </p>
           </div>
           <div className={`status-box tone-${status.tone}`}>
@@ -583,22 +577,6 @@ export default function MembersPage() {
               </label>
 
               <label className="field">
-                <span>{isAdmin ? "Cargo / função padrão" : "Cargo / função"}</span>
-                <select
-                  value={memberForm.cargo}
-                  onChange={(event) => updateMemberField("cargo", event.target.value)}
-                  disabled={!isAdmin}
-                >
-                  {ROLE_OPTIONS.map((role) => (
-                    <option key={role} value={role}>
-                      {role}
-                    </option>
-                  ))}
-                </select>
-                {!isAdmin ? <small>Gestores cadastram novos usuarios como Membro.</small> : null}
-              </label>
-
-              <label className="field">
                 <span>Senha inicial</span>
                 <input
                   type="password"
@@ -608,7 +586,7 @@ export default function MembersPage() {
                 />
               </label>
 
-              {isAdmin ? (
+              {isAdmin ?(
                 <>
                   <label className="member-admin-toggle">
                     <input
@@ -618,14 +596,14 @@ export default function MembersPage() {
                     />
                     <span>
                       <strong>Criar como administrador</strong>
-                      <small>Admins podem gerenciar membros e acessam todos os capitulos.</small>
+                      <small>Admins podem gerenciar membros e acessam todos os capítulos.</small>
                     </span>
                   </label>
                 </>
               ) : null}
 
               <div className="chapter-checklist">
-                <span>{isAdmin ? "Capitulos permitidos" : "Capitulos que voce gerencia"}</span>
+                <span>{isAdmin ?"Capítulos permitidos" : "Capítulos que você gerencia"}</span>
                 {visibleChapters.map((chapter) => (
                   <label key={chapter.key}>
                     <input
@@ -642,9 +620,9 @@ export default function MembersPage() {
 
               <button className="primary-button" disabled={isCreatingMember}>
                 {isCreatingMember
-                  ? "Cadastrando..."
+                  ?"Cadastrando..."
                   : memberForm.isAdmin
-                    ? "Cadastrar admin"
+                    ?"Cadastrar admin"
                     : "Cadastrar membro"}
               </button>
             </form>
@@ -654,7 +632,7 @@ export default function MembersPage() {
             <div className="panel-header">
               <div>
                 <p className="panel-kicker">Cadastrados</p>
-                <h2>{users.length ? `${users.length} usuario(s)` : "Nenhum usuario carregado"}</h2>
+                <h2>{users.length ?`${users.length} usuário(s)` : "Nenhum usuário carregado"}</h2>
               </div>
               <button className="soft-button" onClick={loadUsers} disabled={isLoadingUsers}>
                 Atualizar
@@ -662,11 +640,11 @@ export default function MembersPage() {
             </div>
 
             <div className="member-list">
-              {users.length ? (
+              {users.length ?(
                 users.map((user) => {
                   const draft = userDrafts[user.id] || createUserDraft(user);
                   const isSelf = user.id === auth.user.id;
-                  const editableChapters = isAdmin ? chapters : visibleChapters;
+                  const editableChapters = isAdmin ?chapters : visibleChapters;
                   const selectedChapterKeys = selectedChaptersForDraft(draft, editableChapters);
                   const selectedChapterCount = selectedChapterKeys.length;
 
@@ -678,14 +656,14 @@ export default function MembersPage() {
                           <span>@{user.username}</span>
                         </div>
                         <div className="member-row-meta">
-                          {user.isAdmin ? <span className="member-pill">Admin</span> : null}
+                          {user.isAdmin ?<span className="member-pill">Admin</span> : null}
                           <span className="member-pill member-pill-muted">
                             {selectedChapterCount} sociedade(s)
                           </span>
                         </div>
                       </div>
 
-                      {isAdmin ? (
+                      {isAdmin ?(
                         <div className="member-edit-grid">
                           <label className="field">
                             <span>Nome</span>
@@ -704,7 +682,7 @@ export default function MembersPage() {
                             />
                             <span>
                               <strong>Administrador</strong>
-                              <small>{isSelf ? "Voce nao pode alterar sua propria permissao." : "Concede acesso a gestao."}</small>
+                              <small>{isSelf ?"Você não pode alterar sua própria permissão." : "Concede acesso à gestão."}</small>
                             </span>
                           </label>
                         </div>
@@ -715,7 +693,7 @@ export default function MembersPage() {
                           <span>Sociedades</span>
                           <small>
                             {selectedChapterCount
-                              ? `${selectedChapterCount} habilitada(s). Clique para editar acesso e cargo.`
+                              ?`${selectedChapterCount} habilitada(s). Clique para editar acesso e cargo.`
                               : "Clique para habilitar sociedades e cargos."}
                           </small>
                         </summary>
@@ -727,7 +705,7 @@ export default function MembersPage() {
 
                             return (
                               <div
-                                className={`chapter-role-row ${chapterEnabled ? "is-enabled" : ""}`}
+                                className={`chapter-role-row ${chapterEnabled ?"is-enabled" : ""}`}
                                 key={chapter.key}
                               >
                                 <label className="chapter-role-access">
@@ -770,7 +748,7 @@ export default function MembersPage() {
                         </div>
                       </details>
 
-                      {isAdmin ? (
+                      {isAdmin ?(
                         <div className="inline-actions">
                           <button
                             className="soft-button"
@@ -778,7 +756,7 @@ export default function MembersPage() {
                             onClick={() => handleSaveUser(user)}
                             disabled={savingUserId === user.id}
                           >
-                            {savingUserId === user.id ? "Salvando..." : "Salvar neste usuario"}
+                            {savingUserId === user.id ?"Salvando..." : "Salvar neste usuário"}
                           </button>
                         </div>
                       ) : null}

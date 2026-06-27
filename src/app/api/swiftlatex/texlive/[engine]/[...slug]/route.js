@@ -1,4 +1,4 @@
-import { promises as fs } from "node:fs";
+﻿import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { NextResponse } from "next/server";
@@ -107,7 +107,7 @@ async function tryServeLocal(engine, slug) {
   const engineRoot = ENGINE_ROOTS[engine];
   const manifest = await loadLocalManifest(engine);
   const relativePath = slug[0] === "pk"
-    ? manifest.files?.[`${filename}.pk`] || filename
+    ?manifest.files?.[`${filename}.pk`] || filename
     : resolveLocalRelativePath(manifest, filename, Number.parseInt(slug[0] || "", 10));
 
   const candidate = resolveSafeCandidate(engineRoot, relativePath);
@@ -123,7 +123,7 @@ async function tryServeLocal(engine, slug) {
       "content-type": "application/octet-stream",
     });
 
-    headers.set(filename.endsWith(".pk") ? "pkid" : "fileid", path.basename(candidate));
+    headers.set(filename.endsWith(".pk") ?"pkid" : "fileid", path.basename(candidate));
     return new Response(content, { headers, status: 200 });
   } catch (error) {
     if (error?.code === "ENOENT") {
@@ -136,10 +136,10 @@ async function tryServeLocal(engine, slug) {
 export async function GET(_request, context) {
   const params = await context.params;
   const engine = String(params.engine || "").trim();
-  const slug = Array.isArray(params.slug) ? params.slug : [];
+  const slug = Array.isArray(params.slug) ?params.slug : [];
 
   if (!ALLOWED_ENGINES.has(engine) || !slug.length) {
-    return NextResponse.json({ detail: "Caminho invalido." }, { status: 400 });
+    return NextResponse.json({ detail: "Caminho inválido." }, { status: 400 });
   }
 
   const localResponse = await tryServeLocal(engine, slug);

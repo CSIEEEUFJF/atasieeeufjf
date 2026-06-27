@@ -14,7 +14,7 @@ async function collectFiles(baseDir, relativeDir = "") {
 
   for (const entry of entries) {
     const entryRelativePath = relativeDir
-      ? `${relativeDir}/${entry.name}`
+      ?`${relativeDir}/${entry.name}`
       : entry.name;
     const entryAbsolutePath = path.join(baseDir, entryRelativePath);
 

@@ -1,4 +1,4 @@
-import crypto from "node:crypto";
+﻿import crypto from "node:crypto";
 
 import {
   expandirSociedadesParaBusca,
@@ -11,7 +11,7 @@ import { getPrisma } from "./db";
 export class ChapterAccessError extends Error {}
 
 function text(value, fallback = "") {
-  return typeof value === "string" ? value.trim() : fallback;
+  return typeof value === "string" ?value.trim() : fallback;
 }
 
 function getAccessibleChapters(user) {
@@ -30,7 +30,7 @@ function getAccessibleChapters(user) {
 
 function assertChapterAccess(user, chapterKey) {
   if (!getAccessibleChapters(user).includes(normalizarSociedadeChave(chapterKey, ""))) {
-    throw new ChapterAccessError("Voce nao tem acesso a este capitulo.");
+    throw new ChapterAccessError("Você não tem acesso a este capítulo.");
   }
 }
 
@@ -39,7 +39,7 @@ function limitedText(value, maxLength, fallback = "") {
 }
 
 function listObjects(value) {
-  return Array.isArray(value) ? value.filter((item) => item && typeof item === "object") : [];
+  return Array.isArray(value) ?value.filter((item) => item && typeof item === "object") : [];
 }
 
 function cleanFileName(value) {
@@ -53,11 +53,11 @@ function cleanFileName(value) {
 
 function normalizeFileSize(value) {
   const size = Number(value || 0);
-  return Number.isSafeInteger(size) && size > 0 ? size : 0;
+  return Number.isSafeInteger(size) && size > 0 ?size : 0;
 }
 
 function normalizeAtaPayload(raw) {
-  const form = raw?.form && typeof raw.form === "object" ? raw.form : raw;
+  const form = raw?.form && typeof raw.form === "object" ?raw.form : raw;
   const sociedade = normalizarSociedadeChave(form?.sociedade);
   const outputName = normalizarNomeSaida(raw?.outputName || raw?.arquivo_saida || "ata_preenchida");
   const title = limitedText(raw?.title || form?.titulo || form?.title || outputName, 140, outputName);
@@ -80,9 +80,9 @@ function normalizeAtaPayload(raw) {
         id: limitedText(item.id || crypto.randomUUID(), 80),
         nome: limitedText(item.nome, 180),
       })),
-      pautasText: text(form?.pautasText || (Array.isArray(form?.pautas) ? form.pautas.join("\n") : "")),
+      pautasText: text(form?.pautasText || (Array.isArray(form?.pautas) ?form.pautas.join("\n") : "")),
       resultadosText: text(
-        form?.resultadosText || (Array.isArray(form?.resultados) ? form.resultados.join("\n") : ""),
+        form?.resultadosText || (Array.isArray(form?.resultados) ?form.resultados.join("\n") : ""),
       ),
       sociedade,
       titulo: title,
@@ -135,7 +135,7 @@ export async function parseAtaSaveRequest(request) {
   const payloadRaw = formData.get("payload");
 
   if (typeof payloadRaw !== "string") {
-    throw new Error("Payload da ata nao foi enviado.");
+    throw new Error("Payload da ata não foi enviado.");
   }
 
   const payload = normalizeAtaPayload(JSON.parse(payloadRaw));
@@ -156,7 +156,7 @@ function attachmentCreateData(attachment) {
 }
 
 function serializeDate(value) {
-  return value instanceof Date ? value.toISOString() : value;
+  return value instanceof Date ?value.toISOString() : value;
 }
 
 function summarizeAta(row) {
@@ -179,12 +179,12 @@ export async function listSavedAtas(user, chapterKey = "") {
 
   const rawRequestedChapter = text(chapterKey);
   const requestedChapter = rawRequestedChapter
-    ? normalizarSociedadeChave(rawRequestedChapter, "")
+    ?normalizarSociedadeChave(rawRequestedChapter, "")
     : "";
   if (rawRequestedChapter && !requestedChapter) {
-    throw new ChapterAccessError("Capitulo invalido.");
+    throw new ChapterAccessError("Capítulo inválido.");
   }
-  const filteredChapters = requestedChapter ? [requestedChapter] : accessibleChapters;
+  const filteredChapters = requestedChapter ?[requestedChapter] : accessibleChapters;
   if (requestedChapter) {
     assertChapterAccess(user, requestedChapter);
   }
@@ -225,7 +225,7 @@ export async function getSavedAtaSummary(user, ataId) {
     },
   });
 
-  return row ? summarizeAta(row) : null;
+  return row ?summarizeAta(row) : null;
 }
 
 export async function createSavedAta(user, { attachments, payload }) {
@@ -295,7 +295,7 @@ export async function updateSavedAta(user, ataId, { attachments, payload }) {
     });
   });
 
-  return ata ? summarizeAta(ata) : null;
+  return ata ?summarizeAta(ata) : null;
 }
 
 export async function renameSavedAta(user, ataId, title) {
@@ -349,7 +349,7 @@ export async function renameSavedAta(user, ataId, title) {
     });
   });
 
-  return ata ? summarizeAta(ata) : null;
+  return ata ?summarizeAta(ata) : null;
 }
 
 export async function deleteSavedAta(user, ataId) {

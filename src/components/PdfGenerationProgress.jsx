@@ -20,16 +20,16 @@ function formatSeconds(seconds) {
 
   const minutes = Math.floor(seconds / 60);
   const remainder = seconds % 60;
-  return remainder ? `${minutes}min ${remainder}s` : `${minutes}min`;
+  return remainder ?`${minutes}min ${remainder}s` : `${minutes}min`;
 }
 
 function estimatePdfGenerationSeconds(form) {
-  const attachments = Array.isArray(form?.anexos) ? form.anexos : [];
+  const attachments = Array.isArray(form?.anexos) ?form.anexos : [];
   const attachmentMegabytes = attachments.reduce((total, attachment) => {
     const size = Number(attachment.file?.size || attachment.size || 0);
-    return total + (Number.isFinite(size) && size > 0 ? size / 1024 / 1024 : 0);
+    return total + (Number.isFinite(size) && size > 0 ?size / 1024 / 1024 : 0);
   }, 0);
-  const members = Array.isArray(form?.membros) ? form.membros.length : 0;
+  const members = Array.isArray(form?.membros) ?form.membros.length : 0;
   const textLines = splitLines(form?.pautasText).length + splitLines(form?.resultadosText).length;
 
   return clamp(
@@ -84,7 +84,7 @@ export default function PdfGenerationProgress({ active, form, label = "Gerando P
   }
 
   const remainingLabel = snapshot.remainingSeconds
-    ? `~${formatSeconds(snapshot.remainingSeconds)} restantes`
+    ?`~${formatSeconds(snapshot.remainingSeconds)} restantes`
     : "Finalizando...";
 
   return (

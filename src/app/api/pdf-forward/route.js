@@ -14,7 +14,7 @@ export async function POST(request) {
   const forwardUrl = getForwardUrl().trim();
   if (!forwardUrl) {
     return NextResponse.json({
-      detail: "PDF_FORWARD_URL nao configurada.",
+      detail: "PDF_FORWARD_URL não configurada.",
       forwarded: false,
       skipped: true,
     });
@@ -33,7 +33,7 @@ export async function POST(request) {
   const pdf = incomingForm.get("pdf");
   if (!pdf || typeof pdf.arrayBuffer !== "function") {
     return NextResponse.json(
-      { detail: "Arquivo PDF nao enviado." },
+      { detail: "Arquivo PDF não enviado." },
       { status: 400 },
     );
   }
@@ -48,7 +48,7 @@ export async function POST(request) {
   outgoingForm.append("targetFolder", metadata.targetFolder);
 
   const token = getForwardToken().trim();
-  const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+  const headers = token ?{ Authorization: `Bearer ${token}` } : undefined;
 
   try {
     const response = await fetch(forwardUrl, {

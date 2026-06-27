@@ -1,4 +1,4 @@
-import { normalizarSociedadeChave, SOCIEDADES } from "./ata";
+﻿import { normalizarSociedadeChave, SOCIEDADES } from "./ata";
 import { canManageMembers } from "./auth";
 import { getPrisma } from "./db";
 
@@ -48,7 +48,7 @@ function getGoogleDriveFileId(value) {
     }
 
     const fileMatch = url.pathname.match(/\/file\/d\/([^/]+)/);
-    return fileMatch?.[1] ? decodeURIComponent(fileMatch[1]).trim() : "";
+    return fileMatch?.[1] ?decodeURIComponent(fileMatch[1]).trim() : "";
   } catch {
     return "";
   }
@@ -71,9 +71,9 @@ function sanitizeUrl(value) {
 
   try {
     const url = new URL(cleanValue);
-    return ["http:", "https:"].includes(url.protocol) ? url.toString() : "";
+    return ["http:", "https:"].includes(url.protocol) ?url.toString() : "";
   } catch {
-    return cleanValue.startsWith("/") ? cleanValue : "";
+    return cleanValue.startsWith("/") ?cleanValue : "";
   }
 }
 
@@ -98,11 +98,11 @@ function sanitizePhotoZoom(value, fallback = 100) {
 function normalizeRole(role) {
   const cleanRole = sanitizeText(role, 80);
   const canonical = MEMBER_ROLE_ALIASES[cleanRole] || cleanRole;
-  return MEMBER_ROLE_OPTIONS.includes(canonical) ? canonical : "Membro";
+  return MEMBER_ROLE_OPTIONS.includes(canonical) ?canonical : "Membro";
 }
 
 function normalizeChapters(chapters) {
-  const requested = Array.isArray(chapters) ? chapters : [];
+  const requested = Array.isArray(chapters) ?chapters : [];
   const normalized = requested
     .map((chapter) => normalizarSociedadeChave(chapter, ""))
     .filter((chapter) => CHAPTER_KEYS.includes(chapter));
@@ -132,7 +132,7 @@ function publicSiteMember(row) {
 
 function requireSiteMemberManagement(user) {
   if (!canManageMembers(user)) {
-    throw new Error("Voce nao tem permissao para gerenciar membros do site.");
+    throw new Error("Você não tem permissão para gerenciar membros do site.");
   }
 }
 
@@ -145,13 +145,13 @@ function sanitizeSiteMemberPayload(payload = {}) {
   return {
     bio: sanitizeText(payload.bio, 600),
     chapters: normalizeChapters(payload.chapters),
-    isPublic: typeof payload.isPublic === "boolean" ? Boolean(payload.isPublic) : true,
+    isPublic: typeof payload.isPublic === "boolean" ?Boolean(payload.isPublic) : true,
     name: cleanName,
     photoUrl: sanitizeUrl(payload.photoUrl),
     photoPositionX: sanitizePercentage(payload.photoPositionX),
     photoPositionY: sanitizePercentage(payload.photoPositionY),
     photoZoom: sanitizePhotoZoom(payload.photoZoom),
-    position: Number.isSafeInteger(Number(payload.position)) ? Number(payload.position) : 0,
+    position: Number.isSafeInteger(Number(payload.position)) ?Number(payload.position) : 0,
     role: normalizeRole(payload.role || payload.cargo),
   };
 }
@@ -195,7 +195,7 @@ function sanitizePartialSiteMemberPayload(payload = {}) {
   }
 
   if (Object.prototype.hasOwnProperty.call(payload, "position")) {
-    data.position = Number.isSafeInteger(Number(payload.position)) ? Number(payload.position) : 0;
+    data.position = Number.isSafeInteger(Number(payload.position)) ?Number(payload.position) : 0;
   }
 
   if (Object.prototype.hasOwnProperty.call(payload, "role") || Object.prototype.hasOwnProperty.call(payload, "cargo")) {
