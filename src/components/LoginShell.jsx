@@ -85,7 +85,7 @@ export default function LoginShell({
           <aside className="login-02-cover" aria-label="Sistema Interno IEEE UFJF">
             <img
               className="login-02-cover-image"
-              src="/login-ramo.jpg"
+              src="/login-ramo.jpeg"
               alt="Membros do Ramo Estudantil IEEE UFJF"
             />
           </aside>
