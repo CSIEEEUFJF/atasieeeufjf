@@ -6,6 +6,11 @@ import LoadingBall from "./LoadingBall";
 import UserPasswordDialog from "./UserPasswordDialog";
 import { DEMO_USER } from "./demo-data";
 
+const DEFAULT_HOME_PHOTOS = [
+  { id: "default-login", imageUrl: "/login-ramo.jpg", title: "Ramo IEEE UFJF" },
+  { id: "default-home-2", imageUrl: "/home-ramo-2.jpg", title: "Atividade do Ramo" },
+];
+
 async function readApiError(response, fallback) {
   try {
     const payload = await response.json();
@@ -21,6 +26,15 @@ function createInitialAuthForm() {
     password: "",
     username: "",
   };
+}
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Não foi possível ler a imagem."));
+    reader.readAsDataURL(file);
+  });
 }
 
 function ThemeToggle({ theme, onToggle }) {
@@ -57,6 +71,12 @@ export default function HomeDashboard({ demoMode = false } = {}) {
     tone: "idle",
     text: "Entre para acessar o sistema interno.",
   });
+  const [homePhotos, setHomePhotos] = useState(DEFAULT_HOME_PHOTOS);
+  const [homePhotoIndex, setHomePhotoIndex] = useState(0);
+  const [isPhotoDialogOpen, setIsPhotoDialogOpen] = useState(false);
+  const [photoForm, setPhotoForm] = useState({ imageUrl: "", title: "" });
+  const [photoMessage, setPhotoMessage] = useState("");
+  const [isSavingPhoto, setIsSavingPhoto] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
 
@@ -134,6 +154,51 @@ export default function HomeDashboard({ demoMode = false } = {}) {
     }
   }, [auth.loading, auth.user, demoMode]);
 
+  useEffect(() => {
+    if (!auth.user) {
+      return;
+    }
+
+    let active = true;
+
+    async function loadHomePhotos() {
+      try {
+        const response = await fetch("/api/site-home-photos", { cache: "no-store" });
+        if (!response.ok) {
+          return;
+        }
+
+        const payload = await response.json();
+        const photos = Array.isArray(payload.photos) ?payload.photos : [];
+        if (active && photos.length) {
+          setHomePhotos(photos);
+        }
+      } catch {
+        if (active) {
+          setHomePhotos(DEFAULT_HOME_PHOTOS);
+        }
+      }
+    }
+
+    loadHomePhotos();
+    return () => {
+      active = false;
+    };
+  }, [auth.user]);
+
+  useEffect(() => {
+    if (homePhotos.length <= 1) {
+      setHomePhotoIndex(0);
+      return undefined;
+    }
+
+    const timer = window.setInterval(() => {
+      setHomePhotoIndex((current) => (current + 1) % homePhotos.length);
+    }, 5000);
+
+    return () => window.clearInterval(timer);
+  }, [homePhotos.length]);
+
   function toggleTheme() {
     setTheme((current) => (current === "dark" ? "light" : "dark"));
   }
@@ -199,6 +264,85 @@ export default function HomeDashboard({ demoMode = false } = {}) {
 
   if (auth.loading) {
     return <LoadingBall />;
+  }
+
+  async function handlePhotoFileChange(event) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    if (!/^image\/(?:jpeg|jpg|png|webp)$/i.test(file.type)) {
+      setPhotoMessage("Use uma imagem JPG, PNG ou WebP.");
+      return;
+    }
+
+    if (file.size > 1_100_000) {
+      setPhotoMessage("Use uma imagem menor que 1 MB.");
+      return;
+    }
+
+    try {
+      const imageUrl = await fileToDataUrl(file);
+      setPhotoForm((current) => ({
+        ...current,
+        imageUrl,
+        title: current.title || file.name.replace(/\.[^.]+$/, ""),
+      }));
+      setPhotoMessage("");
+    } catch (error) {
+      setPhotoMessage(error.message || "Não foi possível ler a imagem.");
+    }
+  }
+
+  async function handleCreatePhoto(event) {
+    event.preventDefault();
+    setIsSavingPhoto(true);
+    setPhotoMessage("Salvando foto.");
+
+    try {
+      const response = await fetch("/api/site-home-photos/manage", {
+        body: JSON.stringify(photoForm),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error(await readApiError(response, "Não foi possível cadastrar a foto."));
+      }
+
+      const payload = await response.json();
+      setHomePhotos((current) => [...current, payload.photo].filter(Boolean));
+      setPhotoForm({ imageUrl: "", title: "" });
+      setPhotoMessage("Foto adicionada ao slideshow.");
+    } catch (error) {
+      setPhotoMessage(error.message || "Não foi possível cadastrar a foto.");
+    } finally {
+      setIsSavingPhoto(false);
+    }
+  }
+
+  async function deletePhoto(photo) {
+    if (!Number.isSafeInteger(Number(photo.id))) {
+      setHomePhotos((current) => current.filter((item) => item.id !== photo.id));
+      return;
+    }
+
+    if (!window.confirm("Remover esta foto do slideshow?")) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/site-home-photos/manage/${photo.id}`, { method: "DELETE" });
+      if (!response.ok) {
+        throw new Error(await readApiError(response, "Não foi possível remover a foto."));
+      }
+
+      setHomePhotos((current) => current.filter((item) => item.id !== photo.id));
+      setPhotoMessage("Foto removida.");
+    } catch (error) {
+      setPhotoMessage(error.message || "Não foi possível remover a foto.");
+    }
   }
 
   if (!auth.user) {
@@ -273,8 +417,108 @@ export default function HomeDashboard({ demoMode = false } = {}) {
       {!demoMode && isPasswordDialogOpen ?(
         <UserPasswordDialog user={auth.user} onClose={() => setIsPasswordDialogOpen(false)} />
       ) : null}
+      {!demoMode && isPhotoDialogOpen ?(
+        <div className="dialog-backdrop" role="presentation">
+          <section
+            className="password-dialog home-photo-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="home-photo-dialog-title"
+          >
+            <div className="password-dialog-header">
+              <div>
+                <span>Homepage</span>
+                <h2 id="home-photo-dialog-title">Fotos do slideshow</h2>
+              </div>
+              <button
+                className="text-button"
+                type="button"
+                onClick={() => setIsPhotoDialogOpen(false)}
+                disabled={isSavingPhoto}
+              >
+                Fechar
+              </button>
+            </div>
+
+            <form className="internal-form" onSubmit={handleCreatePhoto}>
+              <label className="field">
+                <span>Título</span>
+                <input
+                  value={photoForm.title}
+                  onChange={(event) =>
+                    setPhotoForm((current) => ({ ...current, title: event.target.value }))
+                  }
+                  maxLength={120}
+                />
+              </label>
+
+              <label className="field">
+                <span>Imagem</span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handlePhotoFileChange}
+                />
+              </label>
+
+              {photoForm.imageUrl ?(
+                <img className="home-photo-preview" src={photoForm.imageUrl} alt="" />
+              ) : null}
+
+              {photoMessage ?(
+                <div className="status-box tone-idle">
+                  <span>Status</span>
+                  <strong>{photoMessage}</strong>
+                </div>
+              ) : null}
+
+              <button className="primary-button" disabled={isSavingPhoto || !photoForm.imageUrl}>
+                {isSavingPhoto ?"Salvando..." : "Adicionar foto"}
+              </button>
+            </form>
+
+            <div className="home-photo-manage-list">
+              {homePhotos.map((photo) => (
+                <article className="home-photo-manage-item" key={photo.id}>
+                  <img src={photo.imageUrl} alt="" />
+                  <span>{photo.title || "Foto do Ramo"}</span>
+                  <button
+                    className="text-button danger"
+                    type="button"
+                    onClick={() => deletePhoto(photo)}
+                  >
+                    Remover
+                  </button>
+                </article>
+              ))}
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       <main className="page-main board-page-main">
+        <section className="home-slideshow" aria-label="Fotos do Ramo IEEE UFJF">
+          <div className="home-slideshow__track">
+            {homePhotos.map((photo, index) => (
+              <img
+                className={index === homePhotoIndex ?"is-active" : ""}
+                src={photo.imageUrl}
+                alt={photo.title || "Foto do Ramo IEEE UFJF"}
+                key={photo.id}
+              />
+            ))}
+          </div>
+          {!demoMode && auth.user.canManageMembers ?(
+            <button
+              className="home-photo-button"
+              type="button"
+              onClick={() => setIsPhotoDialogOpen(true)}
+            >
+              Adicionar foto
+            </button>
+          ) : null}
+        </section>
+
         <section className="hero-panel internal-hero internal-hero--simple">
           <div>
             <p className="panel-kicker">Início</p>

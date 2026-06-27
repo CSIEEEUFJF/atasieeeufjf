@@ -90,6 +90,19 @@ model SiteProject {
   @@map("site_projects")
 }
 
+model SiteHomePhoto {
+  id        Int      @id @default(autoincrement())
+  title     String   @default("")
+  imageUrl  String   @map("image_url")
+  isPublic  Boolean  @default(true) @map("is_public")
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([isPublic, position, id], map: "idx_site_home_photos_public_order")
+  @@map("site_home_photos")
+}
+
 model Ata {
   id          Int             @id @default(autoincrement())
   userId      Int             @map("user_id")
@@ -143,18 +156,23 @@ model InternalTask {
 }
 
 model InternalEvent {
-  id          Int      @id @default(autoincrement())
-  title       String
-  description String   @default("")
-  location    String   @default("")
-  chapter     String
-  startTime   DateTime @map("start_time")
-  endTime     DateTime @map("end_time")
-  createdById Int      @map("created_by_id")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-  createdBy   User     @relation("InternalEventCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  id                  Int      @id @default(autoincrement())
+  title               String
+  description         String   @default("")
+  location            String   @default("")
+  chapter             String
+  startTime           DateTime @map("start_time")
+  endTime             DateTime @map("end_time")
+  recurrenceSeriesId  String?  @map("recurrence_series_id")
+  recurrenceFrequency String?  @map("recurrence_frequency")
+  recurrenceIndex     Int?     @map("recurrence_index")
+  recurrenceCount     Int?     @map("recurrence_count")
+  createdById         Int      @map("created_by_id")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+  createdBy           User     @relation("InternalEventCreator", fields: [createdById], references: [id], onDelete: Cascade)
 
   @@index([chapter, startTime], map: "idx_internal_events_chapter_start")
+  @@index([recurrenceSeriesId], map: "idx_internal_events_recurrence_series")
   @@map("internal_events")
 }

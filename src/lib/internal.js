@@ -1,4 +1,6 @@
-﻿import { getManageableChapterKeys, isChapterMember, isRamoBoardMember } from "./auth";
+﻿import crypto from "node:crypto";
+
+import { getManageableChapterKeys, isChapterMember, isRamoBoardMember } from "./auth";
 import { expandirSociedadesParaBusca, normalizarSociedadeChave, SOCIEDADE_LABELS } from "./ata";
 import { getPrisma } from "./db";
 import {
@@ -44,6 +46,36 @@ function parseDate(value, fieldName, { required = true } = {}) {
   return date;
 }
 
+function parseBrtDateTime(value, fieldName, options = {}) {
+  if (!value || value instanceof Date || /(?:Z|[+-]\d\d:?\d\d)$/.test(String(value))) {
+    return parseDate(value, fieldName, options);
+  }
+
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/);
+  if (!match) {
+    return parseDate(value, fieldName, options);
+  }
+
+  const [, year, month, day, hour, minute, second = "0"] = match;
+  const date = new Date(Date.UTC(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour) + 3,
+    Number(minute),
+    Number(second),
+  ));
+
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`${fieldName} inválido.`);
+  }
+
+  return date;
+}
+
+function createRecurrenceSeriesId() {
+  return crypto.randomUUID();
+}
 function normalizeRecurrenceCount(value) {
   const count = Number.parseInt(String(value || "1"), 10);
   if (!Number.isSafeInteger(count) || count < 1) {
@@ -203,6 +235,10 @@ function publicEvent(row) {
     endTime: row.endTime?.toISOString(),
     id: row.id,
     location: row.location,
+    recurrenceCount: row.recurrenceCount,
+    recurrenceFrequency: row.recurrenceFrequency,
+    recurrenceIndex: row.recurrenceIndex,
+    recurrenceSeriesId: row.recurrenceSeriesId,
     startTime: row.startTime?.toISOString(),
     title: row.title,
     updatedAt: row.updatedAt?.toISOString(),
@@ -412,8 +448,8 @@ export async function listInternalEvents(user, chapter = "") {
 export async function createInternalEvent(user, payload = {}) {
   const title = trimText(payload.title, 160);
   const chapter = normalizeInternalChapter(payload.chapter);
-  const startTime = parseDate(payload.startTime, "o início do evento");
-  const endTime = parseDate(payload.endTime, "o fim do evento");
+  const startTime = parseBrtDateTime(payload.startTime, "o início do evento");
+  const endTime = parseBrtDateTime(payload.endTime, "o fim do evento");
 
   if (!title) {
     throw new Error("Informe o título do evento.");
@@ -429,18 +465,30 @@ export async function createInternalEvent(user, payload = {}) {
 
   ensureCanWriteChapter(user, chapter);
 
+  const occurrences = buildEventOccurrences({ endTime, payload, startTime });
+  const recurrenceSeriesId = occurrences.length > 1 ?createRecurrenceSeriesId() : null;
+  const recurrenceFrequency = recurrenceSeriesId
+    ?EVENT_RECURRENCE_FREQUENCIES.has(payload.recurrenceFrequency)
+      ?payload.recurrenceFrequency
+      : "weekly"
+    : null;
+
   const baseData = {
     chapter,
     createdById: user.id,
     description: trimText(payload.description, 1200),
     location: trimText(payload.location, 240),
+    recurrenceCount: recurrenceSeriesId ?occurrences.length : null,
+    recurrenceFrequency,
+    recurrenceSeriesId,
     title,
   };
-  const eventCreates = buildEventOccurrences({ endTime, payload, startTime }).map((occurrence) =>
+  const eventCreates = occurrences.map((occurrence, index) =>
     getPrisma().internalEvent.create({
       data: {
         ...baseData,
         endTime: occurrence.endTime,
+        recurrenceIndex: recurrenceSeriesId ?index : null,
         startTime: occurrence.startTime,
       },
       include: { createdBy: { select: { id: true, name: true } } },
@@ -467,10 +515,10 @@ export async function updateInternalEvent(user, eventId, payload = {}) {
     ?normalizeInternalChapter(payload.chapter)
     : currentEvent.chapter;
   const startTime = Object.prototype.hasOwnProperty.call(payload, "startTime")
-    ?parseDate(payload.startTime, "o início do evento")
+    ?parseBrtDateTime(payload.startTime, "o início do evento")
     : currentEvent.startTime;
   const endTime = Object.prototype.hasOwnProperty.call(payload, "endTime")
-    ?parseDate(payload.endTime, "o fim do evento")
+    ?parseBrtDateTime(payload.endTime, "o fim do evento")
     : currentEvent.endTime;
 
   if (endTime <= startTime) {
@@ -502,7 +550,7 @@ export async function updateInternalEvent(user, eventId, payload = {}) {
   return publicEvent(event);
 }
 
-export async function deleteInternalEvent(user, eventId) {
+export async function deleteInternalEvent(user, eventId, { series = false } = {}) {
   const event = await getPrisma().internalEvent.findUnique({ where: { id: eventId } });
   if (!event) {
     return false;
@@ -511,6 +559,24 @@ export async function deleteInternalEvent(user, eventId) {
   ensureCanViewChapter(user, event.chapter);
   if (!canManageItem(user, event)) {
     throw new InternalAccessError("Somente criador, admin ou gestor do capítulo pode excluir este evento.");
+  }
+
+  if (series && event.recurrenceSeriesId) {
+    const events = await getPrisma().internalEvent.findMany({
+      where: { recurrenceSeriesId: event.recurrenceSeriesId },
+    });
+    events.forEach((item) => {
+      ensureCanViewChapter(user, item.chapter);
+      if (!canManageItem(user, item)) {
+        throw new InternalAccessError("Somente criador, admin ou gestor do capítulo pode excluir esta série.");
+      }
+    });
+
+    await getPrisma().internalEvent.deleteMany({
+      where: { recurrenceSeriesId: event.recurrenceSeriesId },
+    });
+    await Promise.all(events.map((item) => deleteEventFromFirebase(item)));
+    return true;
   }
 
   await getPrisma().internalEvent.delete({ where: { id: eventId } });

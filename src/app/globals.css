@@ -1999,6 +1999,108 @@ html[data-theme="dark"] .pdf-progress {
   max-width: 1320px;
 }
 
+.board-page-main:has(.home-slideshow) {
+  padding-top: 88px;
+}
+
+.home-slideshow {
+  position: relative;
+  min-height: 150px;
+  margin-bottom: 14px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface-strong);
+  box-shadow: var(--shadow-soft);
+}
+
+.home-slideshow__track {
+  position: absolute;
+  inset: 0;
+}
+
+.home-slideshow__track img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.7s ease;
+}
+
+.home-slideshow__track img.is-active,
+.home-slideshow__track img:only-child {
+  opacity: 1;
+}
+
+.home-slideshow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.5), transparent 58%),
+    linear-gradient(0deg, rgba(0, 0, 0, 0.18), transparent);
+  pointer-events: none;
+}
+
+.home-photo-button {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  z-index: 2;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.42);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.home-photo-dialog {
+  width: min(100%, 760px);
+  max-height: min(88vh, 780px);
+  overflow: auto;
+}
+
+.home-photo-preview {
+  width: 100%;
+  height: 160px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.home-photo-manage-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.home-photo-manage-item {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.home-photo-manage-item img {
+  width: 96px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+}
+
+.home-photo-manage-item span {
+  color: var(--text-strong);
+  font-weight: 800;
+}
+
 .board-chapter-list {
   display: grid;
   gap: 24px;
@@ -2012,6 +2114,20 @@ html[data-theme="dark"] .pdf-progress {
 
 .home-action-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.home-action-grid .board-action-card {
+  min-height: 168px;
+  padding: 22px 24px;
+}
+
+.board-page-main .internal-hero--simple {
+  margin-bottom: 16px;
+  padding: 24px 26px;
+}
+
+.board-page-main .internal-hero--simple h1 {
+  font-size: clamp(2.25rem, 4.9vw, 4.2rem);
 }
 
 .board-action-card {
@@ -2286,6 +2402,41 @@ html[data-theme="dark"] .internal-summary-strip span {
 .calendar-item__date strong {
   color: var(--text-strong);
   line-height: 1.35;
+}
+
+.calendar-item__title-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.recurrence-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 3px 8px;
+  border: 1px solid rgba(0, 98, 155, 0.18);
+  border-radius: 999px;
+  background: rgba(0, 98, 155, 0.08);
+  color: var(--ieee-blue);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+html[data-theme="dark"] .recurrence-badge {
+  border-color: rgba(186, 221, 255, 0.24);
+  background: rgba(186, 221, 255, 0.08);
+  color: #baddff;
+}
+
+.calendar-item__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
 }
 
 .day-schedule-panel {

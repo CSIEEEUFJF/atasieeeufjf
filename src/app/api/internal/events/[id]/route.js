@@ -68,7 +68,10 @@ export async function DELETE(request, { params }) {
   }
 
   try {
-    const deleted = await deleteInternalEvent(user, id);
+    const { searchParams } = new URL(request.url);
+    const deleted = await deleteInternalEvent(user, id, {
+      series: searchParams.get("series") === "1",
+    });
     if (!deleted) {
       return NextResponse.json({ detail: "Evento não encontrado." }, { status: 404 });
     }

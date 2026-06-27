@@ -26,31 +26,66 @@ const TASK_PRIORITY_LABELS = {
   high: "Alta",
 };
 
+const BRT_TIME_ZONE = "America/Sao_Paulo";
+
 function tomorrowAt(hour) {
   const date = new Date();
   date.setDate(date.getDate() + 1);
   date.setHours(hour, 0, 0, 0);
-  return toLocalDateTimeInput(date);
+  return toBrtDateTimeInput(date);
 }
 
-function toLocalDateTimeInput(value) {
+function getBrtDateParts(value) {
   const date = value instanceof Date ?value : new Date(value);
   if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    day: "2-digit",
+    hour: "2-digit",
+    hour12: false,
+    minute: "2-digit",
+    month: "2-digit",
+    timeZone: BRT_TIME_ZONE,
+    year: "numeric",
+  }).formatToParts(date);
+
+  return Object.fromEntries(parts.map((part) => [part.type, part.value]));
+}
+
+function toBrtDateTimeInput(value) {
+  const parts = getBrtDateParts(value);
+  if (!parts) {
     return "";
   }
 
-  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-  return offsetDate.toISOString().slice(0, 16);
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+}
+
+function brtInputToIso(value) {
+  const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+  if (!match) {
+    return value || "";
+  }
+
+  const [, year, month, day, hour, minute] = match;
+  return new Date(Date.UTC(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour) + 3,
+    Number(minute),
+  )).toISOString();
 }
 
 function toDateInputValue(value) {
-  const date = value instanceof Date ?value : new Date(value);
-  if (Number.isNaN(date.getTime())) {
+  const parts = getBrtDateParts(value);
+  if (!parts) {
     return "";
   }
 
-  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-  return offsetDate.toISOString().slice(0, 10);
+  return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
 function formatDateTime(value) {
@@ -63,8 +98,14 @@ function formatDateTime(value) {
     return "Data inválida";
   }
 
-  const pad = (item) => String(item).padStart(2, "0");
-  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "2-digit",
+    timeZone: BRT_TIME_ZONE,
+    year: "numeric",
+  }).format(date).replace(",", "");
 }
 
 function formatTime(value) {
@@ -73,7 +114,11 @@ function formatTime(value) {
     return "--:--";
   }
 
-  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  return new Intl.DateTimeFormat("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: BRT_TIME_ZONE,
+  }).format(date);
 }
 
 function formatDailyScheduleTitle(count) {
@@ -146,7 +191,7 @@ function createDemoChapterOptions() {
 }
 
 function addRecurrence(date, frequency, index) {
-  const nextDate = new Date(date);
+  const nextDate = new Date(brtInputToIso(date));
   if (frequency === "daily") {
     nextDate.setDate(nextDate.getDate() + index);
   } else if (frequency === "biweekly") {
@@ -158,6 +203,52 @@ function addRecurrence(date, frequency, index) {
   }
 
   return nextDate.toISOString();
+}
+
+function eventSeriesKey(event) {
+  if (event.recurrenceSeriesId) {
+    return `series:${event.recurrenceSeriesId}`;
+  }
+
+  return [
+    "legacy",
+    event.chapter || "",
+    event.title || "",
+    event.description || "",
+    event.location || "",
+    formatTime(event.startTime),
+    formatTime(event.endTime),
+  ].join(":");
+}
+
+function isRecurringEvent(event) {
+  return Boolean(event.recurrenceSeriesId || Number(event.recurrenceCount) > 1);
+}
+
+function getVisibleEventItems(events) {
+  const now = Date.now();
+  const grouped = new Map();
+
+  events.forEach((event) => {
+    const key = eventSeriesKey(event);
+    const current = grouped.get(key) || [];
+    current.push(event);
+    grouped.set(key, current);
+  });
+
+  return Array.from(grouped.values())
+    .map((group) => {
+      const sorted = [...group].sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+      const upcoming = sorted.find((event) => new Date(event.startTime).getTime() >= now);
+      const event = upcoming || sorted[sorted.length - 1];
+      return {
+        ...event,
+        isRecurring: group.length > 1 || isRecurringEvent(event),
+        seriesEventIds: group.map((item) => item.id),
+        seriesSize: Number(event.recurrenceCount) || group.length,
+      };
+    })
+    .sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
 }
 
 export default function InternalDashboard({ page = "tasks", demoMode = false }) {
@@ -185,6 +276,7 @@ export default function InternalDashboard({ page = "tasks", demoMode = false }) 
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [isEventDialogOpen, setIsEventDialogOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState(null);
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(() => toDateInputValue(new Date()));
 
   useEffect(() => {
@@ -293,6 +385,7 @@ export default function InternalDashboard({ page = "tasks", demoMode = false }) 
     !selectedChapter || selectedChapter === GLOBAL_CHAPTER || item.chapter === selectedChapter;
   const displayedTasks = tasks.filter(chapterMatchesFilter);
   const displayedEvents = events.filter(chapterMatchesFilter);
+  const visibleCalendarEvents = useMemo(() => getVisibleEventItems(displayedEvents), [displayedEvents]);
   const openTasks = displayedTasks.filter((task) => task.status !== "done");
   const doneTasks = displayedTasks.filter((task) => task.status === "done");
   const dailyEvents = useMemo(
@@ -522,28 +615,83 @@ export default function InternalDashboard({ page = "tasks", demoMode = false }) 
     }
   }
 
+  function openCreateEventDialog() {
+    setEditingEvent(null);
+    setEventForm(createEventForm(eventForm.chapter || selectedChapter || GLOBAL_CHAPTER));
+    setIsEventDialogOpen(true);
+  }
+
+  function openEditEventDialog(event) {
+    setEditingEvent(event);
+    setEventForm({
+      chapter: event.chapter || GLOBAL_CHAPTER,
+      description: event.description || "",
+      endTime: toBrtDateTimeInput(event.endTime),
+      location: event.location || "",
+      recurrenceCount: event.recurrenceCount || 1,
+      recurrenceEnabled: false,
+      recurrenceFrequency: event.recurrenceFrequency || "weekly",
+      startTime: toBrtDateTimeInput(event.startTime),
+      title: event.title || "",
+    });
+    setIsEventDialogOpen(true);
+  }
+
+  function closeEventDialog() {
+    setIsEventDialogOpen(false);
+    setEditingEvent(null);
+  }
+
   async function handleCreateEvent(event) {
     event.preventDefault();
     setIsSavingEvent(true);
-    setStatus({ tone: "loading", text: "Salvando evento." });
+    setStatus({ tone: "loading", text: editingEvent ?"Atualizando evento." : "Salvando evento." });
+
+    const eventPayload = {
+      ...eventForm,
+      chapter: eventForm.chapter || GLOBAL_CHAPTER,
+      endTime: brtInputToIso(eventForm.endTime),
+      startTime: brtInputToIso(eventForm.startTime),
+    };
 
     try {
       if (demoMode) {
+        if (editingEvent) {
+          const updatedEvent = {
+            ...editingEvent,
+            ...eventPayload,
+            recurrenceCount: editingEvent.recurrenceCount || null,
+            recurrenceFrequency: editingEvent.recurrenceFrequency || null,
+            recurrenceSeriesId: editingEvent.recurrenceSeriesId || null,
+          };
+          setEvents((current) =>
+            current.map((item) => (item.id === editingEvent.id ?updatedEvent : item)),
+          );
+          setEventForm(createEventForm(eventForm.chapter));
+          closeEventDialog();
+          setStatus({ tone: "success", text: "Evento demo atualizado localmente." });
+          return;
+        }
+
         const recurrenceCount = eventForm.recurrenceEnabled
           ?Math.max(1, Math.min(52, Number(eventForm.recurrenceCount) || 1))
           : 1;
+        const recurrenceSeriesId = recurrenceCount > 1 ?crypto.randomUUID() : null;
         const createdEvents = Array.from({ length: recurrenceCount }, (_, index) => ({
-          ...eventForm,
-          chapter: eventForm.chapter || GLOBAL_CHAPTER,
+          ...eventPayload,
           endTime: addRecurrence(eventForm.endTime, eventForm.recurrenceFrequency, index),
           id: crypto.randomUUID(),
+          recurrenceCount: recurrenceSeriesId ?recurrenceCount : null,
+          recurrenceFrequency: recurrenceSeriesId ?eventForm.recurrenceFrequency : null,
+          recurrenceIndex: recurrenceSeriesId ?index : null,
+          recurrenceSeriesId,
           startTime: addRecurrence(eventForm.startTime, eventForm.recurrenceFrequency, index),
         }));
         setEvents((current) =>
           [...current, ...createdEvents].sort((a, b) => new Date(a.startTime) - new Date(b.startTime)),
         );
         setEventForm(createEventForm(eventForm.chapter));
-        setIsEventDialogOpen(false);
+        closeEventDialog();
         setStatus({
           tone: "success",
           text: createdEvents.length > 1
@@ -553,10 +701,10 @@ export default function InternalDashboard({ page = "tasks", demoMode = false }) 
         return;
       }
 
-      const response = await fetch("/api/internal/events", {
-        body: JSON.stringify(eventForm),
+      const response = await fetch(editingEvent ?`/api/internal/events/${editingEvent.id}` : "/api/internal/events", {
+        body: JSON.stringify(eventPayload),
         headers: { "Content-Type": "application/json" },
-        method: "POST",
+        method: editingEvent ?"PATCH" : "POST",
       });
 
       if (!response.ok) {
@@ -564,22 +712,29 @@ export default function InternalDashboard({ page = "tasks", demoMode = false }) 
       }
 
       const payload = await response.json();
-      const createdEvents = Array.isArray(payload.events)
-        ?payload.events
-        : [payload.event].filter(Boolean);
-      setEvents((current) =>
-        [...current, ...createdEvents].filter(Boolean).sort((a, b) =>
-          new Date(a.startTime) - new Date(b.startTime),
-        ),
-      );
+      if (editingEvent) {
+        setEvents((current) =>
+          current.map((item) => (item.id === editingEvent.id ?payload.event || item : item)),
+        );
+        setStatus({ tone: "success", text: "Evento atualizado." });
+      } else {
+        const createdEvents = Array.isArray(payload.events)
+          ?payload.events
+          : [payload.event].filter(Boolean);
+        setEvents((current) =>
+          [...current, ...createdEvents].filter(Boolean).sort((a, b) =>
+            new Date(a.startTime) - new Date(b.startTime),
+          ),
+        );
+        setStatus({
+          tone: "success",
+          text: createdEvents.length > 1
+            ?`${createdEvents.length} eventos criados.`
+            : "Evento criado.",
+        });
+      }
       setEventForm(createEventForm(eventForm.chapter));
-      setIsEventDialogOpen(false);
-      setStatus({
-        tone: "success",
-        text: createdEvents.length > 1
-          ?`${createdEvents.length} eventos criados.`
-          : "Evento criado.",
-      });
+      closeEventDialog();
     } catch (error) {
       setStatus({
         tone: "error",
@@ -590,27 +745,56 @@ export default function InternalDashboard({ page = "tasks", demoMode = false }) 
     }
   }
 
-  async function deleteEvent(item) {
-    if (!window.confirm("Excluir este evento?")) {
+  async function deleteEvent(item, { series = false } = {}) {
+    const message = series
+      ?"Excluir todos os eventos desta série?"
+      : "Excluir este evento?";
+    if (!window.confirm(message)) {
       return;
     }
 
-    setStatus({ tone: "loading", text: "Excluindo evento." });
+    setStatus({ tone: "loading", text: series ?"Excluindo série." : "Excluindo evento." });
 
     try {
       if (demoMode) {
-        setEvents((current) => current.filter((event) => event.id !== item.id));
-        setStatus({ tone: "success", text: "Evento demo excluído localmente." });
+        setEvents((current) => current.filter((event) =>
+          series && item.recurrenceSeriesId
+            ?event.recurrenceSeriesId !== item.recurrenceSeriesId
+            : series && item.seriesEventIds?.length
+              ?!item.seriesEventIds.includes(event.id)
+            : event.id !== item.id,
+        ));
+        setStatus({
+          tone: "success",
+          text: series ?"Série demo excluída localmente." : "Evento demo excluído localmente.",
+        });
         return;
       }
 
-      const response = await fetch(`/api/internal/events/${item.id}`, { method: "DELETE" });
-      if (!response.ok) {
-        throw new Error(await readApiError(response, "Não foi possível excluir o evento."));
+      if (series && !item.recurrenceSeriesId && item.seriesEventIds?.length) {
+        const responses = await Promise.all(item.seriesEventIds.map((eventId) =>
+          fetch(`/api/internal/events/${eventId}`, { method: "DELETE" }),
+        ));
+        const failedResponse = responses.find((response) => !response.ok);
+        if (failedResponse) {
+          throw new Error(await readApiError(failedResponse, "Não foi possível excluir a série."));
+        }
+      } else {
+        const suffix = series ?"?series=1" : "";
+        const response = await fetch(`/api/internal/events/${item.id}${suffix}`, { method: "DELETE" });
+        if (!response.ok) {
+          throw new Error(await readApiError(response, "Não foi possível excluir o evento."));
+        }
       }
 
-      setEvents((current) => current.filter((event) => event.id !== item.id));
-      setStatus({ tone: "success", text: "Evento excluído." });
+      setEvents((current) => current.filter((event) =>
+        series && item.recurrenceSeriesId
+          ?event.recurrenceSeriesId !== item.recurrenceSeriesId
+          : series && item.seriesEventIds?.length
+            ?!item.seriesEventIds.includes(event.id)
+          : event.id !== item.id,
+      ));
+      setStatus({ tone: "success", text: series ?"Série excluída." : "Evento excluído." });
     } catch (error) {
       setStatus({
         tone: "error",
@@ -618,7 +802,6 @@ export default function InternalDashboard({ page = "tasks", demoMode = false }) 
       });
     }
   }
-
   const themeToggleButton = (
     <button
       type="button"
@@ -745,7 +928,7 @@ export default function InternalDashboard({ page = "tasks", demoMode = false }) 
               <button
                 className="primary-button internal-add-button"
                 type="button"
-                onClick={() => setIsEventDialogOpen(true)}
+                onClick={openCreateEventDialog}
               >
                 Agendar evento
               </button>
@@ -879,13 +1062,13 @@ export default function InternalDashboard({ page = "tasks", demoMode = false }) 
             >
               <div className="password-dialog-header">
                 <div>
-                  <span>Novo evento</span>
-                  <h2 id="event-dialog-title">Agendar evento</h2>
+                  <span>{editingEvent ?"Editar evento" : "Novo evento"}</span>
+                  <h2 id="event-dialog-title">{editingEvent ?"Editar evento" : "Agendar evento"}</h2>
                 </div>
                 <button
                   className="text-button"
                   type="button"
-                  onClick={() => setIsEventDialogOpen(false)}
+                  onClick={closeEventDialog}
                   disabled={isSavingEvent}
                 >
                   Fechar
@@ -958,6 +1141,7 @@ export default function InternalDashboard({ page = "tasks", demoMode = false }) 
                   <input
                     type="checkbox"
                     checked={eventForm.recurrenceEnabled}
+                    disabled={Boolean(editingEvent)}
                     onChange={(event) =>
                       setEventForm((current) => ({
                         ...current,
@@ -1018,7 +1202,11 @@ export default function InternalDashboard({ page = "tasks", demoMode = false }) 
                 </label>
 
                 <button className="primary-button" disabled={isSavingEvent}>
-                  {isSavingEvent ?"Salvando..." : "Criar evento"}
+                  {isSavingEvent
+                    ?"Salvando..."
+                    : editingEvent
+                      ?"Salvar alterações"
+                      : "Criar evento"}
                 </button>
               </form>
             </section>
@@ -1146,15 +1334,20 @@ export default function InternalDashboard({ page = "tasks", demoMode = false }) 
               </div>
 
               <div className="calendar-list">
-                {displayedEvents.length ?(
-                  displayedEvents.map((item) => (
+                {visibleCalendarEvents.length ?(
+                  visibleCalendarEvents.map((item) => (
                     <article className="calendar-item" key={item.id}>
                       <div className="calendar-item__date">
                         <strong>{formatDateTime(item.startTime)}</strong>
                         <span>{item.chapter}</span>
                       </div>
                       <div className="calendar-item__content">
-                        <h3>{item.title}</h3>
+                        <div className="calendar-item__title-row">
+                          <h3>{item.title}</h3>
+                          {item.isRecurring ?(
+                            <span className="recurrence-badge">Recorrente</span>
+                          ) : null}
+                        </div>
                         <p>{item.description || "Sem descrição."}</p>
                         <dl>
                           <div>
@@ -1167,13 +1360,31 @@ export default function InternalDashboard({ page = "tasks", demoMode = false }) 
                           </div>
                         </dl>
                       </div>
-                      <button
-                        className="text-button danger"
-                        type="button"
-                        onClick={() => deleteEvent(item)}
-                      >
-                        Excluir
-                      </button>
+                      <div className="calendar-item__actions">
+                        <button
+                          className="text-button"
+                          type="button"
+                          onClick={() => openEditEventDialog(item)}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          className="text-button danger"
+                          type="button"
+                          onClick={() => deleteEvent(item)}
+                        >
+                          Excluir
+                        </button>
+                        {item.isRecurring ?(
+                          <button
+                            className="text-button danger"
+                            type="button"
+                            onClick={() => deleteEvent(item, { series: true })}
+                          >
+                            Excluir série
+                          </button>
+                        ) : null}
+                      </div>
                     </article>
                   ))
                 ) : (
