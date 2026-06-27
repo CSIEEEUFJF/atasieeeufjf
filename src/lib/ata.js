@@ -16,6 +16,10 @@ export const SOCIEDADES = {
     folder: path.join(ROOT_DIR, "classes", "APS"),
     documentclass: "ataAPS",
   },
+  CAS: {
+    folder: path.join(ROOT_DIR, "classes", "CAS"),
+    documentclass: "ataCAS",
+  },
   CS: {
     folder: path.join(ROOT_DIR, "classes", "CS"),
     documentclass: "ataCS",
@@ -53,6 +57,7 @@ export const SOCIEDADES = {
 export const SOCIEDADE_LABELS = {
   AESS: "AESS - Aerospace and Electronic Systems Society",
   APS: "APS - Antennas and Propagation Society",
+  CAS: "CAS - Circuits and Systems Society",
   CS: "CS - Computer Society",
   EdSoc: "EdSoc - Education Society",
   IAS: "IAS - Industry Applications Society",
@@ -64,6 +69,8 @@ export const SOCIEDADE_LABELS = {
 };
 
 export const SOCIEDADE_ALIASES = {
+  CASS: "CAS",
+  "Circuits and Systems Society": "CAS",
   "Ramo Geral": "Ramo",
   "Ramo Geral IEEE": "Ramo",
 };

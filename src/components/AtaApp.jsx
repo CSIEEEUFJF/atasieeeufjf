@@ -21,6 +21,7 @@ const FALLBACK_SOCIETIES = [
   { chave: "IAS", nome: "IAS - Industry Applications Society" },
   { chave: "MTTS", nome: "MTT-S - Microwave Theory and Technology Society" },
   { chave: "RAS", nome: "RAS - Robotics and Automation Society" },
+  { chave: "CAS", nome: "CAS - Circuits and Systems Society" },
   { chave: "AESS", nome: "AESS - Aerospace and Electronic Systems Society" },
   { chave: "APS", nome: "APS - Antennas and Propagation Society" },
   { chave: "EdSoc", nome: "EdSoc - Education Society" },

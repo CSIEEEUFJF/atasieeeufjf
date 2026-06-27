@@ -52,7 +52,8 @@ function sanitizeUrl(value) {
 }
 
 function normalizeChapter(value) {
-  const chapter = normalizarSociedadeChave(value, "Ramo");
+  const cleanValue = String(value || "").trim();
+  const chapter = normalizarSociedadeChave(cleanValue, "");
   return CHAPTER_KEYS.includes(chapter) ? chapter : "Ramo";
 }
 
