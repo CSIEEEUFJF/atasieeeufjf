@@ -1533,20 +1533,38 @@ html[data-theme="dark"] .saved-card-topline span {
 
 .members-layout {
   display: grid;
-  grid-template-columns: minmax(280px, 0.78fr) minmax(0, 1.22fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 24px;
   align-items: start;
 }
 
-.member-create-panel {
-  position: sticky;
-  top: 94px;
+.member-create-dialog {
+  width: min(100%, 620px);
+  max-height: min(880px, calc(100vh - 48px));
+  overflow-y: auto;
 }
 
 .member-form,
 .member-list {
   display: grid;
   gap: 16px;
+}
+
+.member-toolbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.member-toolbar-actions .primary-button,
+.member-toolbar-actions .soft-button {
+  width: auto;
+}
+
+.member-search-row {
+  margin-bottom: 18px;
 }
 
 .member-admin-toggle {
@@ -2676,10 +2694,6 @@ html[data-theme="dark"] .field textarea:focus {
   }
 
   .hero-panel {
-    position: static;
-  }
-
-  .member-create-panel {
     position: static;
   }
 

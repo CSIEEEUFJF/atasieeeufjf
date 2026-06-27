@@ -4,6 +4,10 @@ import { getManageableChapterKeys, isChapterMember, isRamoBoardMember } from "./
 import { expandirSociedadesParaBusca, normalizarSociedadeChave, SOCIEDADE_LABELS } from "./ata";
 import { getPrisma } from "./db";
 import {
+  notifyMembersAboutCreatedEvent,
+  notifyMembersAboutCreatedTask,
+} from "./email-notifications";
+import {
   deleteEventFromFirebase,
   deleteTaskFromFirebase,
   syncEventsToFirebase,
@@ -363,6 +367,14 @@ export async function createInternalTask(user, payload = {}) {
   });
 
   await syncTaskToFirebase(task);
+  if (payload.notifyMembers === true) {
+    try {
+      await notifyMembersAboutCreatedTask({ creator: user, task });
+    } catch (error) {
+      console.error("Falha ao notificar membros sobre a tarefa.", error);
+    }
+  }
+
   return publicTask(task);
 }
 
@@ -497,6 +509,14 @@ export async function createInternalEvent(user, payload = {}) {
   const events = await getPrisma().$transaction(eventCreates);
 
   await syncEventsToFirebase(events);
+  if (payload.notifyMembers === true) {
+    try {
+      await notifyMembersAboutCreatedEvent({ creator: user, events });
+    } catch (error) {
+      console.error("Falha ao notificar membros sobre o evento.", error);
+    }
+  }
+
   return events.map(publicEvent);
 }
 

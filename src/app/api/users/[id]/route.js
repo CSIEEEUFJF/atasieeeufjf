@@ -2,6 +2,7 @@
 
 import {
   getCurrentUser,
+  isUniqueConstraintError,
   isSameOriginRequest,
   updateUserManagement,
 } from "../../../../lib/auth";
@@ -42,6 +43,7 @@ export async function PATCH(request, context) {
       "cargo",
       "chapterRoles",
       "chapters",
+      "email",
       "isAdmin",
       "name",
     ].some((field) => Object.prototype.hasOwnProperty.call(payload, field));
@@ -61,7 +63,11 @@ export async function PATCH(request, context) {
     return NextResponse.json({ user });
   } catch (error) {
     return NextResponse.json(
-      { detail: error.message || "Não foi possível atualizar o usuário." },
+      {
+        detail: isUniqueConstraintError(error)
+          ?"Já existe um membro com este e-mail."
+          : error.message || "Não foi possível atualizar o usuário.",
+      },
       { status: 400 },
     );
   }

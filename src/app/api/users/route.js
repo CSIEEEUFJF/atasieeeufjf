@@ -58,11 +58,11 @@ export async function POST(request) {
     const user = await createUserFromManagement(currentUser, payload);
     return NextResponse.json({ user }, { status: 201 });
   } catch (error) {
-    const duplicateUsername = isUniqueConstraintError(error);
+    const duplicateUserField = isUniqueConstraintError(error);
     return NextResponse.json(
       {
-        detail: duplicateUsername
-          ?"Já existe um membro com este nome de usuário."
+        detail: duplicateUserField
+          ?"Já existe um membro com este nome de usuário ou e-mail."
           : error.message || "Não foi possível criar o usuário.",
       },
       { status: 400 },

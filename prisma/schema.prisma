@@ -25,6 +25,7 @@ model User {
   createdEvents    InternalEvent[] @relation("InternalEventCreator")
   createdTasks     InternalTask[]  @relation("InternalTaskCreator")
   chapters         UserChapter[]
+  memberContact    MemberContact?
   sessions         Session[]
 
   @@map("users")
@@ -104,6 +105,22 @@ model SiteHomePhoto {
 
   @@index([isPublic, position, id], map: "idx_site_home_photos_public_order")
   @@map("site_home_photos")
+}
+
+model MemberContact {
+  id               Int       @id @default(autoincrement())
+  name             String
+  email            String    @unique
+  chapters         Json      @default("[]")
+  ieeeMemberNumber String?   @unique @map("ieee_member_number")
+  source           String    @default("ieee_member_detail_view")
+  userId           Int?      @unique @map("user_id")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  user             User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([source], map: "idx_member_contacts_source")
+  @@map("member_contacts")
 }
 
 model Ata {

@@ -8,6 +8,7 @@ import {
   SOCIEDADE_LABELS,
 } from "./ata";
 import { getPrisma, nowDate } from "./db";
+import { notifyUserWelcome } from "./email-notifications";
 
 export const SESSION_COOKIE = "atas_ieee_session";
 
@@ -122,6 +123,19 @@ function internalEmailForUsername(username) {
   return `${username}@local.atas-ieee`;
 }
 
+function normalizeEmail(value, fallback = "") {
+  const cleanValue = String(value || "").trim().toLowerCase();
+  if (!cleanValue) {
+    return fallback;
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanValue) || cleanValue.length > 254) {
+    throw new Error("Informe um e-mail válido.");
+  }
+
+  return cleanValue;
+}
+
 function chapterKeyFromRelation(chapter) {
   return normalizarSociedadeChave(
     typeof chapter === "string" ?chapter : chapter?.chapterKey,
@@ -233,6 +247,7 @@ function publicUser(row) {
     chapters: effectiveChapters,
     id: row.id,
     isAdmin: Boolean(row.isAdmin),
+    email: row.email || "",
     name: row.name,
     username: row.username,
   };
@@ -256,6 +271,7 @@ function publicMemberOption(row, chapterKey = "") {
   return {
     cargo: normalizeMemberRole(row.cargo, row.cargo || ""),
     chapterRoles: roles,
+    email: row.email || "",
     id: row.id,
     name: row.name,
     usesChapterRoles: hasSpecificRoles,
@@ -353,6 +369,7 @@ export async function createUser(
   const cleanUsername = normalizeUsername(username || email);
   const cleanName = String(name || "").trim();
   const cleanCargo = normalizeMemberRole(cargo, "Membro");
+  const cleanEmail = normalizeEmail(email, internalEmailForUsername(cleanUsername));
   const cleanPassword = String(password || "");
   const isAdmin = Boolean(options.isAdmin);
   const userChapters = normalizeChapterKeys(chapters, { allowAll: isAdmin });
@@ -380,7 +397,7 @@ export async function createUser(
       },
       cargo: cleanCargo,
       chapterRoles: cleanChapterRoles,
-      email: internalEmailForUsername(cleanUsername),
+      email: cleanEmail,
       isAdmin,
       name: cleanName,
       passwordHash,
@@ -389,6 +406,12 @@ export async function createUser(
     },
     include: { chapters: true },
   });
+
+  try {
+    await notifyUserWelcome({ initialPassword: cleanPassword, user });
+  } catch (error) {
+    console.error("Falha ao enviar e-mail de boas-vindas.", error);
+  }
 
   return publicUser(user);
 }
@@ -638,6 +661,9 @@ export async function updateUserManagement(currentUser, targetUserId, payload = 
     .map((chapter) => chapter.chapterKey)
     .filter((chapterKey) => !nextChapters.includes(normalizarSociedadeChave(chapterKey, "")));
   const cleanName = typeof payload.name === "string" ?payload.name.trim() : targetUser.name;
+  const cleanEmail = Object.prototype.hasOwnProperty.call(payload, "email")
+    ?normalizeEmail(payload.email, targetUser.email)
+    : targetUser.email;
   const nextCargo = typeof payload.cargo === "string"
     ?normalizeMemberRole(payload.cargo, "Membro")
     : normalizeMemberRole(targetUser.cargo, "Membro");
@@ -664,6 +690,7 @@ export async function updateUserManagement(currentUser, targetUserId, payload = 
           }
         : undefined,
       isAdmin: shouldBeAdmin,
+      email: cleanEmail,
       name: cleanName,
     },
     include: { chapters: true },

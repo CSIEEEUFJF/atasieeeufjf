@@ -158,6 +158,7 @@ function createTaskForm(defaultChapter = GLOBAL_CHAPTER) {
     chapter: defaultChapter,
     description: "",
     dueDate: "",
+    notifyMembers: false,
     priority: "normal",
     title: "",
   };
@@ -169,6 +170,7 @@ function createEventForm(defaultChapter = GLOBAL_CHAPTER) {
     description: "",
     endTime: tomorrowAt(19),
     location: "Sala do Ramo",
+    notifyMembers: false,
     recurrenceCount: 4,
     recurrenceEnabled: false,
     recurrenceFrequency: "weekly",
@@ -628,6 +630,7 @@ export default function InternalDashboard({ page = "tasks", demoMode = false }) 
       description: event.description || "",
       endTime: toBrtDateTimeInput(event.endTime),
       location: event.location || "",
+      notifyMembers: false,
       recurrenceCount: event.recurrenceCount || 1,
       recurrenceEnabled: false,
       recurrenceFrequency: event.recurrenceFrequency || "weekly",
@@ -1044,6 +1047,20 @@ export default function InternalDashboard({ page = "tasks", demoMode = false }) 
                   />
                 </label>
 
+                <label className="member-admin-toggle compact">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(taskForm.notifyMembers)}
+                    onChange={(event) =>
+                      setTaskForm((current) => ({ ...current, notifyMembers: event.target.checked }))
+                    }
+                  />
+                  <span>
+                    <strong>Notificar membros por e-mail</strong>
+                    <small>Envia a nova tarefa para os membros do capítulo selecionado.</small>
+                  </span>
+                </label>
+
                 <button className="primary-button" disabled={isSavingTask}>
                   {isSavingTask ?"Salvando..." : "Criar tarefa"}
                 </button>
@@ -1200,6 +1217,22 @@ export default function InternalDashboard({ page = "tasks", demoMode = false }) 
                     }
                   />
                 </label>
+
+                {!editingEvent ?(
+                  <label className="member-admin-toggle compact">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(eventForm.notifyMembers)}
+                      onChange={(event) =>
+                        setEventForm((current) => ({ ...current, notifyMembers: event.target.checked }))
+                      }
+                    />
+                    <span>
+                      <strong>Notificar membros por e-mail</strong>
+                      <small>Envia o novo evento para os membros do capítulo selecionado.</small>
+                    </span>
+                  </label>
+                ) : null}
 
                 <button className="primary-button" disabled={isSavingEvent}>
                   {isSavingEvent

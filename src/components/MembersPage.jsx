@@ -36,6 +36,7 @@ function createMemberForm(defaultChapter = "") {
   return {
     cargo: "Membro",
     chapters: defaultChapter ?[defaultChapter] : [],
+    email: "",
     isAdmin: false,
     name: "",
     password: "",
@@ -86,6 +87,7 @@ function createUserDraft(user) {
     cargo: Object.values(chapterRoles).find(Boolean) || user.cargo || "",
     chapterRoles,
     chapters: Array.isArray(user.chapters) ?user.chapters : [],
+    email: user.email || "",
     isAdmin: Boolean(user.isAdmin),
     name: user.name || "",
   };
@@ -118,6 +120,13 @@ function primaryCargoFromRoles(chapterRoles, selectedChapters, fallback = "") {
   return selectedChapters.map((chapterKey) => roles[chapterKey]).find(Boolean) || fallback || "";
 }
 
+function normalizeSearchText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
 export default function MembersPage({ demoMode = false } = {}) {
   const [theme, setTheme] = useState("light");
   const [auth, setAuth] = useState({
@@ -139,6 +148,8 @@ export default function MembersPage({ demoMode = false } = {}) {
   const [isCreatingMember, setIsCreatingMember] = useState(false);
   const [savingUserId, setSavingUserId] = useState(null);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [isCreateMemberDialogOpen, setIsCreateMemberDialogOpen] = useState(false);
+  const [memberSearch, setMemberSearch] = useState("");
 
   useEffect(() => {
     const savedTheme = window.localStorage.getItem("atas-ieee-theme");
@@ -248,6 +259,20 @@ export default function MembersPage({ demoMode = false } = {}) {
     ?chapters
     : chapters.filter((chapter) => manageableChapterKeys.includes(chapter.key));
   const defaultManagedChapter = visibleChapters[0]?.key || "";
+  const normalizedMemberSearch = normalizeSearchText(memberSearch.trim());
+  const filteredUsers = normalizedMemberSearch
+    ?users.filter((user) => {
+        const chapterText = Array.isArray(user.chapters) ?user.chapters.join(" ") : "";
+        const searchable = [
+          user.name,
+          user.username,
+          user.email,
+          chapterText,
+        ].join(" ");
+
+        return normalizeSearchText(searchable).includes(normalizedMemberSearch);
+      })
+    : users;
 
   function toggleTheme() {
     setTheme((current) => (current === "dark" ?"light" : "dark"));
@@ -403,6 +428,7 @@ export default function MembersPage({ demoMode = false } = {}) {
           chapters: selectedChapters,
           id: crypto.randomUUID(),
           isAdmin: isAdmin ?memberForm.isAdmin : false,
+          email: memberForm.email.trim(),
           name: memberForm.name.trim() || "Membro Demo",
           username: memberForm.username.trim() || `demo.${users.length + 1}`,
           usesChapterRoles: true,
@@ -411,6 +437,7 @@ export default function MembersPage({ demoMode = false } = {}) {
         setUsers(nextUsers);
         setUserDrafts(hydrateDrafts(nextUsers));
         setMemberForm(createMemberForm(defaultManagedChapter));
+        setIsCreateMemberDialogOpen(false);
         setStatus({
           tone: "success",
           text: isAdmin && memberForm.isAdmin
@@ -442,6 +469,7 @@ export default function MembersPage({ demoMode = false } = {}) {
 
       setMemberForm(createMemberForm(defaultManagedChapter));
       await loadUsers();
+      setIsCreateMemberDialogOpen(false);
       setStatus({
         tone: "success",
         text: isAdmin && memberForm.isAdmin
@@ -475,6 +503,7 @@ export default function MembersPage({ demoMode = false } = {}) {
       chapterRoles,
       chapters: selectedChapters,
       name: draft.name,
+      email: draft.email,
     };
 
     if (user.id !== auth.user.id) {
@@ -627,30 +656,27 @@ export default function MembersPage({ demoMode = false } = {}) {
           onClose={() => setIsPasswordDialogOpen(false)}
         />
       ) : null}
-
-      <main className="page-main members-page-main">
-        <section className="hero-panel members-hero">
-          <div>
-            <p className="panel-kicker">Acessos</p>
-            <h1>Gestão de membros</h1>
-            <p>
-              Cadastre usuários, defina cargo/função por sociedade e controle acesso por capítulo.
-              Gestores de capítulo podem cadastrar novos membros nos capítulos que gerenciam.
-            </p>
-          </div>
-          <div className={`status-box tone-${status.tone}`}>
-            <span>Status</span>
-            <strong>{status.text}</strong>
-          </div>
-        </section>
-
-        <section className="members-layout">
-          <article className="panel member-create-panel">
-            <div className="panel-header">
+      {isCreateMemberDialogOpen ?(
+        <div className="dialog-backdrop" role="presentation">
+          <section
+            className="password-dialog member-create-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="member-create-dialog-title"
+          >
+            <div className="password-dialog-header">
               <div>
-                <p className="panel-kicker">Novo acesso</p>
-                <h2>Cadastrar membro</h2>
+                <span>Novo acesso</span>
+                <h2 id="member-create-dialog-title">Cadastrar membro</h2>
               </div>
+              <button
+                className="text-button"
+                type="button"
+                onClick={() => setIsCreateMemberDialogOpen(false)}
+                disabled={isCreatingMember}
+              >
+                Fechar
+              </button>
             </div>
 
             <form className="member-form" onSubmit={handleCreateMember}>
@@ -660,6 +686,7 @@ export default function MembersPage({ demoMode = false } = {}) {
                   value={memberForm.name}
                   onChange={(event) => updateMemberField("name", event.target.value)}
                   autoComplete="name"
+                  required
                 />
               </label>
 
@@ -669,6 +696,18 @@ export default function MembersPage({ demoMode = false } = {}) {
                   value={memberForm.username}
                   onChange={(event) => updateMemberField("username", event.target.value)}
                   autoComplete="username"
+                  required
+                />
+              </label>
+
+              <label className="field">
+                <span>E-mail</span>
+                <input
+                  type="email"
+                  value={memberForm.email}
+                  onChange={(event) => updateMemberField("email", event.target.value)}
+                  autoComplete="email"
+                  required
                 />
               </label>
 
@@ -679,23 +718,22 @@ export default function MembersPage({ demoMode = false } = {}) {
                   value={memberForm.password}
                   onChange={(event) => updateMemberField("password", event.target.value)}
                   autoComplete="new-password"
+                  required
                 />
               </label>
 
               {isAdmin ?(
-                <>
-                  <label className="member-admin-toggle">
-                    <input
-                      type="checkbox"
-                      checked={memberForm.isAdmin}
-                      onChange={(event) => updateMemberField("isAdmin", event.target.checked)}
-                    />
-                    <span>
-                      <strong>Criar como administrador</strong>
-                      <small>Admins podem gerenciar membros e acessam todos os capítulos.</small>
-                    </span>
-                  </label>
-                </>
+                <label className="member-admin-toggle">
+                  <input
+                    type="checkbox"
+                    checked={memberForm.isAdmin}
+                    onChange={(event) => updateMemberField("isAdmin", event.target.checked)}
+                  />
+                  <span>
+                    <strong>Criar como administrador</strong>
+                    <small>Admins podem gerenciar membros e acessam todos os capítulos.</small>
+                  </span>
+                </label>
               ) : null}
 
               <div className="chapter-checklist">
@@ -722,22 +760,62 @@ export default function MembersPage({ demoMode = false } = {}) {
                     : "Cadastrar membro"}
               </button>
             </form>
-          </article>
+          </section>
+        </div>
+      ) : null}
 
+      <main className="page-main members-page-main">
+        <section className="hero-panel members-hero">
+          <div>
+            <p className="panel-kicker">Acessos</p>
+            <h1>Gestão de membros</h1>
+            <p>
+              Cadastre usuários, defina cargo/função por sociedade e controle acesso por capítulo.
+              Gestores de capítulo podem cadastrar novos membros nos capítulos que gerenciam.
+            </p>
+          </div>
+          <div className={`status-box tone-${status.tone}`}>
+            <span>Status</span>
+            <strong>{status.text}</strong>
+          </div>
+        </section>
+
+        <section className="members-layout">
           <article className="panel members-list-panel">
             <div className="panel-header">
               <div>
                 <p className="panel-kicker">Cadastrados</p>
-                <h2>{users.length ?`${users.length} usuário(s)` : "Nenhum usuário carregado"}</h2>
+                <h2>{users.length ?`${filteredUsers.length} de ${users.length} usuário(s)` : "Nenhum usuário carregado"}</h2>
               </div>
-              <button className="soft-button" onClick={loadUsers} disabled={isLoadingUsers}>
-                Atualizar
-              </button>
+              <div className="member-toolbar-actions">
+                <button
+                  className="primary-button"
+                  type="button"
+                  onClick={() => setIsCreateMemberDialogOpen(true)}
+                >
+                  Adicionar membro
+                </button>
+                <button className="soft-button" onClick={loadUsers} disabled={isLoadingUsers}>
+                  Atualizar
+                </button>
+              </div>
+            </div>
+
+            <div className="member-search-row">
+              <label className="field">
+                <span>Pesquisar membro</span>
+                <input
+                  type="search"
+                  value={memberSearch}
+                  onChange={(event) => setMemberSearch(event.target.value)}
+                  placeholder="Busque por nome, usuário, e-mail ou capítulo"
+                />
+              </label>
             </div>
 
             <div className="member-list">
-              {users.length ?(
-                users.map((user) => {
+              {filteredUsers.length ?(
+                filteredUsers.map((user) => {
                   const draft = userDrafts[user.id] || createUserDraft(user);
                   const isSelf = user.id === auth.user.id;
                   const editableChapters = isAdmin ?chapters : visibleChapters;
@@ -750,6 +828,7 @@ export default function MembersPage({ demoMode = false } = {}) {
                         <div>
                           <strong>{user.name}</strong>
                           <span>@{user.username}</span>
+                          {user.email ?<span>{user.email}</span> : null}
                         </div>
                         <div className="member-row-meta">
                           {user.isAdmin ?<span className="member-pill">Admin</span> : null}
@@ -766,6 +845,15 @@ export default function MembersPage({ demoMode = false } = {}) {
                             <input
                               value={draft.name}
                               onChange={(event) => updateUserDraft(user.id, "name", event.target.value)}
+                            />
+                          </label>
+
+                          <label className="field">
+                            <span>E-mail</span>
+                            <input
+                              type="email"
+                              value={draft.email || ""}
+                              onChange={(event) => updateUserDraft(user.id, "email", event.target.value)}
                             />
                           </label>
 
@@ -861,7 +949,7 @@ export default function MembersPage({ demoMode = false } = {}) {
                 })
               ) : (
                 <div className="empty-state">
-                  Nenhum membro carregado ainda.
+                  {users.length ?"Nenhum membro encontrado para esta busca." : "Nenhum membro carregado ainda."}
                 </div>
               )}
             </div>
