@@ -179,9 +179,30 @@ function memberCargoForSociety(member, society) {
     ? member.chapterRoles
     : {};
   const hasSpecificRoles = Boolean(member?.usesChapterRoles) || Object.keys(roles).length > 0;
+  const roleForSociety = Object.prototype.hasOwnProperty.call(roles, society)
+    ? roles[society] || ""
+    : "";
+  const otherSpecificRole = Object.entries(roles)
+    .filter(([chapterKey, cargo]) =>
+      chapterKey !== society && cargo && cargo !== "Membro",
+    )
+    .sort(([chapterA], [chapterB]) => {
+      if (chapterA === "Ramo") return -1;
+      if (chapterB === "Ramo") return 1;
+      return chapterA.localeCompare(chapterB);
+    })[0];
 
-  if (Object.prototype.hasOwnProperty.call(roles, society)) {
-    return roles[society] || "";
+  if (roleForSociety && roleForSociety !== "Membro") {
+    return roleForSociety;
+  }
+
+  if (otherSpecificRole) {
+    const [chapterKey, cargo] = otherSpecificRole;
+    return `${cargo} - ${chapterKey}`;
+  }
+
+  if (roleForSociety) {
+    return roleForSociety;
   }
 
   return hasSpecificRoles ? "" : member?.cargo || "";

@@ -11,6 +11,7 @@
 \RequirePackage{caption}
 \RequirePackage{booktabs}
 \RequirePackage{array}
+\RequirePackage{longtable}
 \RequirePackage{setspace}
 \RequirePackage{xcolor}
 \RequirePackage{titlesec}
@@ -152,17 +153,15 @@
 }
 
 \newenvironment{membros}{
-  \begin{bluebox}[\centering \centering \Large \sffamily\bfseries\color{white}{MEMBROS PRESENTES}]
-
+\faixatitulo{\Large \textbf{MEMBROS PRESENTES}}
 \renewcommand{\arraystretch}{1.35}
-
-\begin{tabular}{p{1cm} p{8cm} p{5cm}}
+\begin{longtable}{p{1cm} p{8cm} p{5cm}}
 \textbf{ ~} & \textbf{Nome} & \textbf{Cargo / Função} \\[4pt]
+\endfirsthead
+\textbf{ ~} & \textbf{Nome} & \textbf{Cargo / Função} \\[4pt]
+\endhead
 }{
-\end{tabular}
-
-\vspace{6pt}
-\end{bluebox}
+\end{longtable}
 \vspace{0.6cm}
 }
 \newcommand{\membro}[3]{#1 & #2 & #3 \\ \hline}

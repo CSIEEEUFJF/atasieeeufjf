@@ -237,13 +237,10 @@ function publicMemberOption(row, chapterKey = "") {
 
   const roles = normalizeChapterRoles(row.chapterRoles);
   const hasSpecificRoles = Object.keys(roles).length > 0;
-  const selectedRole = chapterKey && Object.prototype.hasOwnProperty.call(roles, chapterKey)
-    ? { [chapterKey]: roles[chapterKey] }
-    : {};
 
   return {
     cargo: normalizeMemberRole(row.cargo, row.cargo || ""),
-    chapterRoles: chapterKey ? selectedRole : roles,
+    chapterRoles: roles,
     id: row.id,
     name: row.name,
     usesChapterRoles: hasSpecificRoles,
