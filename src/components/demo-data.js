@@ -12,7 +12,7 @@ export const DEMO_USER = {
   id: "demo-user",
   isAdmin: true,
   manageableChapters: DEMO_CHAPTERS.map((chapter) => chapter.key),
-  name: "Visitante Demo",
+  name: "Visitante",
   username: "demo",
 };
 
