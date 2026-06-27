@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import AccessDeniedPage from "./AccessDeniedPage";
 import LoadingBall from "./LoadingBall";
 import UserPasswordDialog from "./UserPasswordDialog";
+import { DEMO_USER } from "./demo-data";
 
 async function readApiError(response, fallback) {
   try {
@@ -15,9 +16,13 @@ async function readApiError(response, fallback) {
   }
 }
 
-export default function BoardHomePage() {
+export default function BoardHomePage({ demoMode = false } = {}) {
   const [theme, setTheme] = useState("light");
-  const [auth, setAuth] = useState({ loading: true, setupRequired: false, user: null });
+  const [auth, setAuth] = useState({
+    loading: !demoMode,
+    setupRequired: false,
+    user: demoMode ?DEMO_USER : null,
+  });
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
 
   useEffect(() => {
@@ -40,6 +45,13 @@ export default function BoardHomePage() {
 
   useEffect(() => {
     let active = true;
+
+    if (demoMode) {
+      setAuth({ loading: false, setupRequired: false, user: DEMO_USER });
+      return () => {
+        active = false;
+      };
+    }
 
     async function loadAuth() {
       try {
@@ -69,7 +81,14 @@ export default function BoardHomePage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [demoMode]);
+
+  useEffect(() => {
+    if (!demoMode && !auth.loading && !auth.user) {
+      const nextPath = `${window.location.pathname}${window.location.search}`;
+      window.location.replace(`/login?next=${encodeURIComponent(nextPath)}`);
+    }
+  }, [auth.loading, auth.user, demoMode]);
 
   const nextTheme = theme === "dark" ?"light" : "dark";
 
@@ -78,6 +97,11 @@ export default function BoardHomePage() {
   }
 
   async function handleLogout() {
+    if (demoMode) {
+      window.location.href = "/demo";
+      return;
+    }
+
     try {
       await fetch("/api/auth/logout", { method: "POST" });
     } finally {
@@ -107,7 +131,7 @@ export default function BoardHomePage() {
   }
 
   if (!auth.user) {
-    return <AccessDeniedPage />;
+    return <LoadingBall />;
   }
 
   if (!auth.user.canManageMembers) {
@@ -117,7 +141,7 @@ export default function BoardHomePage() {
   return (
     <div className="app-shell">
       <header className="site-nav">
-        <a href="/diretoria" className="site-brand" aria-label="Ir para diretoria">
+        <a href={demoMode ?"/demo/diretoria" : "/diretoria"} className="site-brand" aria-label="Ir para diretoria">
           <span className="site-brand-badge" aria-hidden="true" />
           <span className="site-brand-lockup">
             <span className="site-brand-text">Sistema Interno - IEEE UFJF</span>
@@ -126,30 +150,36 @@ export default function BoardHomePage() {
         </a>
 
         <ul className="nav-links">
-          <li><a href="/">Início</a></li>
-          <li><a href="/atas">Atas</a></li>
-          <li><a href="/tarefas">Tarefas</a></li>
-          <li><a href="/calendario">Calendário</a></li>
-          <li><a href="/diretoria" aria-current="page">Diretoria</a></li>
+          <li><a href={demoMode ?"/demo" : "/"}>Início</a></li>
+          <li><a href={demoMode ?"/demo/atas" : "/atas"}>Atas</a></li>
+          <li><a href={demoMode ?"/demo/tarefas" : "/tarefas"}>Tarefas</a></li>
+          <li><a href={demoMode ?"/demo/calendario" : "/calendario"}>Calendário</a></li>
+          <li><a href={demoMode ?"/demo/diretoria" : "/diretoria"} aria-current="page">Diretoria</a></li>
         </ul>
 
         <div className="topbar-actions">
-          <button
-            className="user-chip"
-            type="button"
-            onClick={() => setIsPasswordDialogOpen(true)}
-            title="Alterar senha"
-          >
-            {auth.user.name}
-          </button>
-          <button className="ghost-button" onClick={handleLogout}>
-            Sair
-          </button>
+          {demoMode ?(
+            <span className="user-chip">Modo demo</span>
+          ) : (
+            <>
+              <button
+                className="user-chip"
+                type="button"
+                onClick={() => setIsPasswordDialogOpen(true)}
+                title="Alterar senha"
+              >
+                {auth.user.name}
+              </button>
+              <button className="ghost-button" onClick={handleLogout}>
+                Sair
+              </button>
+            </>
+          )}
         </div>
       </header>
 
       {themeToggleButton}
-      {isPasswordDialogOpen ?(
+      {!demoMode && isPasswordDialogOpen ?(
         <UserPasswordDialog user={auth.user} onClose={() => setIsPasswordDialogOpen(false)} />
       ) : null}
 
@@ -166,13 +196,13 @@ export default function BoardHomePage() {
         </section>
 
         <section className="board-action-grid">
-          <a className="board-action-card" href="/diretoria/tarefas">
+          <a className="board-action-card" href={demoMode ?"/demo/diretoria/tarefas" : "/diretoria/tarefas"}>
             <span>Métricas</span>
             <strong>Tarefas por membro</strong>
             <p>Veja tarefas registradas, concluídas e abertas por membro, separadas por capítulo.</p>
           </a>
 
-          <a className="board-action-card" href="/diretoria/membros">
+          <a className="board-action-card" href={demoMode ?"/demo/diretoria/membros" : "/diretoria/membros"}>
             <span>Cadastro</span>
             <strong>Membros e acessos</strong>
             <p>Cadastre novos membros, defina capítulos, cargos e permissões de diretoria.</p>

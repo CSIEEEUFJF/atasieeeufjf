@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+
 import AccessDeniedPage from "../../../components/AccessDeniedPage";
 import MembersPage from "../../../components/MembersPage";
 import { canManageMembers, getCurrentUser } from "../../../lib/auth";
@@ -8,6 +10,10 @@ export const metadata = {
 
 export default async function DiretoriaMembrosPage() {
   const user = await getCurrentUser();
+  if (!user) {
+    redirect("/login?next=/diretoria/membros");
+  }
+
   if (!canManageMembers(user)) {
     return <AccessDeniedPage />;
   }

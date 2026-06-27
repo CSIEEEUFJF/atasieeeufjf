@@ -11,6 +11,7 @@ import {
   formatForwardStatus,
   forwardGeneratedPdf,
 } from "../lib/pdf-forward-client";
+import { DEMO_MEMBERS, DEMO_USER, createDemoAtas } from "./demo-data";
 import LoadingBall from "./LoadingBall";
 import PdfGenerationProgress from "./PdfGenerationProgress";
 import UserPasswordDialog from "./UserPasswordDialog";
@@ -27,46 +28,6 @@ const FALLBACK_SOCIETIES = [
   { chave: "EdSoc", nome: "EdSoc - Education Society" },
   { chave: "VTS", nome: "VTS - Vehicular Technology Society" },
   { chave: "Ramo", nome: "Ramo" },
-];
-
-const DEMO_USER = {
-  canManageMembers: false,
-  chapters: FALLBACK_SOCIETIES.map((item) => item.chave),
-  id: "demo",
-  isAdmin: false,
-  name: "Visitante Demo",
-  username: "demo",
-};
-
-const DEMO_MEMBERS = [
-  {
-    cargo: "Presidente",
-    chapterRoles: { CAS: "Presidente", RAS: "Presidente" },
-    id: "demo-alex",
-    name: "Alex Demo",
-    usesChapterRoles: true,
-  },
-  {
-    cargo: "Vice-Presidente",
-    chapterRoles: { CAS: "Vice-Presidente", RAS: "Vice-Presidente" },
-    id: "demo-bianca",
-    name: "Bianca Demo",
-    usesChapterRoles: true,
-  },
-  {
-    cargo: "Secretário",
-    chapterRoles: { CAS: "Secretário", RAS: "Secretário" },
-    id: "demo-caio",
-    name: "Caio Demo",
-    usesChapterRoles: true,
-  },
-  {
-    cargo: "Membro",
-    chapterRoles: { CAS: "Membro", RAS: "Membro", Ramo: "Membro" },
-    id: "demo-daniela",
-    name: "Daniela Demo",
-    usesChapterRoles: true,
-  },
 ];
 
 const MAX_ATTACHMENTS = 5;
@@ -283,6 +244,30 @@ async function readApiError(response, fallback) {
     return payload.detail || fallback;
   } catch {
     return fallback;
+  }
+}
+
+function getSafeNextPathFromSearch() {
+  const next = new URLSearchParams(window.location.search).get("next");
+  if (!next) {
+    return "";
+  }
+
+  try {
+    const url = new URL(next, window.location.origin);
+    const forbiddenPath =
+      url.pathname === "/login" ||
+      url.pathname.startsWith("/login/") ||
+      url.pathname.startsWith("/api") ||
+      url.pathname.startsWith("/_next");
+
+    if (url.origin !== window.location.origin || forbiddenPath) {
+      return "";
+    }
+
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return "";
   }
 }
 
@@ -671,6 +656,13 @@ function App({ demoMode = false } = {}) {
   }, [demoMode]);
 
   useEffect(() => {
+    if (!demoMode && !auth.loading && !auth.user) {
+      const nextPath = `${window.location.pathname}${window.location.search}`;
+      window.location.replace(`/login?next=${encodeURIComponent(nextPath)}`);
+    }
+  }, [auth.loading, auth.user, demoMode]);
+
+  useEffect(() => {
     let active = true;
 
     async function loadSocieties() {
@@ -883,8 +875,8 @@ function App({ demoMode = false } = {}) {
         tone: "success",
         text: "Acesso liberado.",
       });
-      const nextPath = new URLSearchParams(window.location.search).get("next");
-      if (nextPath?.startsWith("/") && !nextPath.startsWith("//")) {
+      const nextPath = getSafeNextPathFromSearch();
+      if (nextPath) {
         window.location.href = nextPath;
       }
     } catch (error) {
@@ -1285,9 +1277,30 @@ function App({ demoMode = false } = {}) {
 
   async function handleLoadSavedAta(ataId, options = {}) {
     if (demoMode) {
+      const demoAta = createDemoAtas().find((ata) => ata.id === ataId);
+      if (demoAta) {
+        const loadedForm = createFormFromStoredAta(demoAta);
+        startTransition(() => {
+          setForm(loadedForm);
+          setMemberDraft(createEmptyMember());
+          setAttachmentDraft(createEmptyAttachment());
+          setEditingMemberId(null);
+          setEditingAttachmentId(null);
+          setActiveAtaId(null);
+        });
+        setStatus({
+          tone: "success",
+          text: "Ata demo carregada localmente no gerador.",
+        });
+        if (options.replaceUrl) {
+          window.history.replaceState(null, "", window.location.pathname);
+        }
+        return;
+      }
+
       setStatus({
-        tone: "idle",
-        text: "Atas salvas não ficam disponíveis no modo demo.",
+        tone: "error",
+        text: "Ata demo não encontrada.",
       });
       return;
     }
@@ -1573,67 +1586,7 @@ function App({ demoMode = false } = {}) {
   }
 
   if (!auth.user) {
-    const isSetup = authMode === "setup";
-
-    return (
-      <div className="app-shell auth-shell">
-        {themeToggleButton}
-        <section className="hero-panel auth-card">
-          <p className="panel-kicker">Autenticacao</p>
-          <h1>{isSetup ?"Crie o primeiro acesso" : "Entre para continuar"}</h1>
-          <p>
-            {isSetup
-              ?"Este usuário inicial ficará salvo no banco Postgres configurado."
-              : "Use seu usuário local para acessar as atas salvas e o gerador."}
-          </p>
-
-          <form className="auth-form" onSubmit={handleAuthSubmit}>
-            {isSetup ?(
-              <label className="field">
-                <span>Nome</span>
-                <input
-                  value={authForm.name}
-                  onChange={(event) => updateAuthField("name", event.target.value)}
-                  autoComplete="name"
-                />
-              </label>
-            ) : null}
-
-            <label className="field">
-              <span>Nome de usuário</span>
-              <input
-                value={authForm.username}
-                onChange={(event) => updateAuthField("username", event.target.value)}
-                autoComplete="username"
-              />
-            </label>
-
-            <label className="field">
-              <span>Senha</span>
-              <input
-                type="password"
-                value={authForm.password}
-                onChange={(event) => updateAuthField("password", event.target.value)}
-                autoComplete={isSetup ?"new-password" : "current-password"}
-              />
-            </label>
-
-            <div className={`status-box tone-${authMessage.tone}`}>
-              <span>Status</span>
-              <strong>{authMessage.text}</strong>
-            </div>
-
-            <button className="primary-button" disabled={isAuthenticating}>
-              {isAuthenticating
-                ?"Aguarde..."
-                : isSetup
-                  ?"Criar acesso"
-                  : "Entrar"}
-            </button>
-          </form>
-        </section>
-      </div>
-    );
+    return <LoadingBall />;
   }
 
   return (
@@ -1649,7 +1602,11 @@ function App({ demoMode = false } = {}) {
 
         {demoMode ?(
           <ul className="nav-links">
-            <li><a href="/demo" aria-current="page">Demo</a></li>
+            <li><a href="/demo">Início</a></li>
+            <li><a href="/demo/atas" aria-current="page">Atas</a></li>
+            <li><a href="/demo/tarefas">Tarefas</a></li>
+            <li><a href="/demo/calendario">Calendário</a></li>
+            <li><a href="/demo/diretoria">Diretoria</a></li>
           </ul>
         ) : (
           <ul className="nav-links">
@@ -2029,10 +1986,24 @@ function App({ demoMode = false } = {}) {
 
               <div className="sidebar-action-list">
                 {demoMode ?(
-                  <div className="status-box tone-idle">
-                    <span>Demo isolado</span>
-                    <strong>Salvar no banco, atas salvas e envio ao servidor ficam desativados.</strong>
-                  </div>
+                  <>
+                    <div className="status-box tone-idle">
+                      <span>Demo isolado</span>
+                      <strong>O PDF é gerado localmente e nada é enviado ao servidor.</strong>
+                    </div>
+                    <a className="ghost-button standalone-link" href="/demo/atas/banco">
+                      Ver atas demo
+                    </a>
+                    <a className="ghost-button standalone-link" href="/demo/tarefas">
+                      Tarefas
+                    </a>
+                    <a className="ghost-button standalone-link" href="/demo/calendario">
+                      Calendário
+                    </a>
+                    <a className="ghost-button standalone-link" href="/demo/diretoria">
+                      Diretoria
+                    </a>
+                  </>
                 ) : (
                   <>
                     <button className="ghost-button" onClick={handleSaveAta} disabled={isSavingAta || isSubmitting}>

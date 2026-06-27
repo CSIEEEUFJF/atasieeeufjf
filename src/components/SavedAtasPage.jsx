@@ -11,6 +11,7 @@ import {
 } from "../lib/pdf-forward-client";
 import PdfGenerationProgress from "./PdfGenerationProgress";
 import UserPasswordDialog from "./UserPasswordDialog";
+import { DEMO_CHAPTERS, DEMO_USER, createDemoAtas } from "./demo-data";
 
 async function readApiError(response, fallback) {
   try {
@@ -114,18 +115,18 @@ function validateSavedAtaForm(form) {
   }
 }
 
-function SavedAtasPage() {
+function SavedAtasPage({ demoMode = false } = {}) {
   const [theme, setTheme] = useState("light");
   const [auth, setAuth] = useState({
-    loading: true,
+    loading: !demoMode,
     setupRequired: false,
-    user: null,
+    user: demoMode ?DEMO_USER : null,
   });
-  const [chapters, setChapters] = useState([]);
-  const [atas, setAtas] = useState([]);
+  const [chapters, setChapters] = useState(demoMode ?DEMO_CHAPTERS : []);
+  const [atas, setAtas] = useState(demoMode ?createDemoAtas : []);
   const [status, setStatus] = useState({
-    tone: "idle",
-    text: "Carregando suas atas salvas.",
+    tone: demoMode ?"success" : "idle",
+    text: demoMode ?"Banco de atas demo carregado com registros fictícios." : "Carregando suas atas salvas.",
   });
   const [isLoadingAtas, setIsLoadingAtas] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
@@ -154,6 +155,20 @@ function SavedAtasPage() {
 
   useEffect(() => {
     let active = true;
+
+    if (demoMode) {
+      setAuth({
+        loading: false,
+        setupRequired: false,
+        user: DEMO_USER,
+      });
+      setChapters(DEMO_CHAPTERS);
+      setAtas(createDemoAtas());
+      setStatus({ tone: "success", text: "Banco de atas demo carregado com registros fictícios." });
+      return () => {
+        active = false;
+      };
+    }
 
     async function loadAuth() {
       try {
@@ -192,15 +207,26 @@ function SavedAtasPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [demoMode]);
 
   useEffect(() => {
+    if (demoMode) {
+      return;
+    }
+
     if (!auth.user) {
       return;
     }
 
     loadAtas();
-  }, [auth.user]);
+  }, [auth.user, demoMode]);
+
+  useEffect(() => {
+    if (!demoMode && !auth.loading && !auth.user) {
+      const nextPath = `${window.location.pathname}${window.location.search}`;
+      window.location.replace(`/login?next=${encodeURIComponent(nextPath)}`);
+    }
+  }, [auth.loading, auth.user, demoMode]);
 
   const nextTheme = theme === "dark" ?"light" : "dark";
   const userChapterSet = new Set(auth.user?.chapters || []);
@@ -215,6 +241,12 @@ function SavedAtasPage() {
   }
 
   async function loadAtas() {
+    if (demoMode) {
+      setAtas(createDemoAtas());
+      setStatus({ tone: "success", text: "Atas demo restauradas." });
+      return;
+    }
+
     setIsLoadingAtas(true);
     setStatus({
       tone: "loading",
@@ -265,6 +297,15 @@ function SavedAtasPage() {
     });
 
     try {
+      if (demoMode) {
+        setAtas((current) => current.filter((ata) => ata.id !== ataId));
+        setStatus({
+          tone: "success",
+          text: "Ata demo removida localmente.",
+        });
+        return;
+      }
+
       const response = await fetch(`/api/atas/${ataId}`, { method: "DELETE" });
       if (!response.ok) {
         throw new Error(await readApiError(response, "Não foi possível excluir a ata."));
@@ -303,6 +344,17 @@ function SavedAtasPage() {
     });
 
     try {
+      if (demoMode) {
+        setAtas((current) =>
+          current.map((item) => (item.id === ata.id ?{ ...item, title: cleanTitle } : item)),
+        );
+        setStatus({
+          tone: "success",
+          text: "Ata demo renomeada localmente.",
+        });
+        return;
+      }
+
       const response = await fetch(`/api/atas/${ata.id}`, {
         body: JSON.stringify({ title: cleanTitle }),
         headers: {
@@ -345,6 +397,29 @@ function SavedAtasPage() {
     });
 
     try {
+      if (demoMode) {
+        const demoAta = atas.find((item) => item.id === ataId);
+        if (!demoAta) {
+          throw new Error("Ata demo não encontrada.");
+        }
+
+        const form = createFormFromStoredAta(demoAta);
+        validateSavedAtaForm(form);
+        setGenerationProgressForm(form);
+        const result = await compileAtaPdfInBrowser({
+          form,
+          outputName: demoAta.outputName || demoAta.title || "ata_demo",
+        });
+        const ataTitle = demoAta.title || form.titulo || demoAta.outputName || "ata_demo";
+        const pdfFileName = buildPdfFileNameFromTitle(ataTitle, result.fileName);
+        baixarArquivo(result.pdf, pdfFileName);
+        setStatus({
+          tone: "success",
+          text: "PDF demo gerado no navegador. Nenhum arquivo foi enviado ao servidor.",
+        });
+        return;
+      }
+
       const response = await fetch(`/api/atas/${ataId}`, { cache: "no-store" });
       if (!response.ok) {
         throw new Error(await readApiError(response, "Não foi possível abrir a ata salva."));
@@ -414,7 +489,7 @@ function SavedAtasPage() {
 
   function handleSavedAtaAction(ata) {
     if (Number(ata.attachmentCount || 0) > 0) {
-      window.location.href = `/atas/nova?ata=${ata.id}`;
+      window.location.href = demoMode ?`/demo/atas/nova?ata=${ata.id}` : `/atas/nova?ata=${ata.id}`;
       return;
     }
 
@@ -422,6 +497,11 @@ function SavedAtasPage() {
   }
 
   async function handleLogout() {
+    if (demoMode) {
+      window.location.href = "/demo";
+      return;
+    }
+
     try {
       await fetch("/api/auth/logout", { method: "POST" });
     } finally {
@@ -451,29 +531,13 @@ function SavedAtasPage() {
   }
 
   if (!auth.user) {
-    return (
-      <div className="app-shell auth-shell">
-        {themeToggleButton}
-        <section className="hero-panel auth-card">
-          <p className="panel-kicker">Atas salvas</p>
-          <h1>Acesso necessário</h1>
-          <p>
-            {auth.setupRequired
-              ?"Crie o primeiro usuário antes de acessar o banco de atas."
-              : "Entre no sistema para consultar suas atas salvas."}
-          </p>
-          <a className="primary-button standalone-link" href="/">
-            Entrar no sistema
-          </a>
-        </section>
-      </div>
-    );
+    return <LoadingBall />;
   }
 
   return (
     <div className="app-shell">
       <header className="site-nav">
-        <a href="/" className="site-brand" aria-label="Ir para início">
+        <a href={demoMode ?"/demo/atas/banco" : "/"} className="site-brand" aria-label="Ir para início">
           <span className="site-brand-badge" aria-hidden="true" />
           <span className="site-brand-lockup">
             <span className="site-brand-text">Sistema Interno - IEEE UFJF</span>
@@ -482,33 +546,39 @@ function SavedAtasPage() {
         </a>
 
         <ul className="nav-links">
-          <li><a href="/">Início</a></li>
-          <li><a href="/atas" aria-current="page">Atas</a></li>
-          <li><a href="/tarefas">Tarefas</a></li>
-          <li><a href="/calendario">Calendário</a></li>
-          {auth.user.canManageMembers ?<li><a href="/diretoria">Diretoria</a></li> : null}
+          <li><a href={demoMode ?"/demo" : "/"}>Início</a></li>
+          <li><a href={demoMode ?"/demo/atas" : "/atas"} aria-current="page">Atas</a></li>
+          <li><a href={demoMode ?"/demo/tarefas" : "/tarefas"}>Tarefas</a></li>
+          <li><a href={demoMode ?"/demo/calendario" : "/calendario"}>Calendário</a></li>
+          {auth.user.canManageMembers ?<li><a href={demoMode ?"/demo/diretoria" : "/diretoria"}>Diretoria</a></li> : null}
         </ul>
 
         <div className="topbar-actions">
-          <button
-            className="user-chip"
-            type="button"
-            onClick={() => setIsPasswordDialogOpen(true)}
-            title="Alterar senha"
-          >
-            {auth.user.name}
-          </button>
+          {demoMode ?(
+            <span className="user-chip">Modo demo</span>
+          ) : (
+            <button
+              className="user-chip"
+              type="button"
+              onClick={() => setIsPasswordDialogOpen(true)}
+              title="Alterar senha"
+            >
+              {auth.user.name}
+            </button>
+          )}
           <button className="ghost-button" onClick={loadAtas} disabled={isLoadingAtas}>
             Atualizar
           </button>
-          <button className="ghost-button" onClick={handleLogout}>
-            Sair
-          </button>
+          {!demoMode ?(
+            <button className="ghost-button" onClick={handleLogout}>
+              Sair
+            </button>
+          ) : null}
         </div>
       </header>
 
       {themeToggleButton}
-      {isPasswordDialogOpen ?(
+      {!demoMode && isPasswordDialogOpen ?(
         <UserPasswordDialog
           user={auth.user}
           onClose={() => setIsPasswordDialogOpen(false)}
@@ -542,7 +612,7 @@ function SavedAtasPage() {
               <p className="panel-kicker">Biblioteca</p>
               <h2>{atas.length ?`${atas.length} ata(s) nos seus capítulos` : "Nenhuma ata salva"}</h2>
             </div>
-            <a className="soft-button standalone-link" href="/atas/nova">
+            <a className="soft-button standalone-link" href={demoMode ?"/demo/atas/nova" : "/atas/nova"}>
               Criar nova ata
             </a>
           </div>
@@ -614,7 +684,7 @@ function SavedAtasPage() {
                             </button>
                             <a
                               className="text-button standalone-link"
-                              href={`/?ata=${ata.id}`}
+                              href={demoMode ?`/demo/atas/nova?ata=${ata.id}` : `/?ata=${ata.id}`}
                               onClick={(event) => event.stopPropagation()}
                             >
                               Abrir no gerador

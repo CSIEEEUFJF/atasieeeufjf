@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import LoadingBall from "./LoadingBall";
 import UserPasswordDialog from "./UserPasswordDialog";
+import { DEMO_USER } from "./demo-data";
 
 async function readApiError(response, fallback) {
   try {
@@ -43,9 +44,13 @@ function ThemeToggle({ theme, onToggle }) {
   );
 }
 
-export default function HomeDashboard() {
+export default function HomeDashboard({ demoMode = false } = {}) {
   const [theme, setTheme] = useState("light");
-  const [auth, setAuth] = useState({ loading: true, setupRequired: false, user: null });
+  const [auth, setAuth] = useState({
+    loading: !demoMode,
+    setupRequired: false,
+    user: demoMode ?DEMO_USER : null,
+  });
   const [authForm, setAuthForm] = useState(createInitialAuthForm);
   const [authMode, setAuthMode] = useState("login");
   const [authMessage, setAuthMessage] = useState({
@@ -75,6 +80,17 @@ export default function HomeDashboard() {
 
   useEffect(() => {
     let active = true;
+
+    if (demoMode) {
+      setAuth({ loading: false, setupRequired: false, user: DEMO_USER });
+      setAuthMessage({
+        tone: "success",
+        text: "Modo demo aberto com dados fictícios.",
+      });
+      return () => {
+        active = false;
+      };
+    }
 
     async function loadAuth() {
       try {
@@ -109,7 +125,14 @@ export default function HomeDashboard() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [demoMode]);
+
+  useEffect(() => {
+    if (!demoMode && !auth.loading && !auth.user) {
+      const nextPath = `${window.location.pathname}${window.location.search}`;
+      window.location.replace(`/login?next=${encodeURIComponent(nextPath)}`);
+    }
+  }, [auth.loading, auth.user, demoMode]);
 
   function toggleTheme() {
     setTheme((current) => (current === "dark" ? "light" : "dark"));
@@ -162,6 +185,11 @@ export default function HomeDashboard() {
   }
 
   async function handleLogout() {
+    if (demoMode) {
+      window.location.href = "/demo";
+      return;
+    }
+
     try {
       await fetch("/api/auth/logout", { method: "POST" });
     } finally {
@@ -174,99 +202,43 @@ export default function HomeDashboard() {
   }
 
   if (!auth.user) {
-    const isSetup = authMode === "setup";
-
-    return (
-      <div className="app-shell auth-shell">
-        <ThemeToggle theme={theme} onToggle={toggleTheme} />
-        <section className="hero-panel auth-card">
-          <p className="panel-kicker">Sistema interno</p>
-          <h1>{isSetup ? "Crie o primeiro acesso" : "Acesse sua conta"}</h1>
-          <p>
-            {isSetup
-              ? "Este usuário inicial ficará salvo no banco Postgres configurado."
-              : "Entre para acessar tarefas, calendário, atas e área da diretoria."}
-          </p>
-
-          <form className="auth-form" onSubmit={handleAuthSubmit}>
-            {isSetup ? (
-              <label className="field">
-                <span>Nome</span>
-                <input
-                  value={authForm.name}
-                  onChange={(event) => updateAuthField("name", event.target.value)}
-                  autoComplete="name"
-                />
-              </label>
-            ) : null}
-
-            <label className="field">
-              <span>Nome de usuário</span>
-              <input
-                value={authForm.username}
-                onChange={(event) => updateAuthField("username", event.target.value)}
-                autoComplete="username"
-              />
-            </label>
-
-            <label className="field">
-              <span>Senha</span>
-              <input
-                type="password"
-                value={authForm.password}
-                onChange={(event) => updateAuthField("password", event.target.value)}
-                autoComplete={isSetup ? "new-password" : "current-password"}
-              />
-            </label>
-
-            <div className={`status-box tone-${authMessage.tone}`}>
-              <span>Status</span>
-              <strong>{authMessage.text}</strong>
-            </div>
-
-            <button className="primary-button" disabled={isAuthenticating}>
-              {isAuthenticating ? "Aguarde..." : isSetup ? "Criar acesso" : "Entrar"}
-            </button>
-          </form>
-        </section>
-      </div>
-    );
+    return <LoadingBall />;
   }
 
   const actions = [
     {
-      href: "/atas",
+      href: demoMode ?"/demo/atas" : "/atas",
       kicker: "Atas",
       title: "Banco e geração de atas",
       text: "Consulte atas salvas ou crie uma nova ata de reunião.",
     },
     {
-      href: "/tarefas",
+      href: demoMode ?"/demo/tarefas" : "/tarefas",
       kicker: "Demandas",
       title: "Tarefas",
       text: "Acompanhe tarefas abertas, responsáveis, prioridades e prazos.",
     },
     {
-      href: "/calendario",
+      href: demoMode ?"/demo/calendario" : "/calendario",
       kicker: "Agenda",
       title: "Calendário",
       text: "Veja os horários agendados e eventos do Ramo e dos capítulos.",
     },
     {
-      href: "/diretoria",
+      href: demoMode ?"/demo/diretoria" : "/diretoria",
       kicker: "Gestão",
       title: "Diretoria",
       text: "Acesse métricas, membros e controles restritos de gestão.",
     },
   ];
   const visibleActions = actions.filter((action) => (
-    action.href !== "/diretoria" || auth.user.canManageMembers
+    demoMode || !action.href.endsWith("/diretoria") || auth.user.canManageMembers
   ));
 
   return (
     <div className="app-shell">
       <header className="site-nav home-site-nav">
-        <a href="/" className="home-branch-brand" aria-label="Ir para início">
+        <a href={demoMode ?"/demo" : "/"} className="home-branch-brand" aria-label="Ir para início">
           <span className="home-branch-logo" aria-hidden="true" />
           <span className="home-branch-lockup">
             <span>Universidade Federal de Juiz de Fora</span>
@@ -277,22 +249,28 @@ export default function HomeDashboard() {
         </a>
 
         <div className="topbar-actions">
-          <button
-            className="user-chip"
-            type="button"
-            onClick={() => setIsPasswordDialogOpen(true)}
-            title="Alterar senha"
-          >
-            {auth.user.name}
-          </button>
-          <button className="ghost-button" onClick={handleLogout}>
-            Sair
-          </button>
+          {demoMode ?(
+            <span className="user-chip">Modo demo</span>
+          ) : (
+            <>
+              <button
+                className="user-chip"
+                type="button"
+                onClick={() => setIsPasswordDialogOpen(true)}
+                title="Alterar senha"
+              >
+                {auth.user.name}
+              </button>
+              <button className="ghost-button" onClick={handleLogout}>
+                Sair
+              </button>
+            </>
+          )}
         </div>
       </header>
 
       <ThemeToggle theme={theme} onToggle={toggleTheme} />
-      {isPasswordDialogOpen ?(
+      {!demoMode && isPasswordDialogOpen ?(
         <UserPasswordDialog user={auth.user} onClose={() => setIsPasswordDialogOpen(false)} />
       ) : null}
 
@@ -301,7 +279,11 @@ export default function HomeDashboard() {
           <div>
             <p className="panel-kicker">Início</p>
             <h1>Bem vindo, {auth.user.name}</h1>
-            <p>Escolha uma área do sistema interno para continuar.</p>
+            <p>
+              {demoMode
+                ?"Explore o sistema interno com dados fictícios, sem alterar o ambiente real."
+                : "Escolha uma área do sistema interno para continuar."}
+            </p>
           </div>
         </section>
 

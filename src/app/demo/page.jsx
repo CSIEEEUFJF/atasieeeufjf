@@ -1,4 +1,4 @@
-import AtaApp from "../../components/AtaApp";
+import HomeDashboard from "../../components/HomeDashboard";
 
 export const metadata = {
   title: "Demo | Sistema Interno - IEEE UFJF",
@@ -6,5 +6,5 @@ export const metadata = {
 };
 
 export default function DemoPage() {
-  return <AtaApp demoMode />;
+  return <HomeDashboard demoMode />;
 }

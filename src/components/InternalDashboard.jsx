@@ -4,6 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 
 import LoadingBall from "./LoadingBall";
 import UserPasswordDialog from "./UserPasswordDialog";
+import {
+  DEMO_CHAPTERS,
+  DEMO_MEMBERS,
+  DEMO_USER,
+  createDemoEvents,
+  createDemoTasks,
+} from "./demo-data";
 
 const GLOBAL_CHAPTER = "Todos";
 
@@ -134,20 +141,43 @@ async function readApiError(response, fallback) {
   }
 }
 
-export default function InternalDashboard({ page = "tasks" }) {
+function createDemoChapterOptions() {
+  return [{ key: GLOBAL_CHAPTER, label: "Todos os capítulos" }, ...DEMO_CHAPTERS];
+}
+
+function addRecurrence(date, frequency, index) {
+  const nextDate = new Date(date);
+  if (frequency === "daily") {
+    nextDate.setDate(nextDate.getDate() + index);
+  } else if (frequency === "biweekly") {
+    nextDate.setDate(nextDate.getDate() + index * 14);
+  } else if (frequency === "monthly") {
+    nextDate.setMonth(nextDate.getMonth() + index);
+  } else {
+    nextDate.setDate(nextDate.getDate() + index * 7);
+  }
+
+  return nextDate.toISOString();
+}
+
+export default function InternalDashboard({ page = "tasks", demoMode = false }) {
   const [theme, setTheme] = useState("light");
-  const [auth, setAuth] = useState({ loading: true, setupRequired: false, user: null });
-  const [chapters, setChapters] = useState([]);
-  const [members, setMembers] = useState([]);
-  const [tasks, setTasks] = useState([]);
-  const [events, setEvents] = useState([]);
+  const [auth, setAuth] = useState({
+    loading: !demoMode,
+    setupRequired: false,
+    user: demoMode ?DEMO_USER : null,
+  });
+  const [chapters, setChapters] = useState(demoMode ?createDemoChapterOptions : []);
+  const [members, setMembers] = useState(demoMode ?DEMO_MEMBERS : []);
+  const [tasks, setTasks] = useState(demoMode ?createDemoTasks : []);
+  const [events, setEvents] = useState(demoMode ?createDemoEvents : []);
   const activeTab = page === "calendar" ?"calendar" : "tasks";
   const [selectedChapter, setSelectedChapter] = useState("");
   const [taskForm, setTaskForm] = useState(createTaskForm);
   const [eventForm, setEventForm] = useState(createEventForm);
   const [status, setStatus] = useState({
-    tone: "idle",
-    text: "Carregando sistema de atas.",
+    tone: demoMode ?"success" : "idle",
+    text: demoMode ?"Modo demo carregado com dados fictícios." : "Carregando sistema de atas.",
   });
   const [isLoading, setIsLoading] = useState(false);
   const [isSavingTask, setIsSavingTask] = useState(false);
@@ -177,6 +207,20 @@ export default function InternalDashboard({ page = "tasks" }) {
 
   useEffect(() => {
     let active = true;
+
+    if (demoMode) {
+      setAuth({ loading: false, setupRequired: false, user: DEMO_USER });
+      setChapters(createDemoChapterOptions());
+      setMembers(DEMO_MEMBERS);
+      setTasks(createDemoTasks());
+      setEvents(createDemoEvents());
+      setTaskForm(createTaskForm(GLOBAL_CHAPTER));
+      setEventForm(createEventForm(GLOBAL_CHAPTER));
+      setStatus({ tone: "success", text: "Modo demo carregado com dados fictícios." });
+      return () => {
+        active = false;
+      };
+    }
 
     async function loadAuth() {
       try {
@@ -222,26 +266,41 @@ export default function InternalDashboard({ page = "tasks" }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [demoMode]);
 
   useEffect(() => {
+    if (demoMode) {
+      return;
+    }
+
     if (!auth.user) {
       return;
     }
 
     loadInternalData();
     loadMembers();
-  }, [auth.user, selectedChapter]);
+  }, [auth.user, selectedChapter, demoMode]);
+
+  useEffect(() => {
+    if (!demoMode && !auth.loading && !auth.user) {
+      const nextPath = `${window.location.pathname}${window.location.search}`;
+      window.location.replace(`/login?next=${encodeURIComponent(nextPath)}`);
+    }
+  }, [auth.loading, auth.user, demoMode]);
 
   const nextTheme = theme === "dark" ?"light" : "dark";
-  const openTasks = tasks.filter((task) => task.status !== "done");
-  const doneTasks = tasks.filter((task) => task.status === "done");
+  const chapterMatchesFilter = (item) =>
+    !selectedChapter || selectedChapter === GLOBAL_CHAPTER || item.chapter === selectedChapter;
+  const displayedTasks = tasks.filter(chapterMatchesFilter);
+  const displayedEvents = events.filter(chapterMatchesFilter);
+  const openTasks = displayedTasks.filter((task) => task.status !== "done");
+  const doneTasks = displayedTasks.filter((task) => task.status === "done");
   const dailyEvents = useMemo(
     () =>
-      events
+      displayedEvents
         .filter((event) => toDateInputValue(event.startTime) === selectedCalendarDate)
         .sort((a, b) => new Date(a.startTime) - new Date(b.startTime)),
-    [events, selectedCalendarDate],
+    [displayedEvents, selectedCalendarDate],
   );
   const pageCopy = activeTab === "calendar"
     ?{
@@ -272,6 +331,14 @@ export default function InternalDashboard({ page = "tasks" }) {
   }
 
   async function loadInternalData() {
+    if (demoMode) {
+      setTasks(createDemoTasks());
+      setEvents(createDemoEvents());
+      setMembers(DEMO_MEMBERS);
+      setStatus({ tone: "success", text: "Dados demo restaurados." });
+      return;
+    }
+
     setIsLoading(true);
     setStatus({ tone: "loading", text: pageCopy.statusLoading });
 
@@ -309,6 +376,11 @@ export default function InternalDashboard({ page = "tasks" }) {
   }
 
   async function loadMembers() {
+    if (demoMode) {
+      setMembers(DEMO_MEMBERS);
+      return;
+    }
+
     try {
       const response = await fetch("/api/users?scope=accessible", { cache: "no-store" });
       if (!response.ok) {
@@ -323,6 +395,11 @@ export default function InternalDashboard({ page = "tasks" }) {
   }
 
   async function handleLogout() {
+    if (demoMode) {
+      window.location.href = "/demo";
+      return;
+    }
+
     try {
       await fetch("/api/auth/logout", { method: "POST" });
     } finally {
@@ -336,6 +413,23 @@ export default function InternalDashboard({ page = "tasks" }) {
     setStatus({ tone: "loading", text: "Salvando tarefa." });
 
     try {
+      if (demoMode) {
+        const assignedTo = members.find((member) => member.id === taskForm.assignedToId);
+        const task = {
+          ...taskForm,
+          assignedTo: assignedTo ?{ id: assignedTo.id, name: assignedTo.name } : null,
+          assignedToId: taskForm.assignedToId || null,
+          chapter: taskForm.chapter || GLOBAL_CHAPTER,
+          id: crypto.randomUUID(),
+          status: "pending",
+        };
+        setTasks((current) => [...current, task]);
+        setTaskForm(createTaskForm(taskForm.chapter));
+        setIsTaskDialogOpen(false);
+        setStatus({ tone: "success", text: "Tarefa demo criada localmente." });
+        return;
+      }
+
       const response = await fetch("/api/internal/tasks", {
         body: JSON.stringify({
           ...taskForm,
@@ -368,6 +462,14 @@ export default function InternalDashboard({ page = "tasks" }) {
     setStatus({ tone: "loading", text: "Atualizando tarefa." });
 
     try {
+      if (demoMode) {
+        setTasks((current) =>
+          current.map((item) => (item.id === task.id ?{ ...item, status: statusValue } : item)),
+        );
+        setStatus({ tone: "success", text: "Tarefa demo atualizada localmente." });
+        return;
+      }
+
       const response = await fetch(`/api/internal/tasks/${task.id}`, {
         body: JSON.stringify({ status: statusValue }),
         headers: { "Content-Type": "application/json" },
@@ -399,6 +501,12 @@ export default function InternalDashboard({ page = "tasks" }) {
     setStatus({ tone: "loading", text: "Excluindo tarefa." });
 
     try {
+      if (demoMode) {
+        setTasks((current) => current.filter((item) => item.id !== task.id));
+        setStatus({ tone: "success", text: "Tarefa demo excluída localmente." });
+        return;
+      }
+
       const response = await fetch(`/api/internal/tasks/${task.id}`, { method: "DELETE" });
       if (!response.ok) {
         throw new Error(await readApiError(response, "Não foi possível excluir a tarefa."));
@@ -420,6 +528,31 @@ export default function InternalDashboard({ page = "tasks" }) {
     setStatus({ tone: "loading", text: "Salvando evento." });
 
     try {
+      if (demoMode) {
+        const recurrenceCount = eventForm.recurrenceEnabled
+          ?Math.max(1, Math.min(52, Number(eventForm.recurrenceCount) || 1))
+          : 1;
+        const createdEvents = Array.from({ length: recurrenceCount }, (_, index) => ({
+          ...eventForm,
+          chapter: eventForm.chapter || GLOBAL_CHAPTER,
+          endTime: addRecurrence(eventForm.endTime, eventForm.recurrenceFrequency, index),
+          id: crypto.randomUUID(),
+          startTime: addRecurrence(eventForm.startTime, eventForm.recurrenceFrequency, index),
+        }));
+        setEvents((current) =>
+          [...current, ...createdEvents].sort((a, b) => new Date(a.startTime) - new Date(b.startTime)),
+        );
+        setEventForm(createEventForm(eventForm.chapter));
+        setIsEventDialogOpen(false);
+        setStatus({
+          tone: "success",
+          text: createdEvents.length > 1
+            ?`${createdEvents.length} eventos demo criados localmente.`
+            : "Evento demo criado localmente.",
+        });
+        return;
+      }
+
       const response = await fetch("/api/internal/events", {
         body: JSON.stringify(eventForm),
         headers: { "Content-Type": "application/json" },
@@ -465,6 +598,12 @@ export default function InternalDashboard({ page = "tasks" }) {
     setStatus({ tone: "loading", text: "Excluindo evento." });
 
     try {
+      if (demoMode) {
+        setEvents((current) => current.filter((event) => event.id !== item.id));
+        setStatus({ tone: "success", text: "Evento demo excluído localmente." });
+        return;
+      }
+
       const response = await fetch(`/api/internal/events/${item.id}`, { method: "DELETE" });
       if (!response.ok) {
         throw new Error(await readApiError(response, "Não foi possível excluir o evento."));
@@ -502,29 +641,17 @@ export default function InternalDashboard({ page = "tasks" }) {
   }
 
   if (!auth.user) {
-    return (
-      <div className="app-shell auth-shell">
-        {themeToggleButton}
-        <section className="hero-panel auth-card">
-          <p className="panel-kicker">{pageCopy.eyebrow}</p>
-          <h1>Acesso necessário</h1>
-          <p>
-            {auth.setupRequired
-              ?"Crie o primeiro usuário antes de acessar esta página."
-              : "Entre no sistema para acessar tarefas, calendário e atas."}
-          </p>
-          <a className="primary-button standalone-link" href="/">
-            Entrar no sistema
-          </a>
-        </section>
-      </div>
-    );
+    return <LoadingBall />;
   }
 
   return (
     <div className="app-shell">
       <header className="site-nav">
-        <a href={activeTab === "calendar" ?"/calendario" : "/tarefas"} className="site-brand" aria-label={pageCopy.aria}>
+        <a
+          href={demoMode ?(activeTab === "calendar" ?"/demo/calendario" : "/demo/tarefas") : (activeTab === "calendar" ?"/calendario" : "/tarefas")}
+          className="site-brand"
+          aria-label={pageCopy.aria}
+        >
           <span className="site-brand-badge" aria-hidden="true" />
           <span className="site-brand-lockup">
             <span className="site-brand-text">Sistema Interno - IEEE UFJF</span>
@@ -533,33 +660,39 @@ export default function InternalDashboard({ page = "tasks" }) {
         </a>
 
         <ul className="nav-links">
-          <li><a href="/">Início</a></li>
-          <li><a href="/atas">Atas</a></li>
-          <li><a href="/tarefas" aria-current={activeTab === "tasks" ?"page" : undefined}>Tarefas</a></li>
-          <li><a href="/calendario" aria-current={activeTab === "calendar" ?"page" : undefined}>Calendário</a></li>
-          {auth.user.canManageMembers ?<li><a href="/diretoria">Diretoria</a></li> : null}
+          <li><a href={demoMode ?"/demo" : "/"}>Início</a></li>
+          <li><a href={demoMode ?"/demo/atas" : "/atas"}>Atas</a></li>
+          <li><a href={demoMode ?"/demo/tarefas" : "/tarefas"} aria-current={activeTab === "tasks" ?"page" : undefined}>Tarefas</a></li>
+          <li><a href={demoMode ?"/demo/calendario" : "/calendario"} aria-current={activeTab === "calendar" ?"page" : undefined}>Calendário</a></li>
+          {auth.user.canManageMembers ?<li><a href={demoMode ?"/demo/diretoria" : "/diretoria"}>Diretoria</a></li> : null}
         </ul>
 
         <div className="topbar-actions">
-          <button
-            className="user-chip"
-            type="button"
-            onClick={() => setIsPasswordDialogOpen(true)}
-            title="Alterar senha"
-          >
-            {auth.user.name}
-          </button>
+          {demoMode ?(
+            <span className="user-chip">Modo demo</span>
+          ) : (
+            <button
+              className="user-chip"
+              type="button"
+              onClick={() => setIsPasswordDialogOpen(true)}
+              title="Alterar senha"
+            >
+              {auth.user.name}
+            </button>
+          )}
           <button className="ghost-button" onClick={loadInternalData} disabled={isLoading}>
             Atualizar
           </button>
-          <button className="ghost-button" onClick={handleLogout}>
-            Sair
-          </button>
+          {!demoMode ?(
+            <button className="ghost-button" onClick={handleLogout}>
+              Sair
+            </button>
+          ) : null}
         </div>
       </header>
 
       {themeToggleButton}
-      {isPasswordDialogOpen ?(
+      {!demoMode && isPasswordDialogOpen ?(
         <UserPasswordDialog user={auth.user} onClose={() => setIsPasswordDialogOpen(false)} />
       ) : null}
 
@@ -907,7 +1040,7 @@ export default function InternalDashboard({ page = "tasks" }) {
                   <section className="task-column" key={statusKey}>
                     <h3>{TASK_STATUS_LABELS[statusKey]}</h3>
                     <div className="task-list">
-                      {tasks.filter((task) => task.status === statusKey).map((task) => (
+                      {displayedTasks.filter((task) => task.status === statusKey).map((task) => (
                         <article className="task-card" key={task.id}>
                           <div className="task-card__topline">
                             <span>{task.chapter}</span>
@@ -964,7 +1097,7 @@ export default function InternalDashboard({ page = "tasks" }) {
                         </article>
                       ))}
 
-                      {!tasks.some((task) => task.status === statusKey) ?(
+                      {!displayedTasks.some((task) => task.status === statusKey) ?(
                         <div className="empty-state">Nenhuma tarefa nesta etapa.</div>
                       ) : null}
                     </div>
@@ -1013,8 +1146,8 @@ export default function InternalDashboard({ page = "tasks" }) {
               </div>
 
               <div className="calendar-list">
-                {events.length ?(
-                  events.map((item) => (
+                {displayedEvents.length ?(
+                  displayedEvents.map((item) => (
                     <article className="calendar-item" key={item.id}>
                       <div className="calendar-item__date">
                         <strong>{formatDateTime(item.startTime)}</strong>
@@ -1067,7 +1200,7 @@ export default function InternalDashboard({ page = "tasks" }) {
             <>
               <div>
                 <span>Eventos cadastrados</span>
-                <strong>{events.length}</strong>
+                <strong>{displayedEvents.length}</strong>
               </div>
             </>
           )}

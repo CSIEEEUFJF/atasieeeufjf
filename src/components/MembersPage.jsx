@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import LoadingBall from "./LoadingBall";
 import UserPasswordDialog from "./UserPasswordDialog";
+import { DEMO_CHAPTERS, DEMO_MEMBERS, DEMO_USER } from "./demo-data";
 
 const ROLE_OPTIONS = [
   "Membro",
@@ -117,20 +118,22 @@ function primaryCargoFromRoles(chapterRoles, selectedChapters, fallback = "") {
   return selectedChapters.map((chapterKey) => roles[chapterKey]).find(Boolean) || fallback || "";
 }
 
-export default function MembersPage() {
+export default function MembersPage({ demoMode = false } = {}) {
   const [theme, setTheme] = useState("light");
   const [auth, setAuth] = useState({
-    loading: true,
+    loading: !demoMode,
     setupRequired: false,
-    user: null,
+    user: demoMode ?DEMO_USER : null,
   });
-  const [chapters, setChapters] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [memberForm, setMemberForm] = useState(createMemberForm);
-  const [userDrafts, setUserDrafts] = useState({});
+  const [chapters, setChapters] = useState(demoMode ?DEMO_CHAPTERS : []);
+  const [users, setUsers] = useState(demoMode ?DEMO_MEMBERS : []);
+  const [memberForm, setMemberForm] = useState(() =>
+    createMemberForm(demoMode ?DEMO_CHAPTERS[0]?.key || "" : ""),
+  );
+  const [userDrafts, setUserDrafts] = useState(demoMode ?() => hydrateDrafts(DEMO_MEMBERS) : {});
   const [status, setStatus] = useState({
-    tone: "idle",
-    text: "Carregando gestão de membros.",
+    tone: demoMode ?"success" : "idle",
+    text: demoMode ?"Gestão demo carregada com membros fictícios." : "Carregando gestão de membros.",
   });
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [isCreatingMember, setIsCreatingMember] = useState(false);
@@ -157,6 +160,22 @@ export default function MembersPage() {
 
   useEffect(() => {
     let active = true;
+
+    if (demoMode) {
+      setAuth({
+        loading: false,
+        setupRequired: false,
+        user: DEMO_USER,
+      });
+      setChapters(DEMO_CHAPTERS);
+      setUsers(DEMO_MEMBERS);
+      setUserDrafts(hydrateDrafts(DEMO_MEMBERS));
+      setMemberForm(createMemberForm(DEMO_CHAPTERS[0]?.key || ""));
+      setStatus({ tone: "success", text: "Gestão demo carregada com membros fictícios." });
+      return () => {
+        active = false;
+      };
+    }
 
     async function loadAuth() {
       try {
@@ -201,13 +220,24 @@ export default function MembersPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [demoMode]);
 
   useEffect(() => {
+    if (demoMode) {
+      return;
+    }
+
     if (auth.user?.canManageMembers) {
       loadUsers();
     }
-  }, [auth.user]);
+  }, [auth.user, demoMode]);
+
+  useEffect(() => {
+    if (!demoMode && !auth.loading && !auth.user) {
+      const nextPath = `${window.location.pathname}${window.location.search}`;
+      window.location.replace(`/login?next=${encodeURIComponent(nextPath)}`);
+    }
+  }, [auth.loading, auth.user, demoMode]);
 
   const nextTheme = theme === "dark" ?"light" : "dark";
   const isAdmin = Boolean(auth.user?.isAdmin);
@@ -224,6 +254,13 @@ export default function MembersPage() {
   }
 
   async function loadUsers() {
+    if (demoMode) {
+      setUsers(DEMO_MEMBERS);
+      setUserDrafts(hydrateDrafts(DEMO_MEMBERS));
+      setStatus({ tone: "success", text: "Membros demo restaurados." });
+      return;
+    }
+
     setIsLoadingUsers(true);
     setStatus({ tone: "loading", text: "Atualizando membros cadastrados." });
 
@@ -249,6 +286,11 @@ export default function MembersPage() {
   }
 
   async function handleLogout() {
+    if (demoMode) {
+      window.location.href = "/demo";
+      return;
+    }
+
     try {
       await fetch("/api/auth/logout", { method: "POST" });
     } finally {
@@ -352,6 +394,32 @@ export default function MembersPage() {
     });
 
     try {
+      if (demoMode) {
+        const nextUser = {
+          cargo: selectedRole,
+          chapterRoles: Object.fromEntries(
+            selectedChapters.map((chapterKey) => [chapterKey, selectedRole]),
+          ),
+          chapters: selectedChapters,
+          id: crypto.randomUUID(),
+          isAdmin: isAdmin ?memberForm.isAdmin : false,
+          name: memberForm.name.trim() || "Membro Demo",
+          username: memberForm.username.trim() || `demo.${users.length + 1}`,
+          usesChapterRoles: true,
+        };
+        const nextUsers = [...users, nextUser];
+        setUsers(nextUsers);
+        setUserDrafts(hydrateDrafts(nextUsers));
+        setMemberForm(createMemberForm(defaultManagedChapter));
+        setStatus({
+          tone: "success",
+          text: isAdmin && memberForm.isAdmin
+            ?"Administrador demo criado localmente."
+            : "Membro demo cadastrado localmente.",
+        });
+        return;
+      }
+
       const response = await fetch("/api/users", {
         body: JSON.stringify({
           ...memberForm,
@@ -417,6 +485,24 @@ export default function MembersPage() {
     setStatus({ tone: "loading", text: "Salvando alteracoes do membro." });
 
     try {
+      if (demoMode) {
+        const data = {
+          user: {
+            ...user,
+            ...payload,
+            isAdmin: payload.isAdmin ?? user.isAdmin,
+            usesChapterRoles: true,
+          },
+        };
+        setUsers((current) => current.map((item) => (item.id === user.id ?data.user : item)));
+        setUserDrafts((current) => ({
+          ...current,
+          [user.id]: createUserDraft(data.user),
+        }));
+        setStatus({ tone: "success", text: "Usuário demo atualizado localmente." });
+        return;
+      }
+
       const response = await fetch(`/api/users/${user.id}`, {
         body: JSON.stringify(payload),
         headers: {
@@ -470,20 +556,20 @@ export default function MembersPage() {
     return <LoadingBall />;
   }
 
-  if (!auth.user || !auth.user.canManageMembers) {
+  if (!auth.user) {
+    return <LoadingBall />;
+  }
+
+  if (!auth.user.canManageMembers) {
     return (
       <div className="app-shell auth-shell">
         {themeToggleButton}
         <section className="hero-panel auth-card">
           <p className="panel-kicker">Membros</p>
           <h1>Acesso de gestão necessario</h1>
-          <p>
-            {auth.setupRequired
-              ?"Crie o primeiro usuário antes de gerenciar membros."
-              : "Entre com um administrador ou gestor de capítulo para gerenciar membros."}
-          </p>
-          <a className="primary-button standalone-link" href="/">
-            Entrar no sistema
+          <p>Entre com um administrador ou gestor de capítulo para gerenciar membros.</p>
+          <a className="primary-button standalone-link" href="/tarefas">
+            Voltar para tarefas
           </a>
         </section>
       </div>
@@ -493,7 +579,11 @@ export default function MembersPage() {
   return (
     <div className="app-shell">
       <header className="site-nav">
-        <a href="/diretoria/membros" className="site-brand" aria-label="Ir para membros da diretoria">
+        <a
+          href={demoMode ?"/demo/diretoria/membros" : "/diretoria/membros"}
+          className="site-brand"
+          aria-label="Ir para membros da diretoria"
+        >
           <span className="site-brand-badge" aria-hidden="true" />
           <span className="site-brand-lockup">
             <span className="site-brand-text">Sistema Interno - IEEE UFJF</span>
@@ -502,30 +592,36 @@ export default function MembersPage() {
         </a>
 
         <ul className="nav-links">
-          <li><a href="/">Início</a></li>
-          <li><a href="/atas">Atas</a></li>
-          <li><a href="/tarefas">Tarefas</a></li>
-          <li><a href="/calendario">Calendário</a></li>
-          <li><a href="/diretoria" aria-current="page">Diretoria</a></li>
+          <li><a href={demoMode ?"/demo" : "/"}>Início</a></li>
+          <li><a href={demoMode ?"/demo/atas" : "/atas"}>Atas</a></li>
+          <li><a href={demoMode ?"/demo/tarefas" : "/tarefas"}>Tarefas</a></li>
+          <li><a href={demoMode ?"/demo/calendario" : "/calendario"}>Calendário</a></li>
+          <li><a href={demoMode ?"/demo/diretoria" : "/diretoria"} aria-current="page">Diretoria</a></li>
         </ul>
 
         <div className="topbar-actions">
-          <button
-            className="user-chip"
-            type="button"
-            onClick={() => setIsPasswordDialogOpen(true)}
-            title="Alterar senha"
-          >
-            {auth.user.name}
-          </button>
-          <button className="ghost-button" onClick={handleLogout}>
-            Sair
-          </button>
+          {demoMode ?(
+            <span className="user-chip">Modo demo</span>
+          ) : (
+            <>
+              <button
+                className="user-chip"
+                type="button"
+                onClick={() => setIsPasswordDialogOpen(true)}
+                title="Alterar senha"
+              >
+                {auth.user.name}
+              </button>
+              <button className="ghost-button" onClick={handleLogout}>
+                Sair
+              </button>
+            </>
+          )}
         </div>
       </header>
 
       {themeToggleButton}
-      {isPasswordDialogOpen ?(
+      {!demoMode && isPasswordDialogOpen ?(
         <UserPasswordDialog
           user={auth.user}
           onClose={() => setIsPasswordDialogOpen(false)}

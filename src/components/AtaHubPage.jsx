@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import LoadingBall from "./LoadingBall";
 import UserPasswordDialog from "./UserPasswordDialog";
+import { DEMO_USER } from "./demo-data";
 
 async function readApiError(response, fallback) {
   try {
@@ -14,9 +15,13 @@ async function readApiError(response, fallback) {
   }
 }
 
-export default function AtaHubPage() {
+export default function AtaHubPage({ demoMode = false } = {}) {
   const [theme, setTheme] = useState("light");
-  const [auth, setAuth] = useState({ loading: true, setupRequired: false, user: null });
+  const [auth, setAuth] = useState({
+    loading: !demoMode,
+    setupRequired: false,
+    user: demoMode ?DEMO_USER : null,
+  });
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
 
   useEffect(() => {
@@ -39,6 +44,13 @@ export default function AtaHubPage() {
 
   useEffect(() => {
     let active = true;
+
+    if (demoMode) {
+      setAuth({ loading: false, setupRequired: false, user: DEMO_USER });
+      return () => {
+        active = false;
+      };
+    }
 
     async function loadAuth() {
       try {
@@ -66,13 +78,25 @@ export default function AtaHubPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [demoMode]);
+
+  useEffect(() => {
+    if (!demoMode && !auth.loading && !auth.user) {
+      const nextPath = `${window.location.pathname}${window.location.search}`;
+      window.location.replace(`/login?next=${encodeURIComponent(nextPath)}`);
+    }
+  }, [auth.loading, auth.user, demoMode]);
 
   function toggleTheme() {
     setTheme((current) => (current === "dark" ? "light" : "dark"));
   }
 
   async function handleLogout() {
+    if (demoMode) {
+      window.location.href = "/demo";
+      return;
+    }
+
     try {
       await fetch("/api/auth/logout", { method: "POST" });
     } finally {
@@ -103,25 +127,13 @@ export default function AtaHubPage() {
   }
 
   if (!auth.user) {
-    return (
-      <div className="app-shell auth-shell">
-        {themeToggleButton}
-        <section className="hero-panel auth-card">
-          <p className="panel-kicker">Atas</p>
-          <h1>Acesse sua conta</h1>
-          <p>Entre para consultar o banco de atas ou criar uma nova ata.</p>
-          <a className="primary-button standalone-link" href="/">
-            Entrar no sistema
-          </a>
-        </section>
-      </div>
-    );
+    return <LoadingBall />;
   }
 
   return (
     <div className="app-shell">
       <header className="site-nav">
-        <a href="/" className="site-brand" aria-label="Ir para início">
+        <a href={demoMode ?"/demo/atas" : "/"} className="site-brand" aria-label="Ir para início">
           <span className="site-brand-badge" aria-hidden="true" />
           <span className="site-brand-lockup">
             <span className="site-brand-text">Sistema Interno - IEEE UFJF</span>
@@ -130,30 +142,36 @@ export default function AtaHubPage() {
         </a>
 
         <ul className="nav-links">
-          <li><a href="/">Início</a></li>
-          <li><a href="/atas" aria-current="page">Atas</a></li>
-          <li><a href="/tarefas">Tarefas</a></li>
-          <li><a href="/calendario">Calendário</a></li>
-          <li><a href="/diretoria">Diretoria</a></li>
+          <li><a href={demoMode ?"/demo" : "/"}>Início</a></li>
+          <li><a href={demoMode ?"/demo/atas" : "/atas"} aria-current="page">Atas</a></li>
+          <li><a href={demoMode ?"/demo/tarefas" : "/tarefas"}>Tarefas</a></li>
+          <li><a href={demoMode ?"/demo/calendario" : "/calendario"}>Calendário</a></li>
+          <li><a href={demoMode ?"/demo/diretoria" : "/diretoria"}>Diretoria</a></li>
         </ul>
 
         <div className="topbar-actions">
-          <button
-            className="user-chip"
-            type="button"
-            onClick={() => setIsPasswordDialogOpen(true)}
-            title="Alterar senha"
-          >
-            {auth.user.name}
-          </button>
-          <button className="ghost-button" onClick={handleLogout}>
-            Sair
-          </button>
+          {demoMode ?(
+            <span className="user-chip">Modo demo</span>
+          ) : (
+            <>
+              <button
+                className="user-chip"
+                type="button"
+                onClick={() => setIsPasswordDialogOpen(true)}
+                title="Alterar senha"
+              >
+                {auth.user.name}
+              </button>
+              <button className="ghost-button" onClick={handleLogout}>
+                Sair
+              </button>
+            </>
+          )}
         </div>
       </header>
 
       {themeToggleButton}
-      {isPasswordDialogOpen ?(
+      {!demoMode && isPasswordDialogOpen ?(
         <UserPasswordDialog user={auth.user} onClose={() => setIsPasswordDialogOpen(false)} />
       ) : null}
 
@@ -167,13 +185,13 @@ export default function AtaHubPage() {
         </section>
 
         <section className="board-action-grid">
-          <a className="board-action-card" href="/atas/banco">
+          <a className="board-action-card" href={demoMode ?"/demo/atas/banco" : "/atas/banco"}>
             <span>Biblioteca</span>
             <strong>Consultar banco de atas</strong>
             <p>Acesse atas salvas por capítulo, anexos e registros já gerados.</p>
           </a>
 
-          <a className="board-action-card" href="/atas/nova">
+          <a className="board-action-card" href={demoMode ?"/demo/atas/nova" : "/atas/nova"}>
             <span>Gerador</span>
             <strong>Criar nova ata</strong>
             <p>Abra o formulário de geração para preencher reunião, presentes, pautas e resultados.</p>
