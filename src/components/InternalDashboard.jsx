@@ -1057,7 +1057,7 @@ export default function InternalDashboard({ page = "tasks", demoMode = false }) 
                   />
                   <span>
                     <strong>Notificar membros por e-mail</strong>
-                    <small>Envia a nova tarefa para os membros do capítulo selecionado.</small>
+                    <small>Com responsável definido, envia apenas para ele. Sem responsável, envia para o capítulo.</small>
                   </span>
                 </label>
 

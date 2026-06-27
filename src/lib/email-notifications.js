@@ -6,6 +6,9 @@ import { getPrisma } from "./db";
 const BRT_TIME_ZONE = "America/Sao_Paulo";
 const GLOBAL_CHAPTER = "Todos";
 const MAX_EMAIL_RECIPIENTS = 200;
+const RESEND_EMAILS_PER_SECOND = 10;
+const EMAIL_BATCH_DELAY_MS = 1000;
+const SYSTEM_BASE_URL = "https://interno.ieeeufjf.com.br";
 
 let resendClient = null;
 
@@ -23,10 +26,33 @@ function getResendClient() {
   return resendClient;
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+async function sendEmailBatches(messages) {
+  const results = [];
+  for (let index = 0; index < messages.length; index += RESEND_EMAILS_PER_SECOND) {
+    const batch = messages.slice(index, index + RESEND_EMAILS_PER_SECOND);
+    const batchResults = await Promise.allSettled(
+      batch.map((message) => getResendClient().emails.send(message)),
+    );
+    results.push(...batchResults);
+
+    if (index + RESEND_EMAILS_PER_SECOND < messages.length) {
+      await sleep(EMAIL_BATCH_DELAY_MS);
+    }
+  }
+
+  return results;
+}
+
 function isDeliverableEmail(email) {
   const cleanEmail = String(email || "").trim().toLowerCase();
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)
-    && !cleanEmail.endsWith("@local.atas-ieee");
+    && !cleanEmail.includes("@local.atas-ieee");
 }
 
 function escapeHtml(value) {
@@ -58,7 +84,86 @@ function chapterLabel(chapter) {
     return "Todos os capítulos";
   }
 
-  return SOCIEDADE_LABELS[chapter] ?`${chapter} - ${SOCIEDADE_LABELS[chapter]}` : chapter;
+  const label = SOCIEDADE_LABELS[chapter] || chapter;
+  if (!chapter || label === chapter || label.startsWith(`${chapter} - `)) {
+    return label;
+  }
+
+  return `${chapter} - ${label}`;
+}
+
+function emailShell({ children, eyebrow, preview, title }) {
+  const logoUrl = `${SYSTEM_BASE_URL}/ramo-ieee-ufjf.png`;
+
+  return `
+    <div style="margin:0; padding:0; background:#f3f7fb;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse; background:#f3f7fb;">
+        <tr>
+          <td align="center" style="padding:32px 16px;">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px; border-collapse:collapse; overflow:hidden; border:1px solid #d7e5f0; border-radius:18px; background:#ffffff;">
+              <tr>
+                <td style="padding:22px 28px; background:#00629B; color:#ffffff;">
+                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
+                    <tr>
+                      <td style="width:54px; vertical-align:middle;">
+                        <img src="${logoUrl}" width="44" height="44" alt="IEEE UFJF" style="display:block; width:44px; height:44px; object-fit:contain; border:0;">
+                      </td>
+                      <td style="vertical-align:middle; padding-left:10px;">
+                        <div style="font-family:Arial,sans-serif; font-size:16px; font-weight:800; line-height:1.15; color:#ffffff;">Universidade Federal de Juiz de Fora</div>
+                        <div style="font-family:Arial,sans-serif; font-size:14px; font-weight:700; line-height:1.2; color:#ffffff;">IEEE Student Branch</div>
+                      </td>
+                      <td style="width:1px; padding:0 16px;">
+                        <div style="width:1px; height:40px; background:rgba(255,255,255,.72);"></div>
+                      </td>
+                      <td style="vertical-align:middle; white-space:nowrap;">
+                        <div style="font-family:Arial,sans-serif; font-size:17px; font-weight:800; line-height:1.2; color:#ffffff;">Sistema Interno</div>
+                      </td>
+                    </tr>
+                  </table>
+                  <div style="margin-top:22px; font-family:Arial,sans-serif; font-size:12px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; opacity:.88;">${escapeHtml(eyebrow)}</div>
+                  <h1 style="margin:8px 0 0; font-family:Arial,sans-serif; font-size:24px; line-height:1.2; color:#ffffff;">${escapeHtml(title)}</h1>
+                  ${preview ?`<p style="margin:8px 0 0; font-family:Arial,sans-serif; font-size:14px; line-height:1.5; color:#e8f3fb;">${escapeHtml(preview)}</p>` : ""}
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:26px 28px; font-family:Arial,sans-serif; color:#17233c; line-height:1.5;">
+                  ${children}
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:16px 28px; background:#f8fbfd; border-top:1px solid #d7e5f0; font-family:Arial,sans-serif; color:#607089; font-size:12px;">
+                  Sistema Interno IEEE UFJF
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </div>
+  `;
+}
+
+function detailTable(rows) {
+  return `
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse; margin:0 0 18px;">
+      ${rows.map(([label, value]) => `
+        <tr>
+          <td style="width:170px; padding:10px 0; border-bottom:1px solid #e6eef5; color:#42526a; font-family:Arial,sans-serif; font-size:13px; font-weight:700;">${escapeHtml(label)}</td>
+          <td style="padding:10px 0; border-bottom:1px solid #e6eef5; color:#17233c; font-family:Arial,sans-serif; font-size:14px;">${escapeHtml(value)}</td>
+        </tr>
+      `).join("")}
+    </table>
+  `;
+}
+
+function actionButton({ href, label }) {
+  return `
+    <p style="margin:24px 0 0;">
+      <a href="${escapeHtml(href)}" style="display:inline-block; padding:12px 18px; border-radius:10px; background:#00629B; color:#ffffff; font-family:Arial,sans-serif; font-size:14px; font-weight:700; text-decoration:none;">
+        ${escapeHtml(label)}
+      </a>
+    </p>
+  `;
 }
 
 async function listChapterNotificationRecipients(chapter) {
@@ -90,10 +195,7 @@ async function listChapterNotificationRecipients(chapter) {
   users.forEach((user) => {
     const email = String(user.email || "").trim().toLowerCase();
     if (isDeliverableEmail(email)) {
-      recipients.set(email, {
-        email,
-        name: user.name || email,
-      });
+      recipients.set(email, { email, name: user.name || email });
     }
   });
 
@@ -105,75 +207,130 @@ async function listChapterNotificationRecipients(chapter) {
 
     const email = String(contact.email || "").trim().toLowerCase();
     if (isDeliverableEmail(email)) {
-      recipients.set(email, {
-        email,
-        name: contact.name || email,
-      });
+      recipients.set(email, { email, name: contact.name || email });
     }
   });
 
   return [...recipients.values()];
 }
 
-function taskEmailHtml({ creator, task }) {
-  const safeTitle = escapeHtml(task.title);
-  const safeDescription = escapeHtml(task.description || "Sem descrição.");
-  const safeChapter = escapeHtml(chapterLabel(task.chapter));
-  const safeCreator = escapeHtml(creator?.name || "Sistema Interno IEEE UFJF");
-  const safeDueDate = escapeHtml(formatDateTime(task.dueDate));
+async function assignedTaskRecipient(task) {
+  if (!task.assignedToId) {
+    return null;
+  }
 
-  return `
-    <div style="font-family: Arial, sans-serif; color: #17233c; line-height: 1.5;">
-      <h1 style="font-size: 22px; margin: 0 0 12px;">Nova tarefa cadastrada</h1>
-      <p style="margin: 0 0 16px;">Uma nova tarefa foi criada no Sistema Interno IEEE UFJF.</p>
-      <table style="border-collapse: collapse; width: 100%; max-width: 640px;">
-        <tr><td style="padding: 8px 0; font-weight: 700;">Título</td><td style="padding: 8px 0;">${safeTitle}</td></tr>
-        <tr><td style="padding: 8px 0; font-weight: 700;">Capítulo</td><td style="padding: 8px 0;">${safeChapter}</td></tr>
-        <tr><td style="padding: 8px 0; font-weight: 700;">Prazo</td><td style="padding: 8px 0;">${safeDueDate}</td></tr>
-        <tr><td style="padding: 8px 0; font-weight: 700;">Criada por</td><td style="padding: 8px 0;">${safeCreator}</td></tr>
-      </table>
-      <p style="margin: 16px 0 0;"><strong>Descrição:</strong><br>${safeDescription}</p>
-      <p style="margin: 20px 0 0;">
-        <a href="https://interno.ieeeufjf.com.br/tarefas" style="color: #00629B; font-weight: 700;">Abrir tarefas</a>
-      </p>
-    </div>
-  `;
+  const user = await getPrisma().user.findUnique({
+    select: {
+      email: true,
+      memberContact: {
+        select: {
+          email: true,
+          name: true,
+        },
+      },
+      name: true,
+    },
+    where: { id: task.assignedToId },
+  });
+
+  if (!user) {
+    return null;
+  }
+
+  const email = isDeliverableEmail(user.email)
+    ?user.email
+    : user.memberContact?.email;
+
+  if (!isDeliverableEmail(email)) {
+    return null;
+  }
+
+  return {
+    email: String(email).trim().toLowerCase(),
+    name: user.memberContact?.name || user.name || email,
+  };
 }
 
-function taskEmailText({ creator, task }) {
+async function listTaskNotificationRecipients(task) {
+  const assignedRecipient = await assignedTaskRecipient(task);
+  if (assignedRecipient) {
+    return [assignedRecipient];
+  }
+
+  if (task.assignedToId) {
+    return [];
+  }
+
+  return listChapterNotificationRecipients(task.chapter);
+}
+
+function taskAssigneeName(task) {
+  return task.assignedTo?.name || "Sem responsável definido";
+}
+
+function taskGreeting(recipient, task) {
+  return `Prezado ${recipient?.name || "membro"}, informamos que uma nova tarefa foi criada no(a) ${chapterLabel(task.chapter)}.`;
+}
+
+function taskEmailHtml({ creator, recipient, task }) {
+  const description = task.description || "Sem descrição.";
+  const rows = [
+    ["Título", task.title],
+    ["Capítulo", chapterLabel(task.chapter)],
+    ["Prazo", formatDateTime(task.dueDate)],
+    ["Responsável", taskAssigneeName(task)],
+    ["Criada por", creator?.name || "Sistema Interno IEEE UFJF"],
+  ];
+
+  return emailShell({
+    eyebrow: "Tarefa",
+    preview: "Uma nova tarefa foi cadastrada para o seu capítulo.",
+    title: "Nova tarefa cadastrada",
+    children: `
+      <p style="margin:0 0 18px; font-family:Arial,sans-serif; font-size:15px; color:#17233c;">${escapeHtml(taskGreeting(recipient, task))}</p>
+      ${detailTable(rows)}
+      <div style="margin-top:18px;">
+        <div style="color:#42526a; font-family:Arial,sans-serif; font-size:13px; font-weight:700; margin-bottom:6px;">Descrição</div>
+        <div style="padding:14px 16px; border:1px solid #d7e5f0; border-radius:12px; background:#f8fbfd; color:#17233c; font-family:Arial,sans-serif; font-size:14px;">${escapeHtml(description)}</div>
+      </div>
+      ${actionButton({ href: `${SYSTEM_BASE_URL}/tarefas`, label: "Abrir tarefas" })}
+    `,
+  });
+}
+
+function taskEmailText({ creator, recipient, task }) {
   return [
     "Nova tarefa cadastrada no Sistema Interno IEEE UFJF.",
+    "",
+    taskGreeting(recipient, task),
     "",
     `Título: ${task.title}`,
     `Capítulo: ${chapterLabel(task.chapter)}`,
     `Prazo: ${formatDateTime(task.dueDate)}`,
+    `Responsável: ${taskAssigneeName(task)}`,
     `Criada por: ${creator?.name || "Sistema Interno IEEE UFJF"}`,
     "",
     `Descrição: ${task.description || "Sem descrição."}`,
     "",
-    "Acesse: https://interno.ieeeufjf.com.br/tarefas",
+    `Acesse: ${SYSTEM_BASE_URL}/tarefas`,
   ].join("\n");
 }
 
 function welcomeEmailHtml({ initialPassword, user }) {
-  const safeName = escapeHtml(user.name);
-  const safeUsername = escapeHtml(user.username);
-  const safePassword = escapeHtml(initialPassword);
-
-  return `
-    <div style="font-family: Arial, sans-serif; color: #17233c; line-height: 1.5;">
-      <h1 style="font-size: 22px; margin: 0 0 12px;">Bem-vindo ao Sistema Interno IEEE UFJF</h1>
-      <p style="margin: 0 0 16px;">Olá, ${safeName}. Seu acesso ao sistema interno foi criado.</p>
-      <table style="border-collapse: collapse; width: 100%; max-width: 640px;">
-        <tr><td style="padding: 8px 0; font-weight: 700;">Usuário</td><td style="padding: 8px 0;">${safeUsername}</td></tr>
-        <tr><td style="padding: 8px 0; font-weight: 700;">Senha inicial</td><td style="padding: 8px 0;">${safePassword}</td></tr>
-      </table>
-      <p style="margin: 16px 0 0;">Por segurança, troque sua senha no primeiro acesso clicando no seu nome no canto superior do sistema.</p>
-      <p style="margin: 20px 0 0;">
-        <a href="https://interno.ieeeufjf.com.br/login" style="color: #00629B; font-weight: 700;">Acessar o sistema</a>
-      </p>
-    </div>
-  `;
+  return emailShell({
+    eyebrow: "Acesso",
+    preview: "Seu acesso ao Sistema Interno IEEE UFJF foi criado.",
+    title: "Bem-vindo ao Sistema Interno",
+    children: `
+      <p style="margin:0 0 18px; font-family:Arial,sans-serif; font-size:15px;">Olá, ${escapeHtml(user.name)}. Seu acesso ao sistema interno foi criado.</p>
+      ${detailTable([
+        ["Usuário", user.username],
+        ["Senha inicial", initialPassword],
+      ])}
+      <p style="margin:16px 0 0; color:#42526a; font-family:Arial,sans-serif; font-size:14px;">Por segurança, troque sua senha no primeiro acesso clicando no seu nome no canto superior do sistema.</p>
+      ${actionButton({ href: `${SYSTEM_BASE_URL}/login`, label: "Acessar o sistema" })}
+    `,
+  });
 }
 
 function welcomeEmailText({ initialPassword, user }) {
@@ -187,7 +344,7 @@ function welcomeEmailText({ initialPassword, user }) {
     "",
     "Por segurança, troque sua senha no primeiro acesso clicando no seu nome no canto superior do sistema.",
     "",
-    "Acesse: https://interno.ieeeufjf.com.br/login",
+    `Acesse: ${SYSTEM_BASE_URL}/login`,
   ].join("\n");
 }
 
@@ -207,34 +364,30 @@ function recurrenceLabel(event) {
 }
 
 function eventEmailHtml({ creator, event }) {
-  const safeTitle = escapeHtml(event.title);
-  const safeDescription = escapeHtml(event.description || "Sem descrição.");
-  const safeLocation = escapeHtml(event.location || "Local não informado");
-  const safeChapter = escapeHtml(chapterLabel(event.chapter));
-  const safeCreator = escapeHtml(creator?.name || "Sistema Interno IEEE UFJF");
-  const safeStartTime = escapeHtml(formatDateTime(event.startTime));
-  const safeEndTime = escapeHtml(formatDateTime(event.endTime));
   const recurrence = recurrenceLabel(event);
+  const rows = [
+    ["Evento", event.title],
+    ["Capítulo", chapterLabel(event.chapter)],
+    ["Início", formatDateTime(event.startTime)],
+    ["Fim", formatDateTime(event.endTime)],
+    ["Local", event.location || "Local não informado"],
+    ["Criado por", creator?.name || "Sistema Interno IEEE UFJF"],
+  ];
 
-  return `
-    <div style="font-family: Arial, sans-serif; color: #17233c; line-height: 1.5;">
-      <h1 style="font-size: 22px; margin: 0 0 12px;">Novo evento no calendário</h1>
-      <p style="margin: 0 0 16px;">Um novo evento foi agendado no Sistema Interno IEEE UFJF.</p>
-      <table style="border-collapse: collapse; width: 100%; max-width: 640px;">
-        <tr><td style="padding: 8px 0; font-weight: 700;">Evento</td><td style="padding: 8px 0;">${safeTitle}</td></tr>
-        <tr><td style="padding: 8px 0; font-weight: 700;">Capítulo</td><td style="padding: 8px 0;">${safeChapter}</td></tr>
-        <tr><td style="padding: 8px 0; font-weight: 700;">Início</td><td style="padding: 8px 0;">${safeStartTime}</td></tr>
-        <tr><td style="padding: 8px 0; font-weight: 700;">Fim</td><td style="padding: 8px 0;">${safeEndTime}</td></tr>
-        <tr><td style="padding: 8px 0; font-weight: 700;">Local</td><td style="padding: 8px 0;">${safeLocation}</td></tr>
-        <tr><td style="padding: 8px 0; font-weight: 700;">Criado por</td><td style="padding: 8px 0;">${safeCreator}</td></tr>
-      </table>
-      ${recurrence ?`<p style="margin: 16px 0 0;"><strong>${escapeHtml(recurrence)}</strong></p>` : ""}
-      <p style="margin: 16px 0 0;"><strong>Descrição:</strong><br>${safeDescription}</p>
-      <p style="margin: 20px 0 0;">
-        <a href="https://interno.ieeeufjf.com.br/calendario" style="color: #00629B; font-weight: 700;">Abrir calendário</a>
-      </p>
-    </div>
-  `;
+  return emailShell({
+    eyebrow: "Calendário",
+    preview: "Um novo evento foi agendado no calendário interno.",
+    title: "Novo evento no calendário",
+    children: `
+      ${detailTable(rows)}
+      ${recurrence ?`<p style="margin:16px 0; color:#00629B; font-family:Arial,sans-serif; font-size:14px; font-weight:700;">${escapeHtml(recurrence)}</p>` : ""}
+      <div style="margin-top:18px;">
+        <div style="color:#42526a; font-family:Arial,sans-serif; font-size:13px; font-weight:700; margin-bottom:6px;">Descrição</div>
+        <div style="padding:14px 16px; border:1px solid #d7e5f0; border-radius:12px; background:#f8fbfd; color:#17233c; font-family:Arial,sans-serif; font-size:14px;">${escapeHtml(event.description || "Sem descrição.")}</div>
+      </div>
+      ${actionButton({ href: `${SYSTEM_BASE_URL}/calendario`, label: "Abrir calendário" })}
+    `,
+  });
 }
 
 function eventEmailText({ creator, event }) {
@@ -252,7 +405,7 @@ function eventEmailText({ creator, event }) {
     "",
     `Descrição: ${event.description || "Sem descrição."}`,
     "",
-    "Acesse: https://interno.ieeeufjf.com.br/calendario",
+    `Acesse: ${SYSTEM_BASE_URL}/calendario`,
   ].filter(Boolean).join("\n");
 }
 
@@ -273,36 +426,34 @@ async function sendSingleEmail({ html, subject, text, to }) {
   return { enabled: true, sent: 1 };
 }
 
-export async function notifyMembersAboutCreatedTask({ creator, task }) {
-  if (!emailNotificationsEnabled()) {
-    return { enabled: false, sent: 0 };
-  }
-
-  const recipients = await listChapterNotificationRecipients(task.chapter);
-  if (!recipients.length) {
-    return { enabled: true, sent: 0 };
-  }
-
-  const subject = `[IEEE UFJF] Nova tarefa: ${task.title}`;
-  const html = taskEmailHtml({ creator, task });
-  const text = taskEmailText({ creator, task });
-  const results = await Promise.allSettled(
-    recipients.map((recipient) =>
-      getResendClient().emails.send({
-        from: process.env.EMAIL_FROM,
-        html,
-        subject,
-        text,
-        to: `${recipient.name} <${recipient.email}>`,
-      }),
-    ),
-  );
-
+function sentStats(results) {
   return {
     enabled: true,
     failed: results.filter((result) => result.status === "rejected").length,
     sent: results.filter((result) => result.status === "fulfilled").length,
   };
+}
+
+export async function notifyMembersAboutCreatedTask({ creator, task }) {
+  if (!emailNotificationsEnabled()) {
+    return { enabled: false, sent: 0 };
+  }
+
+  const recipients = await listTaskNotificationRecipients(task);
+  if (!recipients.length) {
+    return { enabled: true, sent: 0 };
+  }
+
+  const subject = `[IEEE UFJF] Nova tarefa: ${task.title}`;
+  const messages = recipients.map((recipient) => ({
+    from: process.env.EMAIL_FROM,
+    html: taskEmailHtml({ creator, recipient, task }),
+    subject,
+    text: taskEmailText({ creator, recipient, task }),
+    to: `${recipient.name} <${recipient.email}>`,
+  }));
+
+  return sentStats(await sendEmailBatches(messages));
 }
 
 export async function notifyUserWelcome({ initialPassword, user }) {
@@ -336,21 +487,13 @@ export async function notifyMembersAboutCreatedEvent({ creator, events }) {
   const subject = `[IEEE UFJF] Novo evento: ${firstEvent.title}`;
   const html = eventEmailHtml({ creator, event: notificationEvent });
   const text = eventEmailText({ creator, event: notificationEvent });
-  const results = await Promise.allSettled(
-    recipients.map((recipient) =>
-      getResendClient().emails.send({
-        from: process.env.EMAIL_FROM,
-        html,
-        subject,
-        text,
-        to: `${recipient.name} <${recipient.email}>`,
-      }),
-    ),
-  );
+  const messages = recipients.map((recipient) => ({
+    from: process.env.EMAIL_FROM,
+    html,
+    subject,
+    text,
+    to: `${recipient.name} <${recipient.email}>`,
+  }));
 
-  return {
-    enabled: true,
-    failed: results.filter((result) => result.status === "rejected").length,
-    sent: results.filter((result) => result.status === "fulfilled").length,
-  };
+  return sentStats(await sendEmailBatches(messages));
 }

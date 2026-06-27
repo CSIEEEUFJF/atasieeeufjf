@@ -361,7 +361,7 @@ export async function createInternalTask(user, payload = {}) {
       title,
     },
     include: {
-      assignedTo: { select: { id: true, name: true } },
+      assignedTo: { select: { email: true, id: true, name: true } },
       createdBy: { select: { id: true, name: true } },
     },
   });
