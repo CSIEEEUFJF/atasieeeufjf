@@ -222,12 +222,6 @@ async function assignedTaskRecipient(task) {
   const user = await getPrisma().user.findUnique({
     select: {
       email: true,
-      memberContact: {
-        select: {
-          email: true,
-          name: true,
-        },
-      },
       name: true,
     },
     where: { id: task.assignedToId },
@@ -237,17 +231,13 @@ async function assignedTaskRecipient(task) {
     return null;
   }
 
-  const email = isDeliverableEmail(user.email)
-    ?user.email
-    : user.memberContact?.email;
-
-  if (!isDeliverableEmail(email)) {
+  if (!isDeliverableEmail(user.email)) {
     return null;
   }
 
   return {
-    email: String(email).trim().toLowerCase(),
-    name: user.memberContact?.name || user.name || email,
+    email: String(user.email).trim().toLowerCase(),
+    name: user.name || user.email,
   };
 }
 
