@@ -31,3 +31,5 @@ chrome-dom*.txt
 next-swiftlatex-debug*.log
 swiftlatex-debug.png
 swiftlatex-release.zip
+*.log
+/.codex-logs

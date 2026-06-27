@@ -78,6 +78,12 @@ export default function LoginShell({
                 <button className="primary-button login-02-submit" disabled={isSubmitting}>
                   {isSubmitting ?submittingLabel : submitLabel}
                 </button>
+
+                {!isSetup ?(
+                  <a className="soft-button login-02-demo-link" href="/demo">
+                    Conhecer o sistema
+                  </a>
+                ) : null}
               </form>
             </div>
           </div>

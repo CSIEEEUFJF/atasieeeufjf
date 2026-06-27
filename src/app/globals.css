@@ -319,6 +319,12 @@ html[data-theme="dark"] .loading-ball {
   justify-content: center;
 }
 
+.login-02-demo-link {
+  width: 100%;
+  justify-content: center;
+  text-decoration: none;
+}
+
 .login-02-cover {
   position: relative;
   min-height: 100%;
