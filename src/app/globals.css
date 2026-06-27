@@ -2000,13 +2000,13 @@ html[data-theme="dark"] .pdf-progress {
 }
 
 .board-page-main:has(.home-slideshow) {
-  padding-top: 82px;
+  padding-top: 78px;
 }
 
 .home-slideshow {
   position: relative;
-  min-height: clamp(210px, 24vh, 280px);
-  margin-bottom: 12px;
+  min-height: clamp(420px, 48vh, 560px);
+  margin-bottom: 10px;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
@@ -2117,13 +2117,13 @@ html[data-theme="dark"] .pdf-progress {
 }
 
 .home-action-grid .board-action-card {
-  min-height: 156px;
+  min-height: 148px;
   padding: 22px 24px;
 }
 
 .board-page-main .internal-hero--simple {
-  margin-bottom: 14px;
-  padding: 22px 26px;
+  margin-bottom: 12px;
+  padding: 20px 26px;
 }
 
 .board-page-main .internal-hero--simple h1 {
