@@ -73,6 +73,15 @@ function photoFrameStyle(photo = {}) {
   };
 }
 
+function isManagedPhotoId(value) {
+  const id = Number(value);
+  return Number.isSafeInteger(id) && id > 0;
+}
+
+function isInlineImageUrl(value) {
+  return /^data:image\//i.test(String(value || ""));
+}
+
 function ThemeToggle({ theme, onToggle }) {
   const nextTheme = theme === "dark" ? "light" : "dark";
 
@@ -337,7 +346,7 @@ export default function HomeDashboard({ demoMode = false } = {}) {
     setPhotoMessage(photoForm.id ?"Atualizando foto." : "Salvando foto.");
 
     try {
-      const isEditing = Number.isSafeInteger(Number(photoForm.id));
+      const isEditing = isManagedPhotoId(photoForm.id);
       const response = await fetch(
         isEditing ?`/api/site-home-photos/manage/${photoForm.id}` : "/api/site-home-photos/manage",
         {
@@ -370,13 +379,13 @@ export default function HomeDashboard({ demoMode = false } = {}) {
 
   function editPhoto(photo) {
     setPhotoForm(createPhotoForm(photo));
-    setPhotoMessage(Number.isSafeInteger(Number(photo.id))
+    setPhotoMessage(isManagedPhotoId(photo.id)
       ?"Ajuste o enquadramento e salve."
       : "Fotos padrão podem ser ajustadas nesta sessão; para salvar, adicione uma nova foto.");
   }
 
   async function deletePhoto(photo) {
-    if (!Number.isSafeInteger(Number(photo.id))) {
+    if (!isManagedPhotoId(photo.id)) {
       setHomePhotos((current) => current.filter((item) => item.id !== photo.id));
       return;
     }
@@ -431,7 +440,7 @@ export default function HomeDashboard({ demoMode = false } = {}) {
   const visibleActions = actions.filter((action) => (
     demoMode || !action.href.endsWith("/diretoria") || auth.user.canManageMembers
   ));
-  const isEditingManagedPhoto = Number.isSafeInteger(Number(photoForm.id));
+  const isEditingManagedPhoto = isManagedPhotoId(photoForm.id);
 
   return (
     <div className="app-shell">
@@ -507,11 +516,25 @@ export default function HomeDashboard({ demoMode = false } = {}) {
               </label>
 
               <label className="field">
-                <span>Imagem</span>
+                <span>Arquivo da imagem</span>
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   onChange={handlePhotoFileChange}
+                />
+              </label>
+
+              <label className="field">
+                <span>Link da imagem ou Google Drive</span>
+                <input
+                  value={isInlineImageUrl(photoForm.imageUrl) ?"" : photoForm.imageUrl}
+                  onChange={(event) =>
+                    setPhotoForm((current) => ({
+                      ...current,
+                      imageUrl: event.target.value,
+                    }))
+                  }
+                  placeholder="https://drive.google.com/file/d/..."
                 />
               </label>
 

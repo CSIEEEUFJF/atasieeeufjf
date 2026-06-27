@@ -3,6 +3,67 @@ import { getPrisma } from "./db";
 
 const MAX_IMAGE_DATA_URL_LENGTH = 1_500_000;
 
+function sanitizeText(value, maxLength = 600) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return value.replace(/\s+/g, " ").trim().slice(0, maxLength);
+}
+
+function getGoogleDriveFileId(value) {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+    const isGoogleDriveUrl = [
+      "docs.google.com",
+      "drive.google.com",
+      "drive.usercontent.google.com",
+    ].includes(host);
+
+    if (!isGoogleDriveUrl) {
+      return "";
+    }
+
+    const queryId = url.searchParams.get("id")?.trim();
+    if (queryId) {
+      return queryId;
+    }
+
+    const fileMatch = url.pathname.match(/\/file\/d\/([^/]+)/);
+    return fileMatch?.[1] ?decodeURIComponent(fileMatch[1]).trim() : "";
+  } catch {
+    return "";
+  }
+}
+
+function googleDriveThumbnailUrl(fileId) {
+  return `https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w1600`;
+}
+
+function sanitizeImageUrl(value) {
+  const cleanValue = String(value || "").trim();
+  if (!cleanValue) {
+    return "";
+  }
+
+  if (/^data:image\/(?:jpeg|jpg|png|webp);base64,/i.test(cleanValue)) {
+    return cleanValue;
+  }
+
+  const googleDriveFileId = getGoogleDriveFileId(cleanValue);
+  if (googleDriveFileId) {
+    return googleDriveThumbnailUrl(googleDriveFileId);
+  }
+
+  try {
+    const url = new URL(cleanValue);
+    return ["http:", "https:"].includes(url.protocol) ?url.toString() : "";
+  } catch {
+    return cleanValue.startsWith("/") ?cleanValue : "";
+  }
+}
+
 function publicHomePhoto(row) {
   if (!row) {
     return null;
@@ -46,14 +107,10 @@ function sanitizePhotoZoom(value, fallback = 100) {
 
 function sanitizeHomePhotoPayload(payload = {}) {
   const title = String(payload.title || "").trim().slice(0, 120);
-  const imageUrl = String(payload.imageUrl || "").trim();
+  const imageUrl = sanitizeImageUrl(payload.imageUrl);
 
   if (!imageUrl) {
-    throw new Error("Envie uma imagem para o slideshow.");
-  }
-
-  if (!/^data:image\/(?:jpeg|jpg|png|webp);base64,/i.test(imageUrl) && !imageUrl.startsWith("/")) {
-    throw new Error("Use uma imagem válida em JPG, PNG ou WebP.");
+    throw new Error("Envie uma imagem, link do Google Drive ou URL válida.");
   }
 
   if (imageUrl.length > MAX_IMAGE_DATA_URL_LENGTH) {
