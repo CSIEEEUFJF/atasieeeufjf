@@ -482,7 +482,7 @@ export default function MembersPage() {
               ?"Crie o primeiro usuário antes de gerenciar membros."
               : "Entre com um administrador ou gestor de capítulo para gerenciar membros."}
           </p>
-          <a className="primary-button standalone-link" href="/atas/nova">
+          <a className="primary-button standalone-link" href="/">
             Entrar no sistema
           </a>
         </section>

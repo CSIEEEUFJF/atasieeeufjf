@@ -462,7 +462,7 @@ function SavedAtasPage() {
               ?"Crie o primeiro usuário antes de acessar o banco de atas."
               : "Entre no sistema para consultar suas atas salvas."}
           </p>
-          <a className="primary-button standalone-link" href="/atas/nova">
+          <a className="primary-button standalone-link" href="/">
             Entrar no sistema
           </a>
         </section>

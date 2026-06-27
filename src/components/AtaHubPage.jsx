@@ -110,7 +110,7 @@ export default function AtaHubPage() {
           <p className="panel-kicker">Atas</p>
           <h1>Acesse sua conta</h1>
           <p>Entre para consultar o banco de atas ou criar uma nova ata.</p>
-          <a className="primary-button standalone-link" href="/atas/nova?next=%2F">
+          <a className="primary-button standalone-link" href="/">
             Entrar no sistema
           </a>
         </section>

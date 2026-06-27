@@ -513,7 +513,7 @@ export default function InternalDashboard({ page = "tasks" }) {
               ?"Crie o primeiro usuário antes de acessar esta página."
               : "Entre no sistema para acessar tarefas, calendário e atas."}
           </p>
-          <a className="primary-button standalone-link" href="/atas/nova">
+          <a className="primary-button standalone-link" href="/">
             Entrar no sistema
           </a>
         </section>

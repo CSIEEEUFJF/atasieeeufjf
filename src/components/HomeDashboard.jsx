@@ -14,6 +14,14 @@ async function readApiError(response, fallback) {
   }
 }
 
+function createInitialAuthForm() {
+  return {
+    name: "",
+    password: "",
+    username: "",
+  };
+}
+
 function ThemeToggle({ theme, onToggle }) {
   const nextTheme = theme === "dark" ? "light" : "dark";
 
@@ -38,6 +46,13 @@ function ThemeToggle({ theme, onToggle }) {
 export default function HomeDashboard() {
   const [theme, setTheme] = useState("light");
   const [auth, setAuth] = useState({ loading: true, setupRequired: false, user: null });
+  const [authForm, setAuthForm] = useState(createInitialAuthForm);
+  const [authMode, setAuthMode] = useState("login");
+  const [authMessage, setAuthMessage] = useState({
+    tone: "idle",
+    text: "Entre para acessar o sistema interno.",
+  });
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
 
   useEffect(() => {
@@ -75,6 +90,13 @@ export default function HomeDashboard() {
             setupRequired: Boolean(payload.setupRequired),
             user: payload.user || null,
           });
+          setAuthMode(payload.setupRequired ? "setup" : "login");
+          setAuthMessage({
+            tone: "idle",
+            text: payload.setupRequired
+              ? "Crie o primeiro acesso para liberar o sistema."
+              : "Entre para acessar o sistema interno.",
+          });
         }
       } catch {
         if (active) {
@@ -93,6 +115,52 @@ export default function HomeDashboard() {
     setTheme((current) => (current === "dark" ? "light" : "dark"));
   }
 
+  function updateAuthField(field, value) {
+    setAuthForm((current) => ({ ...current, [field]: value }));
+  }
+
+  async function handleAuthSubmit(event) {
+    event.preventDefault();
+    setIsAuthenticating(true);
+    setAuthMessage({
+      tone: "loading",
+      text: authMode === "setup" ? "Criando usuário inicial..." : "Entrando...",
+    });
+
+    try {
+      const response = await fetch(`/api/auth/${authMode === "setup" ? "setup" : "login"}`, {
+        body: JSON.stringify(authForm),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error(await readApiError(response, "Não foi possível autenticar."));
+      }
+
+      const payload = await response.json();
+      setAuth({
+        loading: false,
+        setupRequired: false,
+        user: payload.user,
+      });
+      setAuthForm(createInitialAuthForm());
+      setAuthMessage({
+        tone: "success",
+        text: "Acesso liberado.",
+      });
+    } catch (error) {
+      setAuthMessage({
+        tone: "error",
+        text: error.message || "Não foi possível autenticar.",
+      });
+    } finally {
+      setIsAuthenticating(false);
+    }
+  }
+
   async function handleLogout() {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
@@ -106,16 +174,60 @@ export default function HomeDashboard() {
   }
 
   if (!auth.user) {
+    const isSetup = authMode === "setup";
+
     return (
       <div className="app-shell auth-shell">
         <ThemeToggle theme={theme} onToggle={toggleTheme} />
         <section className="hero-panel auth-card">
           <p className="panel-kicker">Sistema interno</p>
-          <h1>Acesse sua conta</h1>
-          <p>Entre para acessar tarefas, calendário, atas e área da diretoria.</p>
-          <a className="primary-button standalone-link" href="/atas/nova?next=%2F">
-            Entrar no sistema
-          </a>
+          <h1>{isSetup ? "Crie o primeiro acesso" : "Acesse sua conta"}</h1>
+          <p>
+            {isSetup
+              ? "Este usuário inicial ficará salvo no banco Postgres configurado."
+              : "Entre para acessar tarefas, calendário, atas e área da diretoria."}
+          </p>
+
+          <form className="auth-form" onSubmit={handleAuthSubmit}>
+            {isSetup ? (
+              <label className="field">
+                <span>Nome</span>
+                <input
+                  value={authForm.name}
+                  onChange={(event) => updateAuthField("name", event.target.value)}
+                  autoComplete="name"
+                />
+              </label>
+            ) : null}
+
+            <label className="field">
+              <span>Nome de usuário</span>
+              <input
+                value={authForm.username}
+                onChange={(event) => updateAuthField("username", event.target.value)}
+                autoComplete="username"
+              />
+            </label>
+
+            <label className="field">
+              <span>Senha</span>
+              <input
+                type="password"
+                value={authForm.password}
+                onChange={(event) => updateAuthField("password", event.target.value)}
+                autoComplete={isSetup ? "new-password" : "current-password"}
+              />
+            </label>
+
+            <div className={`status-box tone-${authMessage.tone}`}>
+              <span>Status</span>
+              <strong>{authMessage.text}</strong>
+            </div>
+
+            <button className="primary-button" disabled={isAuthenticating}>
+              {isAuthenticating ? "Aguarde..." : isSetup ? "Criar acesso" : "Entrar"}
+            </button>
+          </form>
         </section>
       </div>
     );
