@@ -16,7 +16,9 @@ const upload = multer({
 const PORT = Number(process.env.PORT || 3001);
 const ATAS_DIR = path.resolve(process.env.ATAS_DIR || "/atas");
 const RECEIVE_TOKEN = String(process.env.RECEIVE_TOKEN || "").trim();
-const CORS_ORIGIN = String(process.env.CORS_ORIGIN || "*").trim();
+const CORS_ORIGIN = String(process.env.CORS_ORIGIN || "").trim();
+const ALLOW_WILDCARD_CORS = String(process.env.ALLOW_WILDCARD_CORS || "") === "1";
+const usedUploadTokenIds = new Map();
 
 function parseJson(value) {
   if (typeof value !== "string" || !value.trim()) {
@@ -32,8 +34,12 @@ function parseJson(value) {
 }
 
 function getAllowedOrigin(origin) {
-  if (!CORS_ORIGIN || CORS_ORIGIN === "*") {
+  if (CORS_ORIGIN === "*" && ALLOW_WILDCARD_CORS) {
     return "*";
+  }
+
+  if (!CORS_ORIGIN) {
+    return "";
   }
 
   const allowedOrigins = CORS_ORIGIN.split(",").map((item) => item.trim()).filter(Boolean);
@@ -108,6 +114,38 @@ function getChapter({ body, metadata }) {
       || fromTargetFolder,
     "Ramo",
   );
+}
+
+function targetFolderForChapter(chapter) {
+  return `/atas/${chapter}`;
+}
+
+function assertPdfBuffer(pdfBuffer) {
+  if (!Buffer.isBuffer(pdfBuffer) || pdfBuffer.length < 5) {
+    throw new Error("PDF vazio ou invalido.");
+  }
+
+  if (pdfBuffer.subarray(0, 5).toString("ascii") !== "%PDF-") {
+    throw new Error("Arquivo enviado nao parece ser um PDF valido.");
+  }
+}
+
+function assertSignedTokenMatchesRequest(payload, { chapter, fileName, targetFolder }) {
+  if (!payload) {
+    return;
+  }
+
+  if (payload.chapter && payload.chapter !== chapter) {
+    throw new Error("Token nao corresponde ao capitulo enviado.");
+  }
+
+  if (payload.targetFolder && payload.targetFolder !== targetFolder) {
+    throw new Error("Token nao corresponde a pasta de destino enviada.");
+  }
+
+  if (payload.fileName && sanitizeFileName(payload.fileName) !== sanitizeFileName(fileName)) {
+    throw new Error("Token nao corresponde ao arquivo enviado.");
+  }
 }
 
 function assertInsideBaseDir(targetPath) {
@@ -280,11 +318,39 @@ function verifySignedToken(token) {
   }
 
   const parsedPayload = parseJson(Buffer.from(payload, "base64url").toString("utf8"));
-  if (!parsedPayload.exp || Number(parsedPayload.exp) < Math.floor(Date.now() / 1000)) {
+  if (
+    !parsedPayload.jti
+    || !parsedPayload.exp
+    || Number(parsedPayload.exp) < Math.floor(Date.now() / 1000)
+  ) {
     return null;
   }
 
   return parsedPayload;
+}
+
+function cleanupUsedUploadTokenIds(nowSeconds) {
+  for (const [jti, expiresAt] of usedUploadTokenIds.entries()) {
+    if (Number(expiresAt) < nowSeconds) {
+      usedUploadTokenIds.delete(jti);
+    }
+  }
+}
+
+function markSignedTokenAsUsed(payload) {
+  if (!payload?.jti) {
+    return false;
+  }
+
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  cleanupUsedUploadTokenIds(nowSeconds);
+
+  if (usedUploadTokenIds.has(payload.jti)) {
+    return false;
+  }
+
+  usedUploadTokenIds.set(payload.jti, Number(payload.exp) || nowSeconds + 300);
+  return true;
 }
 
 async function savePdf({ chapter, fileName, metadata, pdfBuffer }) {
@@ -364,7 +430,7 @@ async function savePdf({ chapter, fileName, metadata, pdfBuffer }) {
 
 function requireToken(request, response, next) {
   if (!RECEIVE_TOKEN) {
-    next();
+    response.status(503).json({ detail: "RECEIVE_TOKEN nao configurado." });
     return;
   }
 
@@ -382,6 +448,11 @@ function requireToken(request, response, next) {
   const signedTokenPayload = verifySignedToken(receivedToken);
   if (!signedTokenPayload) {
     response.status(401).json({ detail: "Token invalido." });
+    return;
+  }
+
+  if (!markSignedTokenAsUsed(signedTokenPayload)) {
+    response.status(401).json({ detail: "Token ja utilizado." });
     return;
   }
 
@@ -404,15 +475,21 @@ app.post("/atas/pdf", requireToken, upload.single("pdf"), async (request, respon
 
     const metadata = parseJson(request.body.metadata);
     const chapter = getChapter({ body: request.body, metadata });
-    if (
-      request.uploadTokenPayload?.chapter
-      && request.uploadTokenPayload.chapter !== chapter
-    ) {
-      response.status(403).json({ detail: "Token nao corresponde ao capitulo enviado." });
+    const targetFolder = targetFolderForChapter(chapter);
+    const fileName = metadata.fileName || request.file.originalname || "ata.pdf";
+
+    try {
+      assertPdfBuffer(request.file.buffer);
+      assertSignedTokenMatchesRequest(request.uploadTokenPayload, {
+        chapter,
+        fileName,
+        targetFolder,
+      });
+    } catch (error) {
+      response.status(403).json({ detail: error.message || "Upload recusado." });
       return;
     }
 
-    const fileName = metadata.fileName || request.file.originalname || "ata.pdf";
     const saved = await savePdf({
       chapter,
       fileName,
@@ -427,7 +504,7 @@ app.post("/atas/pdf", requireToken, upload.single("pdf"), async (request, respon
       fileName: saved.finalFileName,
       ok: true,
       path: saved.pdfPath,
-      targetFolder: `/atas/${chapter}`,
+      targetFolder,
       updated: saved.updated,
     });
   } catch (error) {

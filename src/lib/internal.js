@@ -142,7 +142,15 @@ function ensureCanWriteChapter(user, chapter) {
     throw new InternalAccessError();
   }
 
-  if (chapter === GLOBAL_CHAPTER || user.isAdmin || isChapterMember(user, chapter)) {
+  if (chapter === GLOBAL_CHAPTER) {
+    if (isRamoBoardMember(user)) {
+      return;
+    }
+
+    throw new InternalAccessError("Apenas a diretoria do Ramo pode criar itens para todos os capítulos.");
+  }
+
+  if (user.isAdmin || isChapterMember(user, chapter)) {
     return;
   }
 

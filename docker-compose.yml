@@ -5,10 +5,10 @@ services:
     container_name: ata-receiver
     environment:
       ATAS_DIR: /atas
-      CORS_ORIGIN: ${ATA_RECEIVER_CORS_ORIGIN:-*}
+      CORS_ORIGIN: ${ATA_RECEIVER_CORS_ORIGIN:-https://interno.ieeeufjf.com.br}
       MAX_PDF_BYTES: ${ATA_RECEIVER_MAX_PDF_BYTES:-26214400}
       PORT: 3001
-      RECEIVE_TOKEN: ${ATA_RECEIVER_TOKEN:-}
+      RECEIVE_TOKEN: ${ATA_RECEIVER_TOKEN:?Defina ATA_RECEIVER_TOKEN antes de subir o receiver}
     ports:
       - "${ATA_RECEIVER_PORT:-3001}:3001"
     restart: unless-stopped

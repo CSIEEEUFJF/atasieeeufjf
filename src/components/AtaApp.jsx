@@ -29,6 +29,54 @@ const FALLBACK_SOCIETIES = [
   { chave: "Ramo", nome: "Ramo" },
 ];
 
+const DEMO_USER = {
+  canManageMembers: false,
+  chapters: FALLBACK_SOCIETIES.map((item) => item.chave),
+  id: "demo",
+  isAdmin: false,
+  name: "Visitante Demo",
+  username: "demo",
+};
+
+const DEMO_MEMBERS = [
+  {
+    cargo: "Presidente",
+    chapterRoles: { CAS: "Presidente", RAS: "Presidente" },
+    id: "demo-alex",
+    name: "Alex Demo",
+    usesChapterRoles: true,
+  },
+  {
+    cargo: "Vice-Presidente",
+    chapterRoles: { CAS: "Vice-Presidente", RAS: "Vice-Presidente" },
+    id: "demo-bianca",
+    name: "Bianca Demo",
+    usesChapterRoles: true,
+  },
+  {
+    cargo: "Secretário",
+    chapterRoles: { CAS: "Secretário", RAS: "Secretário" },
+    id: "demo-caio",
+    name: "Caio Demo",
+    usesChapterRoles: true,
+  },
+  {
+    cargo: "Membro",
+    chapterRoles: { CAS: "Membro", RAS: "Membro", Ramo: "Membro" },
+    id: "demo-daniela",
+    name: "Daniela Demo",
+    usesChapterRoles: true,
+  },
+];
+
+const MAX_ATTACHMENTS = 5;
+const MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024;
+const ALLOWED_ATTACHMENT_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+
 function hojeFormatado() {
   const agora = new Date();
   const dia = String(agora.getDate()).padStart(2, "0");
@@ -83,6 +131,53 @@ function createInitialForm() {
     resultadosText: "",
     membros: [],
     anexos: [],
+  };
+}
+
+function createDemoForm() {
+  const hoje = hojeFormatado();
+  return {
+    ...createInitialForm(),
+    autor: "Visitante Demo",
+    data_elaboracao: hoje,
+    data_reuniao: hoje,
+    local_reuniao: "Sala do Ramo IEEE UFJF",
+    membros: [
+      {
+        boardChapter: "CAS",
+        boardPriority: 1,
+        cargo: "Presidente",
+        id: "demo-presenca-1",
+        isBoardRole: true,
+        nome: "Alex Demo",
+        rawCargo: "Presidente",
+        sourceMemberId: "demo-alex",
+      },
+      {
+        boardChapter: "CAS",
+        boardPriority: 1,
+        cargo: "Secretário",
+        id: "demo-presenca-2",
+        isBoardRole: true,
+        nome: "Caio Demo",
+        rawCargo: "Secretário",
+        sourceMemberId: "demo-caio",
+      },
+      {
+        boardChapter: "CAS",
+        boardPriority: 2,
+        cargo: "Membro",
+        id: "demo-presenca-3",
+        isBoardRole: false,
+        nome: "Daniela Demo",
+        rawCargo: "Membro",
+        sourceMemberId: "demo-daniela",
+      },
+    ],
+    pautasText: "Apresentação do modo demonstração\nPlanejamento de atividades do capítulo\nDefinição de próximos responsáveis",
+    resultadosText: "Visitantes puderam conhecer o fluxo de geração de atas\nA atividade de exemplo foi marcada como concluída\nO PDF de demonstração pode ser baixado localmente",
+    sociedade: "CAS",
+    titulo: "Ata demonstrativa CAS",
   };
 }
 
@@ -482,12 +577,12 @@ function baixarArquivo(blob, fileName) {
   URL.revokeObjectURL(url);
 }
 
-function App() {
+function App({ demoMode = false } = {}) {
   const [theme, setTheme] = useState("light");
   const [auth, setAuth] = useState({
-    loading: true,
+    loading: !demoMode,
     setupRequired: false,
-    user: null,
+    user: demoMode ?DEMO_USER : null,
   });
   const [authForm, setAuthForm] = useState(createInitialAuthForm);
   const [authMode, setAuthMode] = useState("login");
@@ -497,8 +592,8 @@ function App() {
   });
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [sociedades, setSociedades] = useState(FALLBACK_SOCIETIES);
-  const [memberOptions, setMemberOptions] = useState([]);
-  const [form, setForm] = useState(createInitialForm);
+  const [memberOptions, setMemberOptions] = useState(demoMode ?DEMO_MEMBERS : []);
+  const [form, setForm] = useState(demoMode ?createDemoForm : createInitialForm);
   const [memberDraft, setMemberDraft] = useState(createEmptyMember);
   const [selectedRegisteredMemberId, setSelectedRegisteredMemberId] = useState("");
   const [attachmentDraft, setAttachmentDraft] = useState(createEmptyAttachment);
@@ -511,11 +606,23 @@ function App() {
   const [showPdfStatus, setShowPdfStatus] = useState(false);
   const [status, setStatus] = useState({
     tone: "idle",
-    text: "Preencha os campos. A primeira compilacao baixa o motor LaTeX no navegador.",
+    text: demoMode
+      ?"Modo demo aberto: dados fictícios, sem login, sem salvar banco e sem envio de PDF ao servidor."
+      :"Preencha os campos. A primeira compilacao baixa o motor LaTeX no navegador.",
   });
   const draftInputRef = useRef(null);
 
   useEffect(() => {
+    if (demoMode) {
+      setAuth({
+        loading: false,
+        setupRequired: false,
+        user: DEMO_USER,
+      });
+      setMemberOptions(DEMO_MEMBERS);
+      return undefined;
+    }
+
     let active = true;
 
     async function loadAuth() {
@@ -561,7 +668,7 @@ function App() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [demoMode]);
 
   useEffect(() => {
     let active = true;
@@ -625,6 +732,12 @@ function App() {
   }, [form.sociedade]);
 
   useEffect(() => {
+    if (demoMode) {
+      setActiveAtaId(null);
+      setMemberOptions(DEMO_MEMBERS);
+      return;
+    }
+
     if (!auth.user) {
       setActiveAtaId(null);
       setMemberOptions([]);
@@ -636,9 +749,17 @@ function App() {
     if (Number.isSafeInteger(ataId) && ataId > 0 && activeAtaId !== ataId) {
       handleLoadSavedAta(ataId, { replaceUrl: true });
     }
-  }, [auth.user]);
+  }, [auth.user, demoMode]);
 
   async function refreshMemberOptions(society = form.sociedade) {
+    if (demoMode) {
+      const users = DEMO_MEMBERS.filter((member) =>
+        member.chapterRoles?.[society] || member.chapterRoles?.Ramo,
+      );
+      setMemberOptions(users);
+      return users;
+    }
+
     if (!auth.user) {
       setMemberOptions([]);
       return [];
@@ -660,6 +781,11 @@ function App() {
   }
 
   useEffect(() => {
+    if (demoMode) {
+      refreshMemberOptions(form.sociedade);
+      return;
+    }
+
     if (!auth.user) {
       setMemberOptions([]);
       return;
@@ -682,7 +808,7 @@ function App() {
     return () => {
       active = false;
     };
-  }, [auth.user, form.sociedade]);
+  }, [auth.user, form.sociedade, demoMode]);
 
   const outputName = (() => {
     const societySlug = slugify(form.sociedade || "ata");
@@ -792,7 +918,7 @@ function App() {
 
   function resetForm() {
     startTransition(() => {
-      setForm(createInitialForm());
+      setForm(demoMode ?createDemoForm() : createInitialForm());
       setMemberDraft(createEmptyMember());
       setAttachmentDraft(createEmptyAttachment());
       setEditingMemberId(null);
@@ -802,7 +928,9 @@ function App() {
       setShowPdfStatus(false);
       setStatus({
         tone: "idle",
-        text: "Formulário limpo. Você pode começar outra ata.",
+        text: demoMode
+          ?"Demonstração restaurada. Nada foi salvo no sistema real."
+          :"Formulário limpo. Você pode começar outra ata.",
       });
     });
   }
@@ -875,6 +1003,34 @@ function App() {
   }
 
   function handleAttachmentFile(file) {
+    if (file) {
+      if (!ALLOWED_ATTACHMENT_TYPES.has(file.type)) {
+        setAttachmentDraft((current) => ({
+          ...current,
+          file: null,
+          fileName: "",
+        }));
+        setStatus({
+          tone: "error",
+          text: "Use anexos em PNG, JPG ou WebP.",
+        });
+        return;
+      }
+
+      if (file.size > MAX_ATTACHMENT_BYTES) {
+        setAttachmentDraft((current) => ({
+          ...current,
+          file: null,
+          fileName: "",
+        }));
+        setStatus({
+          tone: "error",
+          text: "Cada anexo pode ter no máximo 4 MB.",
+        });
+        return;
+      }
+    }
+
     setAttachmentDraft((current) => ({
       ...current,
       file,
@@ -895,6 +1051,14 @@ function App() {
       setStatus({
         tone: "error",
         text: "Escolha um arquivo para o anexo.",
+      });
+      return;
+    }
+
+    if (!editingAttachmentId && form.anexos.length >= MAX_ATTACHMENTS) {
+      setStatus({
+        tone: "error",
+        text: `Use no máximo ${MAX_ATTACHMENTS} anexos por ata.`,
       });
       return;
     }
@@ -1042,6 +1206,10 @@ function App() {
     successText = "Ata salva com sucesso",
     updateStatus = true,
   } = {}) {
+    if (demoMode) {
+      throw new Error("O modo demo não salva atas no banco.");
+    }
+
     if (!auth.user) {
       throw new Error("Entre antes de salvar atas no banco.");
     }
@@ -1088,6 +1256,14 @@ function App() {
   }
 
   async function handleSaveAta() {
+    if (demoMode) {
+      setStatus({
+        tone: "idle",
+        text: "Salvar no banco fica desativado no modo demo. Use \"Baixar rascunho\" para exportar o exemplo.",
+      });
+      return;
+    }
+
     setIsSavingAta(true);
     try {
       const currentMemberOptions = await refreshMemberOptions(form.sociedade);
@@ -1108,6 +1284,14 @@ function App() {
   }
 
   async function handleLoadSavedAta(ataId, options = {}) {
+    if (demoMode) {
+      setStatus({
+        tone: "idle",
+        text: "Atas salvas não ficam disponíveis no modo demo.",
+      });
+      return;
+    }
+
     setStatus({
       tone: "loading",
       text: "Carregando ata salva do banco...",
@@ -1154,6 +1338,41 @@ function App() {
       validateForm();
     } catch (error) {
       setStatus({ tone: "error", text: error.message });
+      return;
+    }
+
+    if (demoMode) {
+      setIsSubmitting(true);
+      setStatus({
+        tone: "loading",
+        text: "Gerando PDF de demonstração localmente no navegador. Nenhum dado será salvo ou enviado.",
+      });
+
+      try {
+        const generationForm = {
+          ...form,
+          membros: prepareAtaMembersFromRegistry(form.membros, form.sociedade, memberOptions),
+        };
+        const result = await compileAtaPdfInBrowser({
+          form: generationForm,
+          outputName,
+        });
+        const pdfFileName = buildPdfFileNameFromTitle(ataTitle, result.fileName);
+        baixarArquivo(result.pdf, pdfFileName);
+        setStatus({
+          tone: "success",
+          text: "PDF demo gerado no navegador e download iniciado. Nada foi salvo no banco ou enviado ao servidor JS.",
+        });
+      } catch (error) {
+        setStatus({
+          tone: "error",
+          text: error instanceof TypeError
+            ?"Não foi possível inicializar o compilador no navegador."
+            : error.message || "Não foi possível gerar o PDF demo.",
+        });
+      } finally {
+        setIsSubmitting(false);
+      }
       return;
     }
 
@@ -1420,7 +1639,7 @@ function App() {
   return (
     <div className="app-shell">
       <header className="site-nav">
-        <a href="/" className="site-brand" aria-label="Ir para início">
+        <a href={demoMode ?"/demo" : "/"} className="site-brand" aria-label="Ir para início">
           <span className="site-brand-badge" aria-hidden="true" />
           <span className="site-brand-lockup">
             <span className="site-brand-text">Sistema Interno - IEEE UFJF</span>
@@ -1428,31 +1647,43 @@ function App() {
           </span>
         </a>
 
-        <ul className="nav-links">
-          <li><a href="/">Início</a></li>
-          <li><a href="/atas" aria-current="page">Atas</a></li>
-          <li><a href="/tarefas">Tarefas</a></li>
-          <li><a href="/calendario">Calendário</a></li>
-          {auth.user.canManageMembers ?<li><a href="/diretoria">Diretoria</a></li> : null}
-        </ul>
+        {demoMode ?(
+          <ul className="nav-links">
+            <li><a href="/demo" aria-current="page">Demo</a></li>
+          </ul>
+        ) : (
+          <ul className="nav-links">
+            <li><a href="/">Início</a></li>
+            <li><a href="/atas" aria-current="page">Atas</a></li>
+            <li><a href="/tarefas">Tarefas</a></li>
+            <li><a href="/calendario">Calendário</a></li>
+            {auth.user.canManageMembers ?<li><a href="/diretoria">Diretoria</a></li> : null}
+          </ul>
+        )}
 
-        <div className="topbar-actions">
-          <button
-            className="user-chip"
-            type="button"
-            onClick={() => setIsPasswordDialogOpen(true)}
-            title="Alterar senha"
-          >
-            {auth.user.name}
-          </button>
-          <button className="ghost-button" onClick={handleLogout}>
-            Sair
-          </button>
-        </div>
+        {demoMode ?(
+          <div className="topbar-actions">
+            <span className="user-chip">Modo demo</span>
+          </div>
+        ) : (
+          <div className="topbar-actions">
+            <button
+              className="user-chip"
+              type="button"
+              onClick={() => setIsPasswordDialogOpen(true)}
+              title="Alterar senha"
+            >
+              {auth.user.name}
+            </button>
+            <button className="ghost-button" onClick={handleLogout}>
+              Sair
+            </button>
+          </div>
+        )}
       </header>
 
       {themeToggleButton}
-      {isPasswordDialogOpen ?(
+      {!demoMode && isPasswordDialogOpen ?(
         <UserPasswordDialog
           user={auth.user}
           onClose={() => setIsPasswordDialogOpen(false)}
@@ -1721,6 +1952,7 @@ function App() {
                 <span>Arquivo</span>
                 <input
                   type="file"
+                  accept="image/png,image/jpeg,image/webp"
                   onChange={(event) =>
                     handleAttachmentFile(event.target.files?.[0] || null)
                   }
@@ -1796,23 +2028,32 @@ function App() {
               </div>
 
               <div className="sidebar-action-list">
-                <button className="ghost-button" onClick={handleSaveAta} disabled={isSavingAta || isSubmitting}>
-                  {isSavingAta ?"Salvando..." : activeAtaId ?"Atualizar ata" : "Salvar ata"}
-                </button>
-                <a className="ghost-button standalone-link" href="/atas">
-                  Ver salvas
-                </a>
-                <a className="ghost-button standalone-link" href="/tarefas">
-                  Tarefas
-                </a>
-                <a className="ghost-button standalone-link" href="/calendario">
-                  Calendário
-                </a>
-                {auth.user.canManageMembers ?(
-                  <a className="ghost-button standalone-link" href="/diretoria">
-                    Diretoria
-                  </a>
-                ) : null}
+                {demoMode ?(
+                  <div className="status-box tone-idle">
+                    <span>Demo isolado</span>
+                    <strong>Salvar no banco, atas salvas e envio ao servidor ficam desativados.</strong>
+                  </div>
+                ) : (
+                  <>
+                    <button className="ghost-button" onClick={handleSaveAta} disabled={isSavingAta || isSubmitting}>
+                      {isSavingAta ?"Salvando..." : activeAtaId ?"Atualizar ata" : "Salvar ata"}
+                    </button>
+                    <a className="ghost-button standalone-link" href="/atas">
+                      Ver salvas
+                    </a>
+                    <a className="ghost-button standalone-link" href="/tarefas">
+                      Tarefas
+                    </a>
+                    <a className="ghost-button standalone-link" href="/calendario">
+                      Calendário
+                    </a>
+                    {auth.user.canManageMembers ?(
+                      <a className="ghost-button standalone-link" href="/diretoria">
+                        Diretoria
+                      </a>
+                    ) : null}
+                  </>
+                )}
                 <button className="ghost-button" onClick={() => draftInputRef.current?.click()}>
                   Importar rascunho
                 </button>
@@ -1820,7 +2061,7 @@ function App() {
                   Baixar rascunho
                 </button>
                 <button className="ghost-button ghost-danger" onClick={resetForm}>
-                  Limpar tudo
+                  {demoMode ?"Restaurar demo" : "Limpar tudo"}
                 </button>
               </div>
             </article>
@@ -1866,7 +2107,13 @@ function App() {
                 onClick={handleGeneratePdf}
                 disabled={isSubmitting || isSavingAta}
               >
-                {isSubmitting ?"Salvando e compilando..." : "Gerar PDF"}
+                {isSubmitting
+                  ?demoMode
+                    ?"Gerando demo..."
+                    :"Salvando e compilando..."
+                  : demoMode
+                    ?"Gerar PDF demo"
+                    :"Gerar PDF"}
               </button>
             </article>
 
