@@ -224,10 +224,13 @@ function publicUser(row) {
   const chapters = Array.isArray(row.chapters)
     ?row.chapters.map(chapterKeyFromRelation).filter(Boolean)
     : [];
+  const effectiveChapters = chapters.includes("RAS") && !chapters.includes("CAS")
+    ?[...chapters, "CAS"]
+    : chapters;
   const user = {
     cargo,
     chapterRoles,
-    chapters,
+    chapters: effectiveChapters,
     id: row.id,
     isAdmin: Boolean(row.isAdmin),
     name: row.name,

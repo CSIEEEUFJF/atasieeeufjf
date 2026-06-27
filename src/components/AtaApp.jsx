@@ -693,8 +693,11 @@ function App() {
 
   const selectedSocietyName =
     sociedades.find((item) => item.chave === form.sociedade)?.nome || form.sociedade;
+  const userChapterKeys = auth.user?.chapters || [];
   const allowedSociedades = auth.user
-    ?sociedades.filter((item) => auth.user.chapters?.includes(item.chave))
+    ?auth.user.isAdmin
+      ?sociedades
+      :sociedades.filter((item) => userChapterKeys.includes(item.chave))
     : sociedades;
   const hasChapterAccess = allowedSociedades.some((item) => item.chave === form.sociedade);
   const nextTheme = theme === "dark" ?"light" : "dark";
