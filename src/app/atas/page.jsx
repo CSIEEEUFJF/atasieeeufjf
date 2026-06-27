@@ -1,9 +1,9 @@
-import SavedAtasPage from "../../components/SavedAtasPage";
+import AtaHubPage from "../../components/AtaHubPage";
 
 export const metadata = {
-  title: "Atas salvas | Sistema de Atas - IEEE UFJF",
+  title: "Atas | Sistema Interno - IEEE UFJF",
 };
 
 export default function AtasPage() {
-  return <SavedAtasPage />;
+  return <AtaHubPage />;
 }

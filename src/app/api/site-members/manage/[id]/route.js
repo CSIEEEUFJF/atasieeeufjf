@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 
 import {
   getCurrentUser,
@@ -14,7 +14,7 @@ export const runtime = "nodejs";
 
 function parseId(value) {
   const id = Number.parseInt(String(value || ""), 10);
-  return Number.isSafeInteger(id) && id > 0 ? id : null;
+  return Number.isSafeInteger(id) && id > 0 ?id : null;
 }
 
 function unauthorized() {
@@ -41,7 +41,7 @@ export async function PATCH(request, context) {
   const memberId = parseId(params.id);
   if (!memberId) {
     return NextResponse.json(
-      { detail: "Membro invalido." },
+      { detail: "Membro inválido." },
       { headers: noStoreHeaders(), status: 400 },
     );
   }
@@ -52,7 +52,7 @@ export async function PATCH(request, context) {
     return NextResponse.json({ member }, { headers: noStoreHeaders() });
   } catch (error) {
     return NextResponse.json(
-      { detail: error.message || "Nao foi possivel atualizar o membro do site." },
+      { detail: error.message || "Não foi possível atualizar o membro do site." },
       { headers: noStoreHeaders(), status: 400 },
     );
   }
@@ -75,7 +75,7 @@ export async function DELETE(request, context) {
   const memberId = parseId(params.id);
   if (!memberId) {
     return NextResponse.json(
-      { detail: "Membro invalido." },
+      { detail: "Membro inválido." },
       { headers: noStoreHeaders(), status: 400 },
     );
   }
@@ -87,7 +87,7 @@ export async function DELETE(request, context) {
     );
   } catch (error) {
     return NextResponse.json(
-      { detail: error.message || "Nao foi possivel remover o membro do site." },
+      { detail: error.message || "Não foi possível remover o membro do site." },
       { headers: noStoreHeaders(), status: 400 },
     );
   }

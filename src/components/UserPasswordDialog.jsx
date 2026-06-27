@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 
@@ -35,7 +35,7 @@ export default function UserPasswordDialog({ onClose, user }) {
     event.preventDefault();
 
     if (form.newPassword !== form.confirmPassword) {
-      setMessage({ tone: "error", text: "A confirmacao da nova senha nao confere." });
+      setMessage({ tone: "error", text: "A confirmação da nova senha não confere." });
       return;
     }
 
@@ -55,7 +55,7 @@ export default function UserPasswordDialog({ onClose, user }) {
       });
 
       if (!response.ok) {
-        throw new Error(await readApiError(response, "Nao foi possivel alterar a senha."));
+        throw new Error(await readApiError(response, "Não foi possível alterar a senha."));
       }
 
       setForm(createInitialPasswordForm());
@@ -63,7 +63,7 @@ export default function UserPasswordDialog({ onClose, user }) {
     } catch (error) {
       setMessage({
         tone: "error",
-        text: error.message || "Nao foi possivel alterar a senha.",
+        text: error.message || "Não foi possível alterar a senha.",
       });
     } finally {
       setIsSubmitting(false);
@@ -82,7 +82,7 @@ export default function UserPasswordDialog({ onClose, user }) {
           <div>
             <p className="panel-kicker">Conta</p>
             <h2>Alterar senha</h2>
-            <span>{user?.name ? `${user.name} (@${user.username})` : "Usuario autenticado"}</span>
+            <span>{user?.name ?`${user.name} (@${user.username})` : "Usuário autenticado"}</span>
           </div>
           <button className="text-button" type="button" onClick={onClose}>
             Fechar
@@ -131,7 +131,7 @@ export default function UserPasswordDialog({ onClose, user }) {
 
           <div className="inline-actions">
             <button className="primary-button" type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Alterando..." : "Alterar senha"}
+              {isSubmitting ?"Alterando..." : "Alterar senha"}
             </button>
             <button className="soft-button" type="button" onClick={onClose}>
               Cancelar

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 
 import {
   AuthSecurityError,
@@ -30,7 +30,7 @@ export async function POST(request) {
 
   if (!(await hasUsers())) {
     return NextResponse.json(
-      { detail: "Crie o primeiro usuario antes de entrar." },
+      { detail: "Crie o primeiro usuário antes de entrar." },
       { headers: noStoreHeaders(), status: 428 },
     );
   }
@@ -41,7 +41,7 @@ export async function POST(request) {
 
     if (!user) {
       return NextResponse.json(
-        { detail: "Usuario ou senha invalidos." },
+        { detail: "Usuário ou senha inválidos." },
         { headers: noStoreHeaders(), status: 401 },
       );
     }
@@ -57,7 +57,7 @@ export async function POST(request) {
         {
           headers: noStoreHeaders(
             error.retryAfterSeconds
-              ? { "Retry-After": String(error.retryAfterSeconds) }
+              ?{ "Retry-After": String(error.retryAfterSeconds) }
               : {},
           ),
           status: error.status,
@@ -66,7 +66,7 @@ export async function POST(request) {
     }
 
     return NextResponse.json(
-      { detail: error.message || "Nao foi possivel entrar." },
+      { detail: error.message || "Não foi possível entrar." },
       { headers: noStoreHeaders(), status: 400 },
     );
   }

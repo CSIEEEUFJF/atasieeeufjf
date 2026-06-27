@@ -21,6 +21,9 @@ model User {
   createdAt        DateTime      @default(now()) @map("created_at")
   updatedAt        DateTime      @updatedAt @map("updated_at")
   atas             Ata[]
+  assignedTasks    InternalTask[]  @relation("InternalTaskAssignee")
+  createdEvents    InternalEvent[] @relation("InternalEventCreator")
+  createdTasks     InternalTask[]  @relation("InternalTaskCreator")
   chapters         UserChapter[]
   sessions         Session[]
 
@@ -101,4 +104,41 @@ model AtaAttachment {
 
   @@index([ataId, position], map: "idx_attachments_ata_position")
   @@map("ata_attachments")
+}
+
+model InternalTask {
+  id           Int      @id @default(autoincrement())
+  title        String
+  description  String   @default("")
+  chapter      String
+  status       String   @default("pending")
+  priority     String   @default("normal")
+  dueDate      DateTime? @map("due_date")
+  createdById  Int      @map("created_by_id")
+  assignedToId Int?     @map("assigned_to_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  assignedTo   User?    @relation("InternalTaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdBy    User     @relation("InternalTaskCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([chapter, status, dueDate], map: "idx_internal_tasks_chapter_status_due")
+  @@index([assignedToId, status], map: "idx_internal_tasks_assignee_status")
+  @@map("internal_tasks")
+}
+
+model InternalEvent {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String   @default("")
+  location    String   @default("")
+  chapter     String
+  startTime   DateTime @map("start_time")
+  endTime     DateTime @map("end_time")
+  createdById Int      @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdBy   User     @relation("InternalEventCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([chapter, startTime], map: "idx_internal_events_chapter_start")
+  @@map("internal_events")
 }

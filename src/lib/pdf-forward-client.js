@@ -1,4 +1,4 @@
-async function readJson(response) {
+﻿async function readJson(response) {
   try {
     return await response.json();
   } catch {
@@ -17,7 +17,7 @@ async function createForwardSession(metadata) {
   const payload = await readJson(response);
 
   if (!response.ok) {
-    throw new Error(payload.detail || "Nao foi possivel preparar o envio ao servidor JS.");
+    throw new Error(payload.detail || "Não foi possível preparar o envio ao servidor JS.");
   }
 
   return payload;
@@ -64,7 +64,7 @@ export async function forwardGeneratedPdf({ fileName, metadata = {}, pdf }) {
   }
 
   const headers = session.authorization
-    ? {
+    ?{
         Authorization: session.authorization,
       }
     : undefined;
@@ -77,7 +77,7 @@ export async function forwardGeneratedPdf({ fileName, metadata = {}, pdf }) {
   const payload = await readJson(response);
 
   if (!response.ok) {
-    throw new Error(payload.detail || "Nao foi possivel enviar o PDF ao servidor JS.");
+    throw new Error(payload.detail || "Não foi possível enviar o PDF ao servidor JS.");
   }
 
   return {
@@ -90,21 +90,21 @@ export async function forwardGeneratedPdf({ fileName, metadata = {}, pdf }) {
 export function formatForwardStatus(result) {
   if (result?.duplicate && result?.updated) {
     return result.fileName
-      ? `PDF existente atualizado no servidor como ${result.fileName}.`
+      ?`PDF existente atualizado no servidor como ${result.fileName}.`
       : "PDF existente atualizado no servidor.";
   }
 
   if (result?.duplicate) {
     return result.fileName
-      ? `PDF ja existia no servidor como ${result.fileName}.`
-      : "PDF ja existia no servidor.";
+      ?`PDF já existia no servidor como ${result.fileName}.`
+      : "PDF já existia no servidor.";
   }
 
   if (result?.forwarded) {
     return result.targetFolder
-      ? `PDF enviado ao servidor JS em ${result.targetFolder}.`
+      ?`PDF enviado ao servidor JS em ${result.targetFolder}.`
       : "PDF enviado ao servidor JS.";
   }
 
-  return "Envio ao servidor JS nao configurado.";
+  return "Envio ao servidor JS não configurado.";
 }

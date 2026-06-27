@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 
 import { getCurrentUser, isSameOriginRequest } from "../../../lib/auth";
 import {
@@ -54,7 +54,7 @@ export async function POST(request) {
     }
 
     return NextResponse.json(
-      { detail: error.message || "Nao foi possivel salvar a ata." },
+      { detail: error.message || "Não foi possível salvar a ata." },
       { status: 400 },
     );
   }

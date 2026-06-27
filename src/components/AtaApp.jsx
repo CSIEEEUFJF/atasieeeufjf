@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { startTransition, useEffect, useRef, useState } from "react";
 
@@ -11,6 +11,7 @@ import {
   formatForwardStatus,
   forwardGeneratedPdf,
 } from "../lib/pdf-forward-client";
+import LoadingBall from "./LoadingBall";
 import PdfGenerationProgress from "./PdfGenerationProgress";
 import UserPasswordDialog from "./UserPasswordDialog";
 
@@ -94,6 +95,7 @@ function createInitialAuthForm() {
 
 function createStoredAtaPayload(form, outputName) {
   const title = String(form.titulo || "").trim() || outputName;
+  const membros = prepareAtaMembers(form.membros, form.sociedade);
 
   return {
     form: {
@@ -108,7 +110,16 @@ function createStoredAtaPayload(form, outputName) {
       data_elaboracao: form.data_elaboracao,
       data_reuniao: form.data_reuniao,
       local_reuniao: form.local_reuniao,
-      membros: form.membros.map(({ cargo, id, nome }) => ({ cargo, id, nome })),
+      membros: membros.map((member) => ({
+        boardChapter: member.boardChapter || "",
+        boardPriority: Number.isFinite(Number(member.boardPriority)) ?Number(member.boardPriority) : undefined,
+        cargo: member.cargo || "",
+        id: member.id,
+        isBoardRole: Boolean(member.isBoardRole),
+        nome: member.nome || "",
+        rawCargo: member.rawCargo || "",
+        sourceMemberId: member.sourceMemberId || "",
+      })),
       pautasText: form.pautasText,
       resultadosText: form.resultadosText,
       sociedade: form.sociedade,
@@ -125,7 +136,7 @@ function createFormFromStoredAta(ata) {
     (ata.attachments || []).map((attachment) => [attachment.clientId, attachment]),
   );
   const attachmentMetadata = Array.isArray(savedForm.anexos) && savedForm.anexos.length
-    ? savedForm.anexos
+    ?savedForm.anexos
     : (ata.attachments || []).map((attachment) => ({
         fileName: attachment.fileName,
         id: attachment.clientId,
@@ -152,10 +163,15 @@ function createFormFromStoredAta(ata) {
     data_reuniao: savedForm.data_reuniao || hojeFormatado(),
     local_reuniao: savedForm.local_reuniao || "",
     membros: Array.isArray(savedForm.membros)
-      ? savedForm.membros.map((item) => ({
+      ?savedForm.membros.map((item) => ({
+          boardChapter: item.boardChapter || "",
+          boardPriority: Number.isFinite(Number(item.boardPriority)) ?Number(item.boardPriority) : undefined,
           cargo: item.cargo || "",
           id: item.id || crypto.randomUUID(),
+          isBoardRole: Boolean(item.isBoardRole),
           nome: item.nome || "",
+          rawCargo: item.rawCargo || "",
+          sourceMemberId: item.sourceMemberId || "",
         }))
       : [],
     pautasText: savedForm.pautasText || "",
@@ -174,38 +190,284 @@ async function readApiError(response, fallback) {
   }
 }
 
-function memberCargoForSociety(member, society) {
+function formatCargoChapter(cargo, chapter) {
+  const cleanCargo = String(cargo || "").trim();
+  const cleanChapter = String(chapter || "").trim();
+
+  if (!cleanCargo) {
+    return "";
+  }
+
+  if (!cleanChapter || cleanCargo === "Membro") {
+    return cleanCargo;
+  }
+
+  return `${cleanCargo}-${cleanChapter}`;
+}
+
+function splitCargoChapter(cargo) {
+  const match = String(cargo || "").trim().match(/^(.+?)-([A-Za-z0-9]+)$/);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    chapter: match[2],
+    cargo: match[1].trim(),
+  };
+}
+
+function isBoardCargo(cargo) {
+  const cleanCargo = String(cargo || "").trim();
+  return Boolean(cleanCargo && cleanCargo !== "Membro");
+}
+
+function boardRolesForMember(member) {
   const roles = member?.chapterRoles && typeof member.chapterRoles === "object"
-    ? member.chapterRoles
+    ?member.chapterRoles
     : {};
-  const hasSpecificRoles = Boolean(member?.usesChapterRoles) || Object.keys(roles).length > 0;
-  const roleForSociety = Object.prototype.hasOwnProperty.call(roles, society)
-    ? roles[society] || ""
-    : "";
-  const otherSpecificRole = Object.entries(roles)
-    .filter(([chapterKey, cargo]) =>
-      chapterKey !== society && cargo && cargo !== "Membro",
-    )
+
+  return Object.entries(roles)
+    .filter(([, cargo]) => cargo && cargo !== "Membro")
     .sort(([chapterA], [chapterB]) => {
       if (chapterA === "Ramo") return -1;
       if (chapterB === "Ramo") return 1;
       return chapterA.localeCompare(chapterB);
-    })[0];
+    });
+}
 
-  if (roleForSociety && roleForSociety !== "Membro") {
-    return roleForSociety;
+function isExternalChapterPresidentRole(role, society) {
+  return role?.cargo === "Presidente" && role.chapter && role.chapter !== society && role.chapter !== "Ramo";
+}
+
+function isCurrentChapterBoardRole(role, society) {
+  return isBoardCargo(role?.cargo) && role.chapter === society && society !== "Ramo";
+}
+
+function memberRoleForAta(member, society) {
+  const roles = member?.chapterRoles && typeof member.chapterRoles === "object"
+    ?member.chapterRoles
+    : {};
+  const boardRoles = boardRolesForMember(member);
+
+  if (society === "Ramo" && boardRoles.length) {
+    const [chapter, cargo] = boardRoles[0];
+    return {
+      cargo: formatCargoChapter(cargo, chapter),
+      chapter,
+      isBoardRole: true,
+      priority: chapter === "Ramo" ?0 : 1,
+      rawCargo: cargo,
+    };
   }
 
-  if (otherSpecificRole) {
-    const [chapterKey, cargo] = otherSpecificRole;
-    return `${cargo} - ${chapterKey}`;
+  if (society !== "Ramo") {
+    const roleForSociety = Object.prototype.hasOwnProperty.call(roles, society)
+      ?roles[society] || ""
+      : "";
+
+    if (roleForSociety && roleForSociety !== "Membro") {
+      return {
+        cargo: roleForSociety,
+        chapter: society,
+        isBoardRole: true,
+        priority: 1,
+        rawCargo: roleForSociety,
+      };
+    }
+
+    const presidentRole = boardRoles
+      .map(([chapter, cargo]) => ({ cargo, chapter }))
+      .find((role) => isExternalChapterPresidentRole(role, society));
+
+    if (presidentRole) {
+      return {
+        cargo: formatCargoChapter(presidentRole.cargo, presidentRole.chapter),
+        chapter: presidentRole.chapter,
+        isBoardRole: true,
+        priority: 1,
+        rawCargo: presidentRole.cargo,
+      };
+    }
   }
 
-  if (roleForSociety) {
-    return roleForSociety;
+  if (Object.prototype.hasOwnProperty.call(roles, society)) {
+    return {
+      cargo: "Membro",
+      chapter: society,
+      isBoardRole: false,
+      priority: 2,
+      rawCargo: "Membro",
+    };
   }
 
-  return hasSpecificRoles ? "" : member?.cargo || "";
+  return {
+    cargo: "Membro",
+    chapter: "",
+    isBoardRole: false,
+    priority: 2,
+    rawCargo: "Membro",
+  };
+}
+
+function memberSortPriority(member, society) {
+  if (Number.isFinite(Number(member.boardPriority))) {
+    return Number(member.boardPriority);
+  }
+
+  const parsedCargo = splitCargoChapter(member.cargo);
+  if (society !== "Ramo") {
+    if (isCurrentChapterBoardRole(parsedCargo, society)) return 1;
+    if (isExternalChapterPresidentRole(parsedCargo, society)) return 1;
+    if (isCurrentChapterBoardRole({ cargo: member.cargo, chapter: member.boardChapter }, society)) return 1;
+    return 2;
+  }
+
+  if (parsedCargo?.chapter === "Ramo" || member.boardChapter === "Ramo") {
+    return 0;
+  }
+
+  if (parsedCargo || isBoardCargo(member.cargo) || member.isBoardRole) {
+    return 1;
+  }
+
+  return 2;
+}
+
+function normalizeMemberForAta(member, society) {
+  const parsedCargo = splitCargoChapter(member.cargo);
+  if (parsedCargo) {
+    if (society !== "Ramo" && isCurrentChapterBoardRole(parsedCargo, society)) {
+      return {
+        ...member,
+        boardChapter: parsedCargo.chapter,
+        boardPriority: 1,
+        cargo: parsedCargo.cargo,
+        isBoardRole: true,
+        rawCargo: member.rawCargo || parsedCargo.cargo,
+      };
+    }
+
+    if (society !== "Ramo" && !isExternalChapterPresidentRole(parsedCargo, society)) {
+      return {
+        ...member,
+        boardChapter: "",
+        boardPriority: 2,
+        cargo: "Membro",
+        isBoardRole: false,
+        rawCargo: "Membro",
+      };
+    }
+
+    const priority = society === "Ramo" && parsedCargo.chapter === "Ramo" ?0 : 1;
+    return {
+      ...member,
+      boardChapter: member.boardChapter || parsedCargo.chapter,
+      boardPriority: Number.isFinite(Number(member.boardPriority)) ?Number(member.boardPriority) : priority,
+      cargo: formatCargoChapter(parsedCargo.cargo, parsedCargo.chapter),
+      isBoardRole: true,
+      rawCargo: member.rawCargo || parsedCargo.cargo,
+    };
+  }
+
+  if (isBoardCargo(member.cargo)) {
+    const chapter = member.boardChapter || society;
+    if (society !== "Ramo" && isCurrentChapterBoardRole({ cargo: member.cargo, chapter }, society)) {
+      return {
+        ...member,
+        boardChapter: chapter,
+        boardPriority: 1,
+        cargo: member.cargo,
+        isBoardRole: true,
+        rawCargo: member.rawCargo || member.cargo,
+      };
+    }
+
+    if (society !== "Ramo" && !isExternalChapterPresidentRole({ cargo: member.cargo, chapter }, society)) {
+      return {
+        ...member,
+        boardChapter: "",
+        boardPriority: 2,
+        cargo: "Membro",
+        isBoardRole: false,
+        rawCargo: "Membro",
+      };
+    }
+
+    return {
+      ...member,
+      boardChapter: chapter,
+      boardPriority: Number.isFinite(Number(member.boardPriority)) ?Number(member.boardPriority) : society === "Ramo" && chapter === "Ramo" ?0 : 1,
+      cargo: formatCargoChapter(member.cargo, chapter),
+      isBoardRole: true,
+      rawCargo: member.rawCargo || member.cargo,
+    };
+  }
+
+  return member;
+}
+
+function prepareAtaMembers(members, society) {
+  return orderedAtaMembers(members.map((member) => normalizeMemberForAta(member, society)), society);
+}
+
+function normalizeMemberName(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function findRegisteredMember(member, options) {
+  const sourceId = member.sourceMemberId || member.registeredMemberId;
+  if (sourceId) {
+    const byId = options.find((option) => String(option.id) === String(sourceId));
+    if (byId) {
+      return byId;
+    }
+  }
+
+  const memberName = normalizeMemberName(member.nome);
+  if (!memberName) {
+    return null;
+  }
+
+  return options.find((option) => normalizeMemberName(option.name) === memberName) || null;
+}
+
+function prepareAtaMembersFromRegistry(members, society, options) {
+  const refreshedMembers = members.map((member) => {
+    const registeredMember = findRegisteredMember(member, options);
+    if (!registeredMember) {
+      return member;
+    }
+
+    const memberRole = memberRoleForAta(registeredMember, society);
+    return {
+      ...member,
+      boardChapter: memberRole.chapter,
+      boardPriority: memberRole.priority,
+      cargo: memberRole.cargo || member.cargo,
+      isBoardRole: memberRole.isBoardRole,
+      nome: registeredMember.name || member.nome,
+      rawCargo: memberRole.rawCargo,
+      sourceMemberId: registeredMember.id,
+    };
+  });
+
+  return prepareAtaMembers(refreshedMembers, society);
+}
+
+function orderedAtaMembers(members, society) {
+  return [...members].sort((memberA, memberB) => {
+    const priorityDiff = memberSortPriority(memberA, society) - memberSortPriority(memberB, society);
+    if (priorityDiff !== 0) {
+      return priorityDiff;
+    }
+
+    return String(memberA.nome || "").localeCompare(String(memberB.nome || ""), "pt-BR");
+  });
 }
 
 function baixarArquivo(blob, fileName) {
@@ -259,7 +521,7 @@ function App() {
       try {
         const response = await fetch("/api/auth/me", { cache: "no-store" });
         if (!response.ok) {
-          throw new Error("Falha ao verificar autenticacao.");
+          throw new Error("Falha ao verificar autenticação.");
         }
 
         const payload = await response.json();
@@ -272,11 +534,11 @@ function App() {
           setupRequired: Boolean(payload.setupRequired),
           user: payload.user || null,
         });
-        setAuthMode(payload.setupRequired ? "setup" : "login");
+        setAuthMode(payload.setupRequired ?"setup" : "login");
         setAuthMessage({
           tone: "idle",
           text: payload.setupRequired
-            ? "Crie o primeiro usuario para proteger o gerador."
+            ?"Crie o primeiro usuário para proteger o gerador."
             : "Entre para acessar o gerador de atas.",
         });
       } catch {
@@ -288,7 +550,7 @@ function App() {
           });
           setAuthMessage({
             tone: "error",
-            text: "Nao foi possivel verificar a autenticacao.",
+            text: "Não foi possível verificar a autenticação.",
           });
         }
       }
@@ -375,6 +637,27 @@ function App() {
     }
   }, [auth.user]);
 
+  async function refreshMemberOptions(society = form.sociedade) {
+    if (!auth.user) {
+      setMemberOptions([]);
+      return [];
+    }
+
+    const params = new URLSearchParams({
+      chapter: society,
+      scope: "accessible",
+    });
+    const response = await fetch(`/api/users?${params.toString()}`, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error("Não foi possível carregar membros cadastrados.");
+    }
+
+    const payload = await response.json();
+    const users = Array.isArray(payload.users) ?payload.users : [];
+    setMemberOptions(users);
+    return users;
+  }
+
   useEffect(() => {
     if (!auth.user) {
       setMemberOptions([]);
@@ -385,19 +668,8 @@ function App() {
 
     async function loadMemberOptions() {
       try {
-        const params = new URLSearchParams({
-          chapter: form.sociedade,
-          scope: "accessible",
-        });
-        const response = await fetch(`/api/users?${params.toString()}`, { cache: "no-store" });
-        if (!response.ok) {
-          throw new Error("Nao foi possivel carregar membros cadastrados.");
-        }
-
-        const payload = await response.json();
-        if (active) {
-          setMemberOptions(Array.isArray(payload.users) ? payload.users : []);
-        }
+        const users = await refreshMemberOptions(form.sociedade);
+        if (active) setMemberOptions(users);
       } catch {
         if (active) {
           setMemberOptions([]);
@@ -414,17 +686,17 @@ function App() {
   const outputName = (() => {
     const societySlug = slugify(form.sociedade || "ata");
     const dateSlug = slugify(form.data_reuniao || form.data_elaboracao || hojeFormatado());
-    return `ata_${societySlug}${dateSlug ? `_${dateSlug}` : ""}`;
+    return `ata_${societySlug}${dateSlug ?`_${dateSlug}` : ""}`;
   })();
   const ataTitle = String(form.titulo || "").trim() || outputName;
 
   const selectedSocietyName =
     sociedades.find((item) => item.chave === form.sociedade)?.nome || form.sociedade;
   const allowedSociedades = auth.user
-    ? sociedades.filter((item) => auth.user.chapters?.includes(item.chave))
+    ?sociedades.filter((item) => auth.user.chapters?.includes(item.chave))
     : sociedades;
   const hasChapterAccess = allowedSociedades.some((item) => item.chave === form.sociedade);
-  const nextTheme = theme === "dark" ? "light" : "dark";
+  const nextTheme = theme === "dark" ?"light" : "dark";
 
   useEffect(() => {
     if (!auth.user || !allowedSociedades.length || hasChapterAccess) {
@@ -446,7 +718,7 @@ function App() {
   }
 
   function toggleTheme() {
-    setTheme((current) => (current === "dark" ? "light" : "dark"));
+    setTheme((current) => (current === "dark" ?"light" : "dark"));
   }
 
   async function handleAuthSubmit(event) {
@@ -454,11 +726,11 @@ function App() {
     setIsAuthenticating(true);
     setAuthMessage({
       tone: "loading",
-      text: authMode === "setup" ? "Criando usuario inicial..." : "Entrando...",
+      text: authMode === "setup" ?"Criando usuário inicial..." : "Entrando...",
     });
 
     try {
-      const response = await fetch(`/api/auth/${authMode === "setup" ? "setup" : "login"}`, {
+      const response = await fetch(`/api/auth/${authMode === "setup" ?"setup" : "login"}`, {
         body: JSON.stringify(authForm),
         headers: {
           "Content-Type": "application/json",
@@ -467,7 +739,7 @@ function App() {
       });
 
       if (!response.ok) {
-        throw new Error(await readApiError(response, "Nao foi possivel autenticar."));
+        throw new Error(await readApiError(response, "Não foi possível autenticar."));
       }
 
       const payload = await response.json();
@@ -484,7 +756,7 @@ function App() {
     } catch (error) {
       setAuthMessage({
         tone: "error",
-        text: error.message || "Nao foi possivel autenticar.",
+        text: error.message || "Não foi possível autenticar.",
       });
     } finally {
       setIsAuthenticating(false);
@@ -541,7 +813,7 @@ function App() {
         ...current,
         membros: current.membros.map((item) =>
           item.id === editingMemberId
-            ? {
+            ?{
                 ...item,
                 nome: memberDraft.nome.trim(),
                 cargo: memberDraft.cargo.trim(),
@@ -598,7 +870,7 @@ function App() {
     setAttachmentDraft((current) => ({
       ...current,
       file,
-      fileName: file ? file.name : current.fileName,
+      fileName: file ?file.name : current.fileName,
     }));
   }
 
@@ -624,10 +896,10 @@ function App() {
         ...current,
         anexos: current.anexos.map((item) =>
           item.id === editingAttachmentId
-            ? {
+            ?{
                 ...item,
                 legenda: attachmentDraft.legenda.trim(),
-                file: attachmentDraft.file ?? item.file,
+                file: attachmentDraft.file ? attachmentDraft.file : item.file,
                 fileName: attachmentDraft.fileName || item.fileName,
               }
             : item,
@@ -663,7 +935,7 @@ function App() {
     setEditingAttachmentId(attachment.id);
     setAttachmentDraft({
       ...attachment,
-      file: attachment.file ?? null,
+      file: null,
     });
     setStatus({
       tone: "idle",
@@ -724,32 +996,41 @@ function App() {
     if (alreadyAdded) {
       setStatus({
         tone: "error",
-        text: "Este membro ja foi adicionado na lista de presenca.",
+        text: "Este membro já foi adicionado na lista de presença.",
       });
       return;
     }
 
-    setForm((current) => ({
-      ...current,
-      membros: [
-        ...current.membros,
-        {
-          cargo: memberCargoForSociety(selectedMember, current.sociedade),
-          id: crypto.randomUUID(),
-          nome: selectedMember.name,
-        },
-      ],
-    }));
+    setForm((current) => {
+      const memberRole = memberRoleForAta(selectedMember, current.sociedade);
+      return {
+        ...current,
+        membros: [
+          ...current.membros,
+          {
+            boardChapter: memberRole.chapter,
+            boardPriority: memberRole.priority,
+            cargo: memberRole.cargo,
+            id: crypto.randomUUID(),
+            isBoardRole: memberRole.isBoardRole,
+            nome: selectedMember.name,
+            rawCargo: memberRole.rawCargo,
+            sourceMemberId: selectedMember.id,
+          },
+        ],
+      };
+    });
     setSelectedRegisteredMemberId("");
-    setStatus({ tone: "success", text: "Membro cadastrado adicionado a presenca." });
+    setStatus({ tone: "success", text: "Membro cadastrado adicionado à presença." });
   }
 
-  function createSavePayload() {
-    return JSON.stringify(createStoredAtaPayload(form, outputName));
+  function createSavePayload(formOverride = form) {
+    return JSON.stringify(createStoredAtaPayload(formOverride, outputName));
   }
 
   async function persistAta({
-    loadingText = activeAtaId ? "Atualizando ata salva no banco..." : "Salvando ata no banco...",
+    formOverride = form,
+    loadingText = activeAtaId ?"Atualizando ata salva no banco..." : "Salvando ata no banco...",
     successText = "Ata salva com sucesso",
     updateStatus = true,
   } = {}) {
@@ -758,7 +1039,7 @@ function App() {
     }
 
     if (!hasChapterAccess) {
-      throw new Error("Seu usuario nao tem acesso ao capitulo selecionado.");
+      throw new Error("Seu usuário não tem acesso ao capítulo selecionado.");
     }
 
     if (updateStatus) {
@@ -768,16 +1049,16 @@ function App() {
       });
     }
 
-    const response = await fetch(activeAtaId ? `/api/atas/${activeAtaId}` : "/api/atas", {
-      body: createSavePayload(),
+    const response = await fetch(activeAtaId ?`/api/atas/${activeAtaId}` : "/api/atas", {
+      body: createSavePayload(formOverride),
       headers: {
         "Content-Type": "application/json",
       },
-      method: activeAtaId ? "PUT" : "POST",
+      method: activeAtaId ?"PUT" : "POST",
     });
 
     if (!response.ok) {
-      throw new Error(await readApiError(response, "Nao foi possivel salvar a ata."));
+      throw new Error(await readApiError(response, "Não foi possível salvar a ata."));
     }
 
     const payload = await response.json();
@@ -801,11 +1082,17 @@ function App() {
   async function handleSaveAta() {
     setIsSavingAta(true);
     try {
-      await persistAta();
+      const currentMemberOptions = await refreshMemberOptions(form.sociedade);
+      await persistAta({
+        formOverride: {
+          ...form,
+          membros: prepareAtaMembersFromRegistry(form.membros, form.sociedade, currentMemberOptions),
+        },
+      });
     } catch (error) {
       setStatus({
         tone: "error",
-        text: error.message || "Nao foi possivel salvar a ata.",
+        text: error.message || "Não foi possível salvar a ata.",
       });
     } finally {
       setIsSavingAta(false);
@@ -821,7 +1108,7 @@ function App() {
     try {
       const response = await fetch(`/api/atas/${ataId}`, { cache: "no-store" });
       if (!response.ok) {
-        throw new Error(await readApiError(response, "Nao foi possivel abrir a ata salva."));
+        throw new Error(await readApiError(response, "Não foi possível abrir a ata salva."));
       }
 
       const payload = await response.json();
@@ -838,7 +1125,7 @@ function App() {
       setStatus({
         tone: "success",
         text: needsAttachmentReupload
-          ? "Ata carregada do banco. Os arquivos dos anexos nao ficam salvos; reenvie-os antes de gerar PDF."
+          ?"Ata carregada do banco. Os arquivos dos anexos não ficam salvos; reenvie-os antes de gerar PDF."
           : "Ata carregada do banco. Você pode editar, gerar PDF ou salvar novamente.",
       });
       if (options.replaceUrl) {
@@ -847,7 +1134,7 @@ function App() {
     } catch (error) {
       setStatus({
         tone: "error",
-        text: error.message || "Nao foi possivel abrir a ata salva.",
+        text: error.message || "Não foi possível abrir a ata salva.",
       });
     }
   }
@@ -872,7 +1159,13 @@ function App() {
     let wasSaved = false;
 
     try {
+      const currentMemberOptions = await refreshMemberOptions(form.sociedade);
+      const generationForm = {
+        ...form,
+        membros: prepareAtaMembersFromRegistry(form.membros, form.sociedade, currentMemberOptions),
+      };
       const savedAta = await persistAta({
+        formOverride: generationForm,
         loadingText: "Salvando ata no banco antes de gerar o PDF.",
         updateStatus: false,
       });
@@ -883,7 +1176,7 @@ function App() {
       });
 
       const result = await compileAtaPdfInBrowser({
-        form,
+        form: generationForm,
         outputName,
       });
 
@@ -914,7 +1207,7 @@ function App() {
       } catch (forwardError) {
         forwardTone = "error";
         forwardMessage =
-          forwardError.message || "Nao foi possivel enviar o PDF ao servidor JS.";
+          forwardError.message || "Não foi possível enviar o PDF ao servidor JS.";
       }
 
       baixarArquivo(result.pdf, pdfFileName);
@@ -924,10 +1217,10 @@ function App() {
       });
     } catch (error) {
       const message = wasSaved
-        ? error instanceof TypeError
-          ? "Ata salva com sucesso, mas nao foi possivel inicializar o compilador no navegador."
-          : `Ata salva com sucesso, mas ${error.message || "nao foi possivel gerar o PDF."}`
-        : error.message || "Nao foi possivel salvar a ata antes de gerar o PDF.";
+        ?error instanceof TypeError
+          ?"Ata salva com sucesso, mas não foi possível inicializar o compilador no navegador."
+          : `Ata salva com sucesso, mas ${error.message || "não foi possível gerar o PDF."}`
+        : error.message || "Não foi possível salvar a ata antes de gerar o PDF.";
 
       setStatus({
         tone: "error",
@@ -940,6 +1233,7 @@ function App() {
   }
 
   function handleDraftDownload() {
+    const membros = prepareAtaMembersFromRegistry(form.membros, form.sociedade, memberOptions);
     const payload = {
       titulo: form.titulo,
       sociedade: form.sociedade,
@@ -948,7 +1242,7 @@ function App() {
       autor: form.autor,
       data_reuniao: form.data_reuniao,
       local_reuniao: form.local_reuniao,
-      membros: form.membros.map(({ nome, cargo }) => ({ nome, cargo })),
+      membros: membros.map(({ nome, cargo }) => ({ nome, cargo })),
       pautas: splitLines(form.pautasText),
       resultados: splitLines(form.resultadosText),
       anexos: form.anexos.map(({ legenda, fileName }) => ({
@@ -986,19 +1280,24 @@ function App() {
           autor: data.autor || "",
           data_reuniao: data.data_reuniao || hojeFormatado(),
           local_reuniao: data.local_reuniao || "",
-          pautasText: Array.isArray(data.pautas) ? data.pautas.join("\n") : "",
+          pautasText: Array.isArray(data.pautas) ?data.pautas.join("\n") : "",
           resultadosText: Array.isArray(data.resultados)
-            ? data.resultados.join("\n")
+            ?data.resultados.join("\n")
             : "",
           membros: Array.isArray(data.membros)
-            ? data.membros.map((item) => ({
-                id: crypto.randomUUID(),
-                nome: item.nome || "",
+            ?data.membros.map((item) => ({
+                boardChapter: item.boardChapter || "",
+                boardPriority: Number.isFinite(Number(item.boardPriority)) ?Number(item.boardPriority) : undefined,
                 cargo: item.cargo || "",
+                id: crypto.randomUUID(),
+                isBoardRole: Boolean(item.isBoardRole),
+                nome: item.nome || "",
+                rawCargo: item.rawCargo || "",
+                sourceMemberId: item.sourceMemberId || "",
               }))
             : [],
           anexos: Array.isArray(data.anexos)
-            ? data.anexos.map((item) => ({
+            ?data.anexos.map((item) => ({
                 id: crypto.randomUUID(),
                 legenda: item.legenda || "",
                 file: null,
@@ -1032,27 +1331,18 @@ function App() {
       data-theme-current={theme}
       onClick={toggleTheme}
       aria-pressed={theme === "dark"}
-      aria-label={`Alternar para tema ${nextTheme === "dark" ? "escuro" : "claro"}`}
-      title={`Trocar para tema ${nextTheme === "dark" ? "escuro" : "claro"}`}
+      aria-label={`Alternar para tema ${nextTheme === "dark" ?"escuro" : "claro"}`}
+      title={`Trocar para tema ${nextTheme === "dark" ?"escuro" : "claro"}`}
     >
       <span className="theme-toggle__icon" aria-hidden="true" />
       <span className="theme-toggle__label">
-        {theme === "dark" ? "Tema escuro" : "Tema claro"}
+        {theme === "dark" ?"Tema escuro" : "Tema claro"}
       </span>
     </button>
   );
 
   if (auth.loading) {
-    return (
-      <div className="app-shell auth-shell">
-        {themeToggleButton}
-        <section className="hero-panel auth-card">
-          <p className="panel-kicker">Autenticacao</p>
-          <h1>Carregando acesso</h1>
-          <p>Verificando a sessao local antes de abrir o gerador.</p>
-        </section>
-      </div>
-    );
+    return <LoadingBall />;
   }
 
   if (!auth.user) {
@@ -1063,15 +1353,15 @@ function App() {
         {themeToggleButton}
         <section className="hero-panel auth-card">
           <p className="panel-kicker">Autenticacao</p>
-          <h1>{isSetup ? "Crie o primeiro acesso" : "Entre para continuar"}</h1>
+          <h1>{isSetup ?"Crie o primeiro acesso" : "Entre para continuar"}</h1>
           <p>
             {isSetup
-              ? "Este usuario inicial ficará salvo no banco Postgres configurado."
-              : "Use seu usuario local para acessar as atas salvas e o gerador."}
+              ?"Este usuário inicial ficará salvo no banco Postgres configurado."
+              : "Use seu usuário local para acessar as atas salvas e o gerador."}
           </p>
 
           <form className="auth-form" onSubmit={handleAuthSubmit}>
-            {isSetup ? (
+            {isSetup ?(
               <label className="field">
                 <span>Nome</span>
                 <input
@@ -1097,7 +1387,7 @@ function App() {
                 type="password"
                 value={authForm.password}
                 onChange={(event) => updateAuthField("password", event.target.value)}
-                autoComplete={isSetup ? "new-password" : "current-password"}
+                autoComplete={isSetup ?"new-password" : "current-password"}
               />
             </label>
 
@@ -1108,9 +1398,9 @@ function App() {
 
             <button className="primary-button" disabled={isAuthenticating}>
               {isAuthenticating
-                ? "Aguarde..."
+                ?"Aguarde..."
                 : isSetup
-                  ? "Criar acesso"
+                  ?"Criar acesso"
                   : "Entrar"}
             </button>
           </form>
@@ -1122,17 +1412,20 @@ function App() {
   return (
     <div className="app-shell">
       <header className="site-nav">
-        <a href="#top" className="site-brand" aria-label="Ir para o topo">
+        <a href="/" className="site-brand" aria-label="Ir para início">
           <span className="site-brand-badge" aria-hidden="true" />
           <span className="site-brand-lockup">
-            <span className="site-brand-text">Sistema de Atas</span>
+            <span className="site-brand-text">Sistema Interno - IEEE UFJF</span>
             <span className="site-brand-meta">IEEE UFJF</span>
           </span>
         </a>
 
         <ul className="nav-links">
-          <li><a href="/atas">Atas salvas</a></li>
-          {auth.user.canManageMembers ? <li><a href="/membros">Gestão</a></li> : null}
+          <li><a href="/">Início</a></li>
+          <li><a href="/atas" aria-current="page">Atas</a></li>
+          <li><a href="/tarefas">Tarefas</a></li>
+          <li><a href="/calendario">Calendário</a></li>
+          {auth.user.canManageMembers ?<li><a href="/diretoria">Diretoria</a></li> : null}
         </ul>
 
         <div className="topbar-actions">
@@ -1151,7 +1444,7 @@ function App() {
       </header>
 
       {themeToggleButton}
-      {isPasswordDialogOpen ? (
+      {isPasswordDialogOpen ?(
         <UserPasswordDialog
           user={auth.user}
           onClose={() => setIsPasswordDialogOpen(false)}
@@ -1170,14 +1463,14 @@ function App() {
               <div className="output-pill">{selectedSocietyName}</div>
             </div>
 
-            {allowedSociedades.length ? (
+            {allowedSociedades.length ?(
               <div className="society-grid">
                 {allowedSociedades.map((item) => (
                   <button
                     key={item.chave}
                     type="button"
                     className={`society-card ${
-                      form.sociedade === item.chave ? "is-active" : ""
+                      form.sociedade === item.chave ?"is-active" : ""
                     }`}
                     onClick={() => updateField("sociedade", item.chave)}
                   >
@@ -1264,11 +1557,11 @@ function App() {
                 >
                   <option value="">Selecione um membro</option>
                   {memberOptions.map((member) => {
-                    const societyCargo = memberCargoForSociety(member, form.sociedade);
+                    const societyCargo = memberRoleForAta(member, form.sociedade).cargo;
 
                     return (
                       <option key={member.id} value={member.id}>
-                        {member.name}{societyCargo ? ` - ${societyCargo}` : ""}
+                        {member.name}{societyCargo ?` - ${societyCargo}` : ""}
                       </option>
                     );
                   })}
@@ -1310,7 +1603,7 @@ function App() {
 
             <div className="inline-actions">
               <button className="soft-button" onClick={handleMemberSave}>
-                {editingMemberId ? "Salvar edição" : "Adicionar membro"}
+                {editingMemberId ?"Salvar edição" : "Adicionar membro"}
               </button>
               <button
                 className="soft-button"
@@ -1324,8 +1617,8 @@ function App() {
             </div>
 
             <div className="list-shell">
-              {form.membros.length ? (
-                form.membros.map((member, index) => (
+              {form.membros.length ?(
+                prepareAtaMembers(form.membros, form.sociedade).map((member, index) => (
                   <div className="list-row" key={member.id}>
                     <div className="list-index">{index + 1}</div>
                     <div className="list-content">
@@ -1426,7 +1719,7 @@ function App() {
                 />
                 <small>
                   {attachmentDraft.fileName
-                    ? `Selecionado: ${attachmentDraft.fileName}`
+                    ?`Selecionado: ${attachmentDraft.fileName}`
                     : "Nenhum arquivo selecionado"}
                 </small>
               </label>
@@ -1434,7 +1727,7 @@ function App() {
 
             <div className="inline-actions">
               <button className="soft-button" onClick={handleAttachmentSave}>
-                {editingAttachmentId ? "Salvar edição" : "Adicionar anexo"}
+                {editingAttachmentId ?"Salvar edição" : "Adicionar anexo"}
               </button>
               <button
                 className="soft-button"
@@ -1448,7 +1741,7 @@ function App() {
             </div>
 
             <div className="list-shell">
-              {form.anexos.length ? (
+              {form.anexos.length ?(
                 form.anexos.map((attachment) => (
                   <div className="list-row" key={attachment.id}>
                     <div className="list-index attachment-index">+</div>
@@ -1456,7 +1749,7 @@ function App() {
                       <strong>{attachment.legenda}</strong>
                       <span>
                         {attachment.file
-                          ? attachment.fileName
+                          ?attachment.fileName
                           : `${attachment.fileName || "Arquivo"} precisa ser reenviado`}
                       </span>
                     </div>
@@ -1496,14 +1789,20 @@ function App() {
 
               <div className="sidebar-action-list">
                 <button className="ghost-button" onClick={handleSaveAta} disabled={isSavingAta || isSubmitting}>
-                  {isSavingAta ? "Salvando..." : activeAtaId ? "Atualizar ata" : "Salvar ata"}
+                  {isSavingAta ?"Salvando..." : activeAtaId ?"Atualizar ata" : "Salvar ata"}
                 </button>
                 <a className="ghost-button standalone-link" href="/atas">
                   Ver salvas
                 </a>
-                {auth.user.canManageMembers ? (
-                  <a className="ghost-button standalone-link" href="/membros">
-                    Gestão de membros
+                <a className="ghost-button standalone-link" href="/tarefas">
+                  Tarefas
+                </a>
+                <a className="ghost-button standalone-link" href="/calendario">
+                  Calendário
+                </a>
+                {auth.user.canManageMembers ?(
+                  <a className="ghost-button standalone-link" href="/diretoria">
+                    Diretoria
                   </a>
                 ) : null}
                 <button className="ghost-button" onClick={() => draftInputRef.current?.click()}>
@@ -1541,7 +1840,7 @@ function App() {
                 <strong>{outputName}.pdf</strong>
               </div>
 
-              {showPdfStatus ? (
+              {showPdfStatus ?(
                 <div className={`status-box tone-${status.tone}`}>
                   <span>Status</span>
                   <strong>{status.text}</strong>
@@ -1559,7 +1858,7 @@ function App() {
                 onClick={handleGeneratePdf}
                 disabled={isSubmitting || isSavingAta}
               >
-                {isSubmitting ? "Salvando e compilando..." : "Gerar PDF"}
+                {isSubmitting ?"Salvando e compilando..." : "Gerar PDF"}
               </button>
             </article>
 

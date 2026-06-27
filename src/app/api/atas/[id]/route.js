@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 
 import { getCurrentUser, isSameOriginRequest } from "../../../../lib/auth";
 import {
@@ -14,7 +14,7 @@ export const runtime = "nodejs";
 
 function parseId(value) {
   const id = Number.parseInt(String(value || ""), 10);
-  return Number.isSafeInteger(id) && id > 0 ? id : null;
+  return Number.isSafeInteger(id) && id > 0 ?id : null;
 }
 
 function unauthorized() {
@@ -47,7 +47,7 @@ export async function GET(_request, context) {
 
   const ata = await getSavedAta(routeContext.user, routeContext.id);
   if (!ata) {
-    return NextResponse.json({ detail: "Ata nao encontrada." }, { status: 404 });
+    return NextResponse.json({ detail: "Ata não encontrada." }, { status: 404 });
   }
 
   return NextResponse.json({ ata });
@@ -68,7 +68,7 @@ export async function PUT(request, context) {
     const ata = await updateSavedAta(routeContext.user, routeContext.id, parsed);
 
     if (!ata) {
-      return NextResponse.json({ detail: "Ata nao encontrada." }, { status: 404 });
+      return NextResponse.json({ detail: "Ata não encontrada." }, { status: 404 });
     }
 
     return NextResponse.json({ ata });
@@ -78,7 +78,7 @@ export async function PUT(request, context) {
     }
 
     return NextResponse.json(
-      { detail: error.message || "Nao foi possivel atualizar a ata." },
+      { detail: error.message || "Não foi possível atualizar a ata." },
       { status: 400 },
     );
   }
@@ -99,13 +99,13 @@ export async function PATCH(request, context) {
     const ata = await renameSavedAta(routeContext.user, routeContext.id, payload.title);
 
     if (!ata) {
-      return NextResponse.json({ detail: "Ata nao encontrada." }, { status: 404 });
+      return NextResponse.json({ detail: "Ata não encontrada." }, { status: 404 });
     }
 
     return NextResponse.json({ ata });
   } catch (error) {
     return NextResponse.json(
-      { detail: error.message || "Nao foi possivel renomear a ata." },
+      { detail: error.message || "Não foi possível renomear a ata." },
       { status: 400 },
     );
   }
@@ -123,7 +123,7 @@ export async function DELETE(request, context) {
 
   const deleted = await deleteSavedAta(routeContext.user, routeContext.id);
   if (!deleted) {
-    return NextResponse.json({ detail: "Ata nao encontrada." }, { status: 404 });
+    return NextResponse.json({ detail: "Ata não encontrada." }, { status: 404 });
   }
 
   return NextResponse.json({ ok: true });

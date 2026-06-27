@@ -119,7 +119,7 @@ function listaObjetos(value) {
 export function listarSociedades() {
   return Object.keys(SOCIEDADES).map((chave) => ({
     chave,
-    nome: SOCIEDADE_LABELS[chave] ?? chave,
+    nome: SOCIEDADE_LABELS[chave] || chave,
   }));
 }
 
@@ -212,6 +212,131 @@ function limparDados(dados) {
   };
 }
 
+function dividirCargoCapitulo(cargo) {
+  const match = texto(cargo).match(/^(.+?)-([A-Za-z0-9]+)$/);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    cargo: match[1].trim(),
+    capitulo: match[2].trim(),
+  };
+}
+
+function ehCargoDiretoria(cargo) {
+  const cargoLimpo = texto(cargo);
+  return Boolean(cargoLimpo && cargoLimpo !== "Membro");
+}
+
+function ehPresidenteDeOutroCapitulo(cargo, capitulo, sociedade) {
+  return texto(cargo) === "Presidente" && texto(capitulo) && capitulo !== sociedade && capitulo !== "Ramo";
+}
+
+function ehDiretoriaDoCapituloAtual(cargo, capitulo, sociedade) {
+  return ehCargoDiretoria(cargo) && texto(capitulo) === sociedade && sociedade !== "Ramo";
+}
+
+function formatarCargoCapitulo(cargo, capitulo) {
+  const cargoLimpo = texto(cargo);
+  const capituloLimpo = texto(capitulo);
+
+  if (!cargoLimpo || cargoLimpo === "Membro" || !capituloLimpo) {
+    return cargoLimpo;
+  }
+
+  return `${cargoLimpo}-${capituloLimpo}`;
+}
+
+function prioridadeMembroAta(membro, sociedade) {
+  const cargoDividido = dividirCargoCapitulo(membro.cargo);
+  const capitulo = texto(membro.boardChapter) || cargoDividido?.capitulo || (ehCargoDiretoria(membro.cargo) ? sociedade : "");
+
+  if (sociedade !== "Ramo") {
+    if (ehDiretoriaDoCapituloAtual(cargoDividido?.cargo || membro.cargo, capitulo, sociedade)) return 1;
+    return ehPresidenteDeOutroCapitulo(cargoDividido?.cargo || membro.cargo, capitulo, sociedade) ?1 : 2;
+  }
+
+  if (capitulo === "Ramo") {
+    return 0;
+  }
+
+  if (cargoDividido || ehCargoDiretoria(membro.cargo) || membro.isBoardRole) {
+    return 1;
+  }
+
+  return 2;
+}
+
+function normalizarMembroAta(membro, sociedade) {
+  const cargoDividido = dividirCargoCapitulo(membro.cargo);
+
+  if (cargoDividido) {
+    if (sociedade !== "Ramo" && ehDiretoriaDoCapituloAtual(cargoDividido.cargo, cargoDividido.capitulo, sociedade)) {
+      return {
+        ...membro,
+        cargo: cargoDividido.cargo,
+      };
+    }
+
+    if (sociedade !== "Ramo" && !ehPresidenteDeOutroCapitulo(cargoDividido.cargo, cargoDividido.capitulo, sociedade)) {
+      return {
+        ...membro,
+        cargo: "Membro",
+      };
+    }
+
+    return {
+      ...membro,
+      cargo: formatarCargoCapitulo(cargoDividido.cargo, cargoDividido.capitulo),
+    };
+  }
+
+  if (ehCargoDiretoria(membro.cargo) || membro.isBoardRole) {
+    const capitulo = texto(membro.boardChapter) || sociedade;
+    if (sociedade !== "Ramo" && ehDiretoriaDoCapituloAtual(membro.cargo, capitulo, sociedade)) {
+      return {
+        ...membro,
+        cargo: texto(membro.cargo),
+      };
+    }
+
+    if (sociedade !== "Ramo" && !ehPresidenteDeOutroCapitulo(membro.cargo, capitulo, sociedade)) {
+      return {
+        ...membro,
+        cargo: "Membro",
+      };
+    }
+
+    return {
+      ...membro,
+      cargo: formatarCargoCapitulo(membro.cargo, capitulo),
+    };
+  }
+
+  return {
+    ...membro,
+    cargo: "Membro",
+  };
+}
+
+function prepararMembrosAta(membros, sociedade) {
+  return listaObjetos(membros)
+    .map((membro) => ({
+      ...normalizarMembroAta(membro, sociedade),
+      nome: texto(membro.nome),
+    }))
+    .filter((membro) => membro.nome || texto(membro.cargo))
+    .sort((membroA, membroB) => {
+      const prioridade = prioridadeMembroAta(membroA, sociedade) - prioridadeMembroAta(membroB, sociedade);
+      if (prioridade !== 0) {
+        return prioridade;
+      }
+
+      return texto(membroA.nome).localeCompare(texto(membroB.nome), "pt-BR");
+    });
+}
+
 export async function copiarRecursosSociedade(sociedade, destino) {
   const origem = SOCIEDADES[normalizarSociedadeChave(sociedade, "")]?.folder;
   if (!origem) {
@@ -255,7 +380,7 @@ export async function montarDados(payload, uploadMap, uploadsDir) {
 
     const upload = uploadMap.get(uploadKey);
     if (!upload || typeof upload.arrayBuffer !== "function") {
-      throw new Error("Um dos anexos enviados nao foi encontrado no upload.");
+      throw new Error("Um dos anexos enviados não foi encontrado no upload.");
     }
 
     const nomeArquivo = normalizarNomeArquivo(upload.name || "anexo.bin");
@@ -326,6 +451,7 @@ export function renderizarTex(dados, anexosPreparados) {
   }
 
   const documentclass = SOCIEDADES[dados.sociedade].documentclass;
+  const membros = prepararMembrosAta(dados.membros, dados.sociedade);
   const linhas = [
     `\\documentclass{${documentclass}}`,
     "",
@@ -342,7 +468,7 @@ export function renderizarTex(dados, anexosPreparados) {
     "\\begin{membros}",
   ];
 
-  for (const [indice, membro] of dados.membros.entries()) {
+  for (const [indice, membro] of membros.entries()) {
     linhas.push(
       "    \\membro"
       + `{${indice + 1}}`
@@ -401,7 +527,7 @@ export async function compilarPdf(caminhoTex) {
   });
 
   if (resultado.error) {
-    throw new Error("O comando 'pdflatex' nao esta disponivel no sistema.");
+    throw new Error("O comando 'pdflatex' não está disponível no sistema.");
   }
 
   if (resultado.status !== 0) {

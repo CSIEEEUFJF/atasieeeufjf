@@ -1,8 +1,8 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Sistema de Atas - IEEE UFJF",
-  description: "Sistema interno de atas do Ramo Estudantil IEEE UFJF.",
+  title: "Sistema Interno - IEEE UFJF",
+  description: "Sistema interno do Ramo Estudantil IEEE UFJF.",
   icons: {
     icon: [
       { url: "/ramo-ieee-ufjf-blue.svg", type: "image/svg+xml" },

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 
 import {
   buildStorageMetadata,
@@ -13,7 +13,7 @@ export async function POST(request) {
   const forwardUrl = getForwardUrl().trim();
   if (!forwardUrl) {
     return NextResponse.json({
-      detail: "PDF_FORWARD_URL nao configurada.",
+      detail: "PDF_FORWARD_URL não configurada.",
       forwarded: false,
       skipped: true,
     });
@@ -35,13 +35,13 @@ export async function POST(request) {
 
   if (staticTokenConfigured && !uploadToken) {
     return NextResponse.json(
-      { detail: "Nao foi possivel criar o token temporario de upload." },
+      { detail: "Não foi possível criar o token temporário de upload." },
       { status: 500 },
     );
   }
 
   return NextResponse.json({
-    authorization: uploadToken ? `Bearer ${uploadToken}` : "",
+    authorization: uploadToken ?`Bearer ${uploadToken}` : "",
     directUpload: true,
     metadata,
     targetFolder: metadata.targetFolder,

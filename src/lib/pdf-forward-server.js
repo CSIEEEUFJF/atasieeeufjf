@@ -18,7 +18,7 @@ export function parseMetadataValue(value) {
 
   try {
     const parsed = JSON.parse(value);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ?parsed : {};
   } catch {
     return {};
   }
@@ -31,7 +31,7 @@ export function normalizeChapter(value) {
     .replace(/[^0-9A-Za-z._-]+/g, "")
     .replace(/^\.+|\.+$/g, "");
 
-  return cleanValue && cleanValue !== "." && cleanValue !== ".." ? cleanValue : DEFAULT_CHAPTER;
+  return cleanValue && cleanValue !== "." && cleanValue !== ".." ?cleanValue : DEFAULT_CHAPTER;
 }
 
 export function buildStorageMetadata(metadata) {

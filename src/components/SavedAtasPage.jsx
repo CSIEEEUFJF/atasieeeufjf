@@ -1,7 +1,8 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 
+import LoadingBall from "./LoadingBall";
 import { compileAtaPdfInBrowser } from "../lib/swiftlatex-client";
 import {
   buildPdfFileNameFromTitle,
@@ -43,7 +44,7 @@ function createFormFromStoredAta(ata) {
     (ata.attachments || []).map((attachment) => [attachment.clientId, attachment]),
   );
   const attachmentMetadata = Array.isArray(savedForm.anexos) && savedForm.anexos.length
-    ? savedForm.anexos
+    ?savedForm.anexos
     : (ata.attachments || []).map((attachment) => ({
         fileName: attachment.fileName,
         id: attachment.clientId,
@@ -70,7 +71,7 @@ function createFormFromStoredAta(ata) {
     data_reuniao: savedForm.data_reuniao || "",
     local_reuniao: savedForm.local_reuniao || "",
     membros: Array.isArray(savedForm.membros)
-      ? savedForm.membros.map((item) => ({
+      ?savedForm.membros.map((item) => ({
           cargo: item.cargo || "",
           id: item.id || crypto.randomUUID(),
           nome: item.nome || "",
@@ -99,17 +100,17 @@ function validateSavedAtaForm(form) {
 
   if (!form.data_elaboracao.trim()) missing.push("data da elaboracao");
   if (!form.autor.trim()) missing.push("autor");
-  if (!form.data_reuniao.trim()) missing.push("data da reuniao");
-  if (!form.local_reuniao.trim()) missing.push("local da reuniao");
+  if (!form.data_reuniao.trim()) missing.push("data da reunião");
+  if (!form.local_reuniao.trim()) missing.push("local da reunião");
   if (!form.membros.length) missing.push("ao menos um membro");
   if (!form.pautasText.trim()) missing.push("ao menos uma pauta");
   if (!form.resultadosText.trim()) missing.push("ao menos um resultado");
   if (form.anexos.some((item) => !item.file)) {
-    missing.push("arquivos dos anexos, que nao ficam armazenados no banco");
+    missing.push("arquivos dos anexos, que não ficam armazenados no banco");
   }
 
   if (missing.length) {
-    throw new Error(`Nao foi possivel gerar o PDF. Corrija: ${missing.join(", ")}.`);
+    throw new Error(`Não foi possível gerar o PDF. Corrija: ${missing.join(", ")}.`);
   }
 }
 
@@ -158,7 +159,7 @@ function SavedAtasPage() {
       try {
         const response = await fetch("/api/auth/me", { cache: "no-store" });
         if (!response.ok) {
-          throw new Error("Nao foi possivel verificar a autenticacao.");
+          throw new Error("Não foi possível verificar a autenticação.");
         }
 
         const payload = await response.json();
@@ -171,7 +172,7 @@ function SavedAtasPage() {
           setupRequired: Boolean(payload.setupRequired),
           user: payload.user || null,
         });
-        setChapters(Array.isArray(payload.chapters) ? payload.chapters : []);
+        setChapters(Array.isArray(payload.chapters) ?payload.chapters : []);
       } catch (error) {
         if (active) {
           setAuth({
@@ -181,7 +182,7 @@ function SavedAtasPage() {
           });
           setStatus({
             tone: "error",
-            text: error.message || "Nao foi possivel verificar a autenticacao.",
+            text: error.message || "Não foi possível verificar a autenticação.",
           });
         }
       }
@@ -201,7 +202,7 @@ function SavedAtasPage() {
     loadAtas();
   }, [auth.user]);
 
-  const nextTheme = theme === "dark" ? "light" : "dark";
+  const nextTheme = theme === "dark" ?"light" : "dark";
   const userChapterSet = new Set(auth.user?.chapters || []);
   const accessibleChapters = chapters.filter((chapter) => userChapterSet.has(chapter.key));
   const atasByChapter = accessibleChapters.map((chapter) => ({
@@ -210,7 +211,7 @@ function SavedAtasPage() {
   }));
 
   function toggleTheme() {
-    setTheme((current) => (current === "dark" ? "light" : "dark"));
+    setTheme((current) => (current === "dark" ?"light" : "dark"));
   }
 
   async function loadAtas() {
@@ -226,17 +227,17 @@ function SavedAtasPage() {
         setAuth((current) => ({ ...current, user: null }));
         setStatus({
           tone: "error",
-          text: "Sua sessao expirou. Entre novamente pelo gerador.",
+          text: "Sua sessão expirou. Entre novamente pelo gerador.",
         });
         return;
       }
 
       if (!response.ok) {
-        throw new Error(await readApiError(response, "Nao foi possivel carregar as atas."));
+        throw new Error(await readApiError(response, "Não foi possível carregar as atas."));
       }
 
       const payload = await response.json();
-      setAtas(Array.isArray(payload.atas) ? payload.atas : []);
+      setAtas(Array.isArray(payload.atas) ?payload.atas : []);
       setStatus({
         tone: "success",
         text: "Lista de atas salvas atualizada.",
@@ -244,7 +245,7 @@ function SavedAtasPage() {
     } catch (error) {
       setStatus({
         tone: "error",
-        text: error.message || "Nao foi possivel carregar as atas.",
+        text: error.message || "Não foi possível carregar as atas.",
       });
     } finally {
       setIsLoadingAtas(false);
@@ -266,7 +267,7 @@ function SavedAtasPage() {
     try {
       const response = await fetch(`/api/atas/${ataId}`, { method: "DELETE" });
       if (!response.ok) {
-        throw new Error(await readApiError(response, "Nao foi possivel excluir a ata."));
+        throw new Error(await readApiError(response, "Não foi possível excluir a ata."));
       }
 
       setAtas((current) => current.filter((ata) => ata.id !== ataId));
@@ -277,7 +278,7 @@ function SavedAtasPage() {
     } catch (error) {
       setStatus({
         tone: "error",
-        text: error.message || "Nao foi possivel excluir a ata.",
+        text: error.message || "Não foi possível excluir a ata.",
       });
     } finally {
       setDeletingId(null);
@@ -311,12 +312,12 @@ function SavedAtasPage() {
       });
 
       if (!response.ok) {
-        throw new Error(await readApiError(response, "Nao foi possivel renomear a ata."));
+        throw new Error(await readApiError(response, "Não foi possível renomear a ata."));
       }
 
       const payload = await response.json();
       setAtas((current) =>
-        current.map((item) => (item.id === ata.id ? payload.ata || item : item)),
+        current.map((item) => (item.id === ata.id ?payload.ata || item : item)),
       );
       setStatus({
         tone: "success",
@@ -325,7 +326,7 @@ function SavedAtasPage() {
     } catch (error) {
       setStatus({
         tone: "error",
-        text: error.message || "Nao foi possivel renomear a ata.",
+        text: error.message || "Não foi possível renomear a ata.",
       });
     } finally {
       setRenamingId(null);
@@ -346,7 +347,7 @@ function SavedAtasPage() {
     try {
       const response = await fetch(`/api/atas/${ataId}`, { cache: "no-store" });
       if (!response.ok) {
-        throw new Error(await readApiError(response, "Nao foi possivel abrir a ata salva."));
+        throw new Error(await readApiError(response, "Não foi possível abrir a ata salva."));
       }
 
       const payload = await response.json();
@@ -387,7 +388,7 @@ function SavedAtasPage() {
       } catch (forwardError) {
         forwardTone = "error";
         forwardMessage =
-          forwardError.message || "Nao foi possivel enviar o PDF ao servidor JS.";
+          forwardError.message || "Não foi possível enviar o PDF ao servidor JS.";
       }
 
       baixarArquivo(result.pdf, pdfFileName);
@@ -398,8 +399,8 @@ function SavedAtasPage() {
     } catch (error) {
       const message =
         error instanceof TypeError
-          ? "Nao foi possivel inicializar o compilador no navegador."
-          : error.message || "Nao foi possivel gerar o PDF da ata salva.";
+          ?"Não foi possível inicializar o compilador no navegador."
+          : error.message || "Não foi possível gerar o PDF da ata salva.";
 
       setStatus({
         tone: "error",
@@ -435,27 +436,18 @@ function SavedAtasPage() {
       data-theme-current={theme}
       onClick={toggleTheme}
       aria-pressed={theme === "dark"}
-      aria-label={`Alternar para tema ${nextTheme === "dark" ? "escuro" : "claro"}`}
-      title={`Trocar para tema ${nextTheme === "dark" ? "escuro" : "claro"}`}
+      aria-label={`Alternar para tema ${nextTheme === "dark" ?"escuro" : "claro"}`}
+      title={`Trocar para tema ${nextTheme === "dark" ?"escuro" : "claro"}`}
     >
       <span className="theme-toggle__icon" aria-hidden="true" />
       <span className="theme-toggle__label">
-        {theme === "dark" ? "Tema escuro" : "Tema claro"}
+        {theme === "dark" ?"Tema escuro" : "Tema claro"}
       </span>
     </button>
   );
 
   if (auth.loading) {
-    return (
-      <div className="app-shell auth-shell">
-        {themeToggleButton}
-        <section className="hero-panel auth-card">
-          <p className="panel-kicker">Atas salvas</p>
-          <h1>Carregando biblioteca</h1>
-          <p>Verificando sua sessao local antes de abrir o banco de atas.</p>
-        </section>
-      </div>
-    );
+    return <LoadingBall />;
   }
 
   if (!auth.user) {
@@ -464,14 +456,14 @@ function SavedAtasPage() {
         {themeToggleButton}
         <section className="hero-panel auth-card">
           <p className="panel-kicker">Atas salvas</p>
-          <h1>Acesso necessario</h1>
+          <h1>Acesso necessário</h1>
           <p>
             {auth.setupRequired
-              ? "Crie o primeiro usuario pelo gerador antes de acessar o banco de atas."
-              : "Entre pelo gerador para consultar suas atas salvas."}
+              ?"Crie o primeiro usuário antes de acessar o banco de atas."
+              : "Entre no sistema para consultar suas atas salvas."}
           </p>
-          <a className="primary-button standalone-link" href="/">
-            Ir para o gerador
+          <a className="primary-button standalone-link" href="/atas/nova">
+            Entrar no sistema
           </a>
         </section>
       </div>
@@ -481,18 +473,20 @@ function SavedAtasPage() {
   return (
     <div className="app-shell">
       <header className="site-nav">
-        <a href="/" className="site-brand" aria-label="Ir para o gerador">
+        <a href="/" className="site-brand" aria-label="Ir para início">
           <span className="site-brand-badge" aria-hidden="true" />
           <span className="site-brand-lockup">
-            <span className="site-brand-text">Sistema de Atas</span>
+            <span className="site-brand-text">Sistema Interno - IEEE UFJF</span>
             <span className="site-brand-meta">Banco de atas por capítulo</span>
           </span>
         </a>
 
         <ul className="nav-links">
-          <li><a href="/">Gerador</a></li>
-          <li><a href="/atas" aria-current="page">Atas salvas</a></li>
-          {auth.user.canManageMembers ? <li><a href="/membros">Membros</a></li> : null}
+          <li><a href="/">Início</a></li>
+          <li><a href="/atas" aria-current="page">Atas</a></li>
+          <li><a href="/tarefas">Tarefas</a></li>
+          <li><a href="/calendario">Calendário</a></li>
+          {auth.user.canManageMembers ?<li><a href="/diretoria">Diretoria</a></li> : null}
         </ul>
 
         <div className="topbar-actions">
@@ -504,14 +498,6 @@ function SavedAtasPage() {
           >
             {auth.user.name}
           </button>
-          <a className="ghost-button" href="/">
-            Nova ata
-          </a>
-          {auth.user.canManageMembers ? (
-            <a className="ghost-button" href="/membros">
-              Membros
-            </a>
-          ) : null}
           <button className="ghost-button" onClick={loadAtas} disabled={isLoadingAtas}>
             Atualizar
           </button>
@@ -522,7 +508,7 @@ function SavedAtasPage() {
       </header>
 
       {themeToggleButton}
-      {isPasswordDialogOpen ? (
+      {isPasswordDialogOpen ?(
         <UserPasswordDialog
           user={auth.user}
           onClose={() => setIsPasswordDialogOpen(false)}
@@ -532,7 +518,7 @@ function SavedAtasPage() {
       <main className="page-main saved-page-main">
         <section className="hero-panel saved-hero">
           <div>
-            <p className="panel-kicker">Banco interno</p>
+            <p className="panel-kicker">Banco de atas</p>
             <h1>Atas salvas</h1>
             <p>
               Consulte atas separadas por capítulo. Cada usuário vê apenas os capítulos
@@ -554,15 +540,15 @@ function SavedAtasPage() {
           <div className="panel-header">
             <div>
               <p className="panel-kicker">Biblioteca</p>
-              <h2>{atas.length ? `${atas.length} ata(s) nos seus capítulos` : "Nenhuma ata salva"}</h2>
+              <h2>{atas.length ?`${atas.length} ata(s) nos seus capítulos` : "Nenhuma ata salva"}</h2>
             </div>
-            <a className="soft-button standalone-link" href="/">
+            <a className="soft-button standalone-link" href="/atas/nova">
               Criar nova ata
             </a>
           </div>
 
           <div className="chapter-sections">
-            {atasByChapter.length ? (
+            {atasByChapter.length ?(
               atasByChapter.map((chapter) => (
                 <section className="chapter-section" key={chapter.key}>
                   <div className="chapter-section-header">
@@ -574,17 +560,17 @@ function SavedAtasPage() {
                   </div>
 
                   <div className="saved-card-grid">
-                    {chapter.atas.length ? (
+                    {chapter.atas.length ?(
                       chapter.atas.map((ata) => (
                         <article
                           className={`saved-card saved-card-clickable ${
-                            generatingId === ata.id ? "is-generating" : ""
+                            generatingId === ata.id ?"is-generating" : ""
                           }`}
                           key={ata.id}
                           onClick={() => handleSavedAtaAction(ata)}
                           title={
                             ata.attachmentCount > 0
-                              ? "Abrir no gerador para reenviar anexos"
+                              ?"Abrir no gerador para reenviar anexos"
                               : "Gerar PDF desta ata"
                           }
                         >
@@ -592,7 +578,7 @@ function SavedAtasPage() {
                             <span>{ata.sociedade}</span>
                             <span>
                               {generatingId === ata.id
-                                ? "Gerando PDF"
+                                ?"Gerando PDF"
                                 : `${ata.attachmentCount} anexo(s)`}
                             </span>
                           </div>
@@ -621,9 +607,9 @@ function SavedAtasPage() {
                               disabled={generatingId === ata.id}
                             >
                               {generatingId === ata.id
-                                ? "Gerando..."
+                                ?"Gerando..."
                                 : ata.attachmentCount > 0
-                                  ? "Reenviar anexos"
+                                  ?"Reenviar anexos"
                                   : "Gerar PDF"}
                             </button>
                             <a
@@ -641,7 +627,7 @@ function SavedAtasPage() {
                               }}
                               disabled={renamingId === ata.id}
                             >
-                              {renamingId === ata.id ? "Renomeando..." : "Renomear"}
+                              {renamingId === ata.id ?"Renomeando..." : "Renomear"}
                             </button>
                             <button
                               className="text-button danger"
@@ -651,7 +637,7 @@ function SavedAtasPage() {
                               }}
                               disabled={deletingId === ata.id}
                             >
-                              {deletingId === ata.id ? "Excluindo..." : "Excluir"}
+                              {deletingId === ata.id ?"Excluindo..." : "Excluir"}
                             </button>
                           </div>
                         </article>

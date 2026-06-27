@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 
 import {
   getCurrentUser,
@@ -17,7 +17,7 @@ function forbidden() {
 
 function parseId(value) {
   const id = Number.parseInt(String(value || ""), 10);
-  return Number.isSafeInteger(id) && id > 0 ? id : null;
+  return Number.isSafeInteger(id) && id > 0 ?id : null;
 }
 
 export async function PATCH(request, context) {
@@ -33,7 +33,7 @@ export async function PATCH(request, context) {
   const params = await context.params;
   const userId = parseId(params.id);
   if (!userId) {
-    return NextResponse.json({ detail: "Usuario invalido." }, { status: 400 });
+    return NextResponse.json({ detail: "Usuário inválido." }, { status: 400 });
   }
 
   try {
@@ -55,13 +55,13 @@ export async function PATCH(request, context) {
 
     const user = await updateUserManagement(currentUser, userId, payload);
     if (!user) {
-      return NextResponse.json({ detail: "Usuario nao encontrado." }, { status: 404 });
+      return NextResponse.json({ detail: "Usuário não encontrado." }, { status: 404 });
     }
 
     return NextResponse.json({ user });
   } catch (error) {
     return NextResponse.json(
-      { detail: error.message || "Nao foi possivel atualizar o usuario." },
+      { detail: error.message || "Não foi possível atualizar o usuário." },
       { status: 400 },
     );
   }

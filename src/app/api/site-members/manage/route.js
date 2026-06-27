@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 
 import {
   getCurrentUser,
@@ -64,7 +64,7 @@ export async function POST(request) {
     );
   } catch (error) {
     return NextResponse.json(
-      { detail: error.message || "Nao foi possivel cadastrar o membro do site." },
+      { detail: error.message || "Não foi possível cadastrar o membro do site." },
       { headers: noStoreHeaders(), status: 400 },
     );
   }
