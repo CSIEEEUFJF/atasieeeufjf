@@ -126,12 +126,45 @@ function decodeHtmlEntities(value) {
 function normalizeDriveFileTitle(value, fallback) {
   const decodedValue = decodeHtmlEntities(value)
     .replace(/<[^>]+>/g, " ")
+    .replace(/\s*-\s*Google Drive$/i, "")
     .replace(/\.(?:jpe?g|png|webp)$/i, "")
     .replace(/[_-]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 
   return sanitizeText(decodedValue || fallback, 160);
+}
+
+function parseTitleFromGoogleDriveFileHtml(html) {
+  const decodedHtml = decodeHtmlEntities(html);
+  const candidates = [
+    decodedHtml.match(/<meta\s+property=["']og:title["']\s+content=["']([^"']+)["']/i)?.[1],
+    decodedHtml.match(/<meta\s+content=["']([^"']+)["']\s+property=["']og:title["']/i)?.[1],
+    decodedHtml.match(/<title>([^<]+)<\/title>/i)?.[1],
+    decodedHtml.match(/aria-label=["']([^"']+\.(?:jpe?g|png|webp))["']/i)?.[1],
+  ];
+
+  return candidates
+    .map((candidate) => normalizeDriveFileTitle(candidate, ""))
+    .find(Boolean) || "";
+}
+
+async function fetchGoogleDriveFileTitle(fileId) {
+  const urls = [
+    `https://drive.google.com/file/d/${encodeURIComponent(fileId)}/view`,
+    `https://drive.google.com/uc?id=${encodeURIComponent(fileId)}&export=download`,
+  ];
+
+  for (const url of urls) {
+    const html = await fetchTextWithTimeout(url, 7000);
+    const title = parseTitleFromGoogleDriveFileHtml(html);
+
+    if (title) {
+      return title;
+    }
+  }
+
+  return "";
 }
 
 function inferFileNameNearId(html, fileId) {
@@ -205,12 +238,12 @@ async function listGoogleDriveFolderPhotoCandidates(folderUrl) {
       }
 
       const rawName = match[2] || inferFileNameNearId(html, fileId);
-      const title = normalizeDriveFileTitle(rawName, `Foto historica ${candidatesById.size + 1}`);
+      const title = normalizeDriveFileTitle(rawName, "");
 
       candidatesById.set(fileId, {
         imageUrl: thumbnailUrl(fileId),
         title,
-        year: extractYearFromText(title),
+        year: title ? extractYearFromText(title) : 0,
       });
 
       if (candidatesById.size >= MAX_DRIVE_IMPORT_PHOTOS) {
@@ -223,7 +256,33 @@ async function listGoogleDriveFolderPhotoCandidates(folderUrl) {
     }
   }
 
-  return [...candidatesById.values()];
+  const candidates = [...candidatesById.entries()];
+  const resolvedCandidates = [];
+
+  for (const [fileId, candidate] of candidates) {
+    const fetchedTitle = candidate.title || await fetchGoogleDriveFileTitle(fileId);
+    const title = normalizeDriveFileTitle(
+      fetchedTitle,
+      `Foto historica ${resolvedCandidates.length + 1}`,
+    );
+
+    resolvedCandidates.push({
+      ...candidate,
+      title,
+      year: candidate.year || extractYearFromText(title),
+    });
+  }
+
+  return resolvedCandidates.sort((firstPhoto, secondPhoto) => {
+    const firstYear = firstPhoto.year || 9999;
+    const secondYear = secondPhoto.year || 9999;
+
+    if (firstYear !== secondYear) {
+      return firstYear - secondYear;
+    }
+
+    return firstPhoto.title.localeCompare(secondPhoto.title, "pt-BR");
+  });
 }
 
 function publicHistoryPhoto(row) {
@@ -338,7 +397,7 @@ export async function listPublicHistoryPhotos() {
     where: { isPublic: true },
   });
 
-  return rows.map(publicHistoryPhoto).filter(Boolean);
+  return sortHistoryPhotoRows(rows.map(publicHistoryPhoto).filter(Boolean));
 }
 
 export async function listManagedHistoryPhotos(currentUser) {
@@ -348,7 +407,25 @@ export async function listManagedHistoryPhotos(currentUser) {
     orderBy: [{ year: "asc" }, { position: "asc" }, { id: "asc" }],
   });
 
-  return rows.map(publicHistoryPhoto).filter(Boolean);
+  return sortHistoryPhotoRows(rows.map(publicHistoryPhoto).filter(Boolean));
+}
+
+function sortHistoryPhotoRows(photos) {
+  return [...photos].sort((firstPhoto, secondPhoto) => {
+    const firstYear = Number(firstPhoto.year) || 9999;
+    const secondYear = Number(secondPhoto.year) || 9999;
+
+    if (firstYear !== secondYear) {
+      return firstYear - secondYear;
+    }
+
+    const positionDelta = (Number(firstPhoto.position) || 0) - (Number(secondPhoto.position) || 0);
+    if (positionDelta !== 0) {
+      return positionDelta;
+    }
+
+    return String(firstPhoto.title || "").localeCompare(String(secondPhoto.title || ""), "pt-BR");
+  });
 }
 
 export async function createHistoryPhoto(currentUser, payload = {}) {
@@ -373,17 +450,39 @@ export async function importHistoryPhotosFromDriveFolder(currentUser, payload = 
 
   const prisma = getPrisma();
   const existingRows = await prisma.siteHistoryPhoto.findMany({
-    select: { imageUrl: true, position: true },
+    select: { id: true, imageUrl: true, position: true, title: true, year: true },
   });
-  const existingUrls = new Set(existingRows.map((row) => sanitizeImageUrl(row.imageUrl)).filter(Boolean));
+  const existingByUrl = new Map(
+    existingRows
+      .map((row) => [sanitizeImageUrl(row.imageUrl), row])
+      .filter(([imageUrl]) => Boolean(imageUrl)),
+  );
   let nextPosition = existingRows.reduce(
     (maxPosition, row) => Math.max(maxPosition, Number(row.position) || 0),
     -1,
   ) + 1;
   const createdPhotos = [];
+  const updatedPhotos = [];
 
   for (const candidate of candidates) {
-    if (existingUrls.has(candidate.imageUrl)) {
+    const existingRow = existingByUrl.get(candidate.imageUrl);
+
+    if (existingRow) {
+      const hasGenericTitle = /^Foto historica \d+$/i.test(existingRow.title || "");
+      const shouldUpdateTitle = hasGenericTitle && candidate.title;
+      const shouldUpdateYear = !existingRow.year && candidate.year;
+
+      if (shouldUpdateTitle || shouldUpdateYear) {
+        const updatedRow = await prisma.siteHistoryPhoto.update({
+          data: {
+            ...(shouldUpdateTitle ? { title: candidate.title } : {}),
+            ...(shouldUpdateYear ? { year: candidate.year } : {}),
+          },
+          where: { id: existingRow.id },
+        });
+        updatedPhotos.push(publicHistoryPhoto(updatedRow));
+      }
+
       continue;
     }
 
@@ -401,7 +500,7 @@ export async function importHistoryPhotosFromDriveFolder(currentUser, payload = 
       },
     });
 
-    existingUrls.add(candidate.imageUrl);
+    existingByUrl.set(candidate.imageUrl, row);
     createdPhotos.push(publicHistoryPhoto(row));
     nextPosition += 1;
   }
@@ -409,7 +508,8 @@ export async function importHistoryPhotosFromDriveFolder(currentUser, payload = 
   return {
     created: createdPhotos,
     found: candidates.length,
-    skipped: candidates.length - createdPhotos.length,
+    skipped: candidates.length - createdPhotos.length - updatedPhotos.length,
+    updated: updatedPhotos,
   };
 }
 

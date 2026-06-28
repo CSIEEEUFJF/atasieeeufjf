@@ -516,7 +516,7 @@ export default function SiteAdminPage({ user }) {
       await loadAll();
       setStatus({
         tone: "success",
-        text: `${result.created?.length || 0} foto(s) importada(s). ${result.skipped || 0} ja existiam.`,
+        text: `${result.created?.length || 0} foto(s) importada(s), ${result.updated?.length || 0} atualizada(s). ${result.skipped || 0} ja existiam.`,
       });
     } catch (error) {
       setStatus({ tone: "error", text: error.message || "Nao foi possivel importar a pasta." });
