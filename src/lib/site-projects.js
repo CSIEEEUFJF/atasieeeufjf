@@ -209,6 +209,15 @@ async function resolveGalleryImages(payload = {}) {
 
 function normalizeChapter(value) {
   const cleanValue = String(value || "").trim();
+  if (SITE_PROJECT_CHAPTER_KEYS.has(cleanValue)) {
+    return cleanValue;
+  }
+
+  const upperValue = cleanValue.toUpperCase();
+  if (SITE_PROJECT_CHAPTER_KEYS.has(upperValue)) {
+    return upperValue;
+  }
+
   const chapter = normalizarSociedadeChave(cleanValue, "");
   return SITE_PROJECT_CHAPTER_KEYS.has(chapter) ? chapter : "Ramo";
 }

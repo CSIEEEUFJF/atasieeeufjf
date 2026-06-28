@@ -26,7 +26,9 @@ const FALLBACK_SOCIETIES = [
   { chave: "AESS", nome: "AESS - Aerospace and Electronic Systems Society" },
   { chave: "APS", nome: "APS - Antennas and Propagation Society" },
   { chave: "EdSoc", nome: "EdSoc - Education Society" },
+  { chave: "SIGHT", nome: "SIGHT - Special Interest Group on Humanitarian Technology" },
   { chave: "VTS", nome: "VTS - Vehicular Technology Society" },
+  { chave: "WIE", nome: "WIE - Women in Engineering" },
   { chave: "Ramo", nome: "Ramo" },
 ];
 

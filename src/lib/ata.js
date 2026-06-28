@@ -48,9 +48,17 @@ export const SOCIEDADES = {
     folder: path.join(ROOT_DIR, "classes", "Ramo Geral"),
     documentclass: "ataIEEE",
   },
+  SIGHT: {
+    folder: path.join(ROOT_DIR, "classes", "SIGHT"),
+    documentclass: "ataSIGHT",
+  },
   VTS: {
     folder: path.join(ROOT_DIR, "classes", "VTS"),
     documentclass: "ataVTS",
+  },
+  WIE: {
+    folder: path.join(ROOT_DIR, "classes", "WIE"),
+    documentclass: "ataWIE",
   },
 };
 
@@ -65,12 +73,17 @@ export const SOCIEDADE_LABELS = {
   PES: "PES - Power & Energy Society",
   RAS: "RAS - Robotics and Automation Society",
   Ramo: "Ramo",
+  SIGHT: "SIGHT - Special Interest Group on Humanitarian Technology",
   VTS: "VTS - Vehicular Technology Society",
+  WIE: "WIE - Women in Engineering",
 };
 
 export const SOCIEDADE_ALIASES = {
   CASS: "CAS",
   "Circuits and Systems Society": "CAS",
+  "IEEE SIGHT": "SIGHT",
+  "Special Interest Group on Humanitarian Technology": "SIGHT",
+  "Women in Engineering": "WIE",
   "Ramo Geral": "Ramo",
   "Ramo Geral IEEE": "Ramo",
 };
