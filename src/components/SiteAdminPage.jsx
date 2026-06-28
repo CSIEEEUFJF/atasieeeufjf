@@ -34,6 +34,7 @@ const MEMBER_ROLES = [
 function emptyMemberForm() {
   return {
     bio: "",
+    bioEn: "",
     chapters: [],
     id: null,
     isPublic: true,
@@ -638,6 +639,10 @@ export default function SiteAdminPage({ user }) {
                   <label className="field field-span-2">
                     <span>Biografia</span>
                     <textarea value={memberForm.bio} onChange={(event) => updateMember("bio", event.target.value)} />
+                  </label>
+                  <label className="field field-span-2">
+                    <span>Biografia em inglês</span>
+                    <textarea value={memberForm.bioEn} onChange={(event) => updateMember("bioEn", event.target.value)} />
                   </label>
                 </div>
 

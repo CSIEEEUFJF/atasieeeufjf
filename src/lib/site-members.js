@@ -117,6 +117,7 @@ function publicSiteMember(row) {
 
   return {
     bio: row.bio || "",
+    bioEn: row.bioEn || "",
     chapters: normalizeChapters(row.chapters),
     id: row.id,
     isPublic: Boolean(row.isPublic),
@@ -144,6 +145,7 @@ function sanitizeSiteMemberPayload(payload = {}) {
 
   return {
     bio: sanitizeText(payload.bio, 600),
+    bioEn: sanitizeText(payload.bioEn, 600),
     chapters: normalizeChapters(payload.chapters),
     isPublic: typeof payload.isPublic === "boolean" ?Boolean(payload.isPublic) : true,
     name: cleanName,
@@ -168,6 +170,10 @@ function sanitizePartialSiteMemberPayload(payload = {}) {
 
   if (Object.prototype.hasOwnProperty.call(payload, "bio")) {
     data.bio = sanitizeText(payload.bio, 600);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, "bioEn")) {
+    data.bioEn = sanitizeText(payload.bioEn, 600);
   }
 
   if (Object.prototype.hasOwnProperty.call(payload, "chapters")) {
