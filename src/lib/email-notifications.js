@@ -93,10 +93,24 @@ function chapterLabel(chapter) {
 }
 
 function emailShell({ children, eyebrow, preview, title }) {
-  const logoUrl = `${SYSTEM_BASE_URL}/ramo-ieee-ufjf.png`;
+  const logoUrl = `${SYSTEM_BASE_URL}/ramo-ieee-ufjf-white.png`;
 
   return `
     <div style="margin:0; padding:0; background:#f3f7fb;">
+      <style>
+        @font-face {
+          font-family: "Formata";
+          font-style: normal;
+          font-weight: 400;
+          src: url("${SYSTEM_BASE_URL}/@font/formata-regular.ttf") format("truetype");
+        }
+        @font-face {
+          font-family: "Formata";
+          font-style: normal;
+          font-weight: 700 900;
+          src: url("${SYSTEM_BASE_URL}/@font/formata-bold.ttf") format("truetype");
+        }
+      </style>
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse; background:#f3f7fb;">
         <tr>
           <td align="center" style="padding:32px 16px;">
@@ -109,29 +123,29 @@ function emailShell({ children, eyebrow, preview, title }) {
                         <img src="${logoUrl}" width="44" height="44" alt="IEEE UFJF" style="display:block; width:44px; height:44px; object-fit:contain; border:0;">
                       </td>
                       <td style="vertical-align:middle; padding-left:10px;">
-                        <div style="font-family:Arial,sans-serif; font-size:16px; font-weight:800; line-height:1.15; color:#ffffff;">Universidade Federal de Juiz de Fora</div>
-                        <div style="font-family:Arial,sans-serif; font-size:14px; font-weight:700; line-height:1.2; color:#ffffff;">IEEE Student Branch</div>
+                        <div style="font-family:Formata,Arial,sans-serif; font-size:16px; font-weight:800; line-height:1.15; color:#ffffff;">Universidade Federal de Juiz de Fora</div>
+                        <div style="font-family:Formata,Arial,sans-serif; font-size:14px; font-weight:700; line-height:1.2; color:#ffffff;">IEEE Student Branch</div>
                       </td>
                       <td style="width:1px; padding:0 16px;">
                         <div style="width:1px; height:40px; background:rgba(255,255,255,.72);"></div>
                       </td>
                       <td style="vertical-align:middle; white-space:nowrap;">
-                        <div style="font-family:Arial,sans-serif; font-size:17px; font-weight:800; line-height:1.2; color:#ffffff;">Sistema Interno</div>
+                        <div style="font-family:Formata,Arial,sans-serif; font-size:17px; font-weight:800; line-height:1.2; color:#ffffff;">Sistema Interno</div>
                       </td>
                     </tr>
                   </table>
-                  <div style="margin-top:22px; font-family:Arial,sans-serif; font-size:12px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; opacity:.88;">${escapeHtml(eyebrow)}</div>
-                  <h1 style="margin:8px 0 0; font-family:Arial,sans-serif; font-size:24px; line-height:1.2; color:#ffffff;">${escapeHtml(title)}</h1>
-                  ${preview ?`<p style="margin:8px 0 0; font-family:Arial,sans-serif; font-size:14px; line-height:1.5; color:#e8f3fb;">${escapeHtml(preview)}</p>` : ""}
+                  <div style="margin-top:22px; font-family:Formata,Arial,sans-serif; font-size:12px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; opacity:.88;">${escapeHtml(eyebrow)}</div>
+                  <h1 style="margin:8px 0 0; font-family:Formata,Arial,sans-serif; font-size:24px; line-height:1.2; color:#ffffff;">${escapeHtml(title)}</h1>
+                  ${preview ?`<p style="margin:8px 0 0; font-family:Formata,Arial,sans-serif; font-size:14px; line-height:1.5; color:#e8f3fb;">${escapeHtml(preview)}</p>` : ""}
                 </td>
               </tr>
               <tr>
-                <td style="padding:26px 28px; font-family:Arial,sans-serif; color:#17233c; line-height:1.5;">
+                <td style="padding:26px 28px; font-family:Formata,Arial,sans-serif; color:#17233c; line-height:1.5;">
                   ${children}
                 </td>
               </tr>
               <tr>
-                <td style="padding:16px 28px; background:#f8fbfd; border-top:1px solid #d7e5f0; font-family:Arial,sans-serif; color:#607089; font-size:12px;">
+                <td style="padding:16px 28px; background:#f8fbfd; border-top:1px solid #d7e5f0; font-family:Formata,Arial,sans-serif; color:#607089; font-size:12px;">
                   Sistema Interno IEEE UFJF
                 </td>
               </tr>
@@ -148,8 +162,8 @@ function detailTable(rows) {
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse; margin:0 0 18px;">
       ${rows.map(([label, value]) => `
         <tr>
-          <td style="width:170px; padding:10px 0; border-bottom:1px solid #e6eef5; color:#42526a; font-family:Arial,sans-serif; font-size:13px; font-weight:700;">${escapeHtml(label)}</td>
-          <td style="padding:10px 0; border-bottom:1px solid #e6eef5; color:#17233c; font-family:Arial,sans-serif; font-size:14px;">${escapeHtml(value)}</td>
+          <td style="width:170px; padding:10px 0; border-bottom:1px solid #e6eef5; color:#42526a; font-family:Formata,Arial,sans-serif; font-size:13px; font-weight:700;">${escapeHtml(label)}</td>
+          <td style="padding:10px 0; border-bottom:1px solid #e6eef5; color:#17233c; font-family:Formata,Arial,sans-serif; font-size:14px;">${escapeHtml(value)}</td>
         </tr>
       `).join("")}
     </table>
@@ -159,7 +173,7 @@ function detailTable(rows) {
 function actionButton({ href, label }) {
   return `
     <p style="margin:24px 0 0;">
-      <a href="${escapeHtml(href)}" style="display:inline-block; padding:12px 18px; border-radius:10px; background:#00629B; color:#ffffff; font-family:Arial,sans-serif; font-size:14px; font-weight:700; text-decoration:none;">
+      <a href="${escapeHtml(href)}" style="display:inline-block; padding:12px 18px; border-radius:10px; background:#00629B; color:#ffffff; font-family:Formata,Arial,sans-serif; font-size:14px; font-weight:700; text-decoration:none;">
         ${escapeHtml(label)}
       </a>
     </p>
@@ -277,11 +291,11 @@ function taskEmailHtml({ creator, recipient, task }) {
     preview: "Uma nova tarefa foi cadastrada para o seu capítulo.",
     title: "Nova tarefa cadastrada",
     children: `
-      <p style="margin:0 0 18px; font-family:Arial,sans-serif; font-size:15px; color:#17233c;">${escapeHtml(taskGreeting(recipient, task))}</p>
+      <p style="margin:0 0 18px; font-family:Formata,Arial,sans-serif; font-size:15px; color:#17233c;">${escapeHtml(taskGreeting(recipient, task))}</p>
       ${detailTable(rows)}
       <div style="margin-top:18px;">
-        <div style="color:#42526a; font-family:Arial,sans-serif; font-size:13px; font-weight:700; margin-bottom:6px;">Descrição</div>
-        <div style="padding:14px 16px; border:1px solid #d7e5f0; border-radius:12px; background:#f8fbfd; color:#17233c; font-family:Arial,sans-serif; font-size:14px;">${escapeHtml(description)}</div>
+        <div style="color:#42526a; font-family:Formata,Arial,sans-serif; font-size:13px; font-weight:700; margin-bottom:6px;">Descrição</div>
+        <div style="padding:14px 16px; border:1px solid #d7e5f0; border-radius:12px; background:#f8fbfd; color:#17233c; font-family:Formata,Arial,sans-serif; font-size:14px;">${escapeHtml(description)}</div>
       </div>
       ${actionButton({ href: `${SYSTEM_BASE_URL}/tarefas`, label: "Abrir tarefas" })}
     `,
@@ -312,12 +326,12 @@ function welcomeEmailHtml({ initialPassword, user }) {
     preview: "Seu acesso ao Sistema Interno IEEE UFJF foi criado.",
     title: "Bem-vindo ao Sistema Interno",
     children: `
-      <p style="margin:0 0 18px; font-family:Arial,sans-serif; font-size:15px;">Olá, ${escapeHtml(user.name)}. Seu acesso ao sistema interno foi criado.</p>
+      <p style="margin:0 0 18px; font-family:Formata,Arial,sans-serif; font-size:15px;">Olá, ${escapeHtml(user.name)}. Seu acesso ao sistema interno foi criado.</p>
       ${detailTable([
         ["Usuário", user.username],
         ["Senha inicial", initialPassword],
       ])}
-      <p style="margin:16px 0 0; color:#42526a; font-family:Arial,sans-serif; font-size:14px;">Por segurança, troque sua senha no primeiro acesso clicando no seu nome no canto superior do sistema.</p>
+      <p style="margin:16px 0 0; color:#42526a; font-family:Formata,Arial,sans-serif; font-size:14px;">Por segurança, troque sua senha no primeiro acesso clicando no seu nome no canto superior do sistema.</p>
       ${actionButton({ href: `${SYSTEM_BASE_URL}/login`, label: "Acessar o sistema" })}
     `,
   });
@@ -370,10 +384,10 @@ function eventEmailHtml({ creator, event }) {
     title: "Novo evento no calendário",
     children: `
       ${detailTable(rows)}
-      ${recurrence ?`<p style="margin:16px 0; color:#00629B; font-family:Arial,sans-serif; font-size:14px; font-weight:700;">${escapeHtml(recurrence)}</p>` : ""}
+      ${recurrence ?`<p style="margin:16px 0; color:#00629B; font-family:Formata,Arial,sans-serif; font-size:14px; font-weight:700;">${escapeHtml(recurrence)}</p>` : ""}
       <div style="margin-top:18px;">
-        <div style="color:#42526a; font-family:Arial,sans-serif; font-size:13px; font-weight:700; margin-bottom:6px;">Descrição</div>
-        <div style="padding:14px 16px; border:1px solid #d7e5f0; border-radius:12px; background:#f8fbfd; color:#17233c; font-family:Arial,sans-serif; font-size:14px;">${escapeHtml(event.description || "Sem descrição.")}</div>
+        <div style="color:#42526a; font-family:Formata,Arial,sans-serif; font-size:13px; font-weight:700; margin-bottom:6px;">Descrição</div>
+        <div style="padding:14px 16px; border:1px solid #d7e5f0; border-radius:12px; background:#f8fbfd; color:#17233c; font-family:Formata,Arial,sans-serif; font-size:14px;">${escapeHtml(event.description || "Sem descrição.")}</div>
       </div>
       ${actionButton({ href: `${SYSTEM_BASE_URL}/calendario`, label: "Abrir calendário" })}
     `,
@@ -487,3 +501,4 @@ export async function notifyMembersAboutCreatedEvent({ creator, events }) {
 
   return sentStats(await sendEmailBatches(messages));
 }
+
