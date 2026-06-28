@@ -77,16 +77,18 @@ model SiteMember {
 }
 
 model SiteProject {
-  id        Int      @id @default(autoincrement())
-  title     String
-  subtitle  String   @default("")
-  chapter   String   @default("Ramo")
-  imageUrl  String   @default("") @map("image_url")
-  linkUrl   String   @default("") @map("link_url")
-  isPublic  Boolean  @default(true) @map("is_public")
-  position  Int      @default(0)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id             Int      @id @default(autoincrement())
+  title          String
+  subtitle       String   @default("")
+  chapter        String   @default("Ramo")
+  imageUrl       String   @default("") @map("image_url")
+  linkUrl        String   @default("") @map("link_url")
+  driveFolderUrl String   @default("") @map("drive_folder_url")
+  galleryImages  Json     @default("[]") @map("gallery_images")
+  isPublic       Boolean  @default(true) @map("is_public")
+  position       Int      @default(0)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   @@index([isPublic, position, title], map: "idx_site_projects_public_order")
   @@map("site_projects")

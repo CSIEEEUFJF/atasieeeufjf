@@ -3,6 +3,7 @@ import { canManageMembers } from "./auth";
 import { getPrisma } from "./db";
 
 const CHAPTER_KEYS = Object.keys(SOCIEDADES);
+const MAX_GALLERY_IMAGES = 24;
 
 function sanitizeText(value, maxLength = 300) {
   if (typeof value !== "string") {
@@ -32,6 +33,26 @@ function getGoogleDriveFileId(value) {
   }
 }
 
+function getGoogleDriveFolderId(value) {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+    if (!["drive.google.com", "drive.usercontent.google.com"].includes(host)) {
+      return "";
+    }
+
+    const queryId = url.searchParams.get("id")?.trim();
+    if (queryId) {
+      return queryId;
+    }
+
+    const folderMatch = url.pathname.match(/\/folders\/([^/]+)/);
+    return folderMatch?.[1] ? decodeURIComponent(folderMatch[1]).trim() : "";
+  } catch {
+    return "";
+  }
+}
+
 function sanitizeUrl(value) {
   const cleanValue = sanitizeText(value, 700);
   if (!cleanValue) {
@@ -51,6 +72,53 @@ function sanitizeUrl(value) {
   }
 }
 
+function sanitizeDriveFolderUrl(value) {
+  const cleanValue = sanitizeText(value, 700);
+  if (!cleanValue) {
+    return "";
+  }
+
+  const folderId = getGoogleDriveFolderId(cleanValue);
+  if (folderId) {
+    return `https://drive.google.com/drive/folders/${encodeURIComponent(folderId)}`;
+  }
+
+  try {
+    const url = new URL(cleanValue);
+    const isDriveHost = ["drive.google.com", "drive.usercontent.google.com"].includes(url.hostname.toLowerCase());
+    return isDriveHost && ["http:", "https:"].includes(url.protocol) ? url.toString() : "";
+  } catch {
+    return "";
+  }
+}
+
+function sanitizeGalleryImages(value) {
+  const rawImages = Array.isArray(value)
+    ? value
+    : String(value || "")
+        .split(/\r?\n|,/)
+        .map((item) => item.trim());
+
+  const images = [];
+  const seen = new Set();
+
+  for (const rawImage of rawImages) {
+    const imageUrl = sanitizeUrl(rawImage);
+    if (!imageUrl || seen.has(imageUrl)) {
+      continue;
+    }
+
+    seen.add(imageUrl);
+    images.push(imageUrl);
+
+    if (images.length >= MAX_GALLERY_IMAGES) {
+      break;
+    }
+  }
+
+  return images;
+}
+
 function normalizeChapter(value) {
   const cleanValue = String(value || "").trim();
   const chapter = normalizarSociedadeChave(cleanValue, "");
@@ -64,6 +132,8 @@ function publicSiteProject(row) {
 
   return {
     chapter: normalizeChapter(row.chapter),
+    driveFolderUrl: sanitizeDriveFolderUrl(row.driveFolderUrl),
+    galleryImages: sanitizeGalleryImages(row.galleryImages),
     id: row.id,
     imageUrl: sanitizeUrl(row.imageUrl),
     isPublic: Boolean(row.isPublic),
@@ -88,6 +158,8 @@ function sanitizeSiteProjectPayload(payload = {}) {
 
   return {
     chapter: normalizeChapter(payload.chapter),
+    driveFolderUrl: sanitizeDriveFolderUrl(payload.driveFolderUrl),
+    galleryImages: sanitizeGalleryImages(payload.galleryImages),
     imageUrl: sanitizeUrl(payload.imageUrl),
     isPublic: typeof payload.isPublic === "boolean" ? Boolean(payload.isPublic) : true,
     linkUrl: sanitizeUrl(payload.linkUrl),
@@ -117,6 +189,14 @@ function sanitizePartialSiteProjectPayload(payload = {}) {
 
   if (Object.prototype.hasOwnProperty.call(payload, "imageUrl")) {
     data.imageUrl = sanitizeUrl(payload.imageUrl);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, "driveFolderUrl")) {
+    data.driveFolderUrl = sanitizeDriveFolderUrl(payload.driveFolderUrl);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, "galleryImages")) {
+    data.galleryImages = sanitizeGalleryImages(payload.galleryImages);
   }
 
   if (Object.prototype.hasOwnProperty.call(payload, "linkUrl")) {
