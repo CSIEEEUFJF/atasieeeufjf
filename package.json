@@ -17,6 +17,7 @@
     "db:studio": "prisma studio",
     "members:import-contacts": "node scripts/import-member-contacts.mjs",
     "members:copy-ras-to-cas": "node scripts/add-cas-to-ras-members.mjs",
+    "site-projects:seed-chapters": "node scripts/seed-site-chapter-projects.mjs",
     "vendor:texlive": "node scripts/vendor-texlive.mjs"
   },
   "dependencies": {

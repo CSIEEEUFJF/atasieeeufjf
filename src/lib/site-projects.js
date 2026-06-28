@@ -230,6 +230,8 @@ function publicSiteProject(row) {
     photoPositionY: clampNumber(row.photoPositionY, 0, 100, 50),
     photoZoom: clampNumber(row.photoZoom, 100, 200, 100),
     position: row.position || 0,
+    showOnChapter: typeof row.showOnChapter === "boolean" ? row.showOnChapter : true,
+    showOnHome: typeof row.showOnHome === "boolean" ? row.showOnHome : true,
     subtitle: row.subtitle || "",
     title: row.title,
   };
@@ -261,6 +263,8 @@ async function sanitizeSiteProjectPayload(payload = {}) {
     photoPositionY: clampNumber(payload.photoPositionY, 0, 100, 50),
     photoZoom: clampNumber(payload.photoZoom, 100, 200, 100),
     position: Number.isSafeInteger(Number(payload.position)) ? Number(payload.position) : 0,
+    showOnChapter: typeof payload.showOnChapter === "boolean" ? Boolean(payload.showOnChapter) : true,
+    showOnHome: typeof payload.showOnHome === "boolean" ? Boolean(payload.showOnHome) : true,
     subtitle: sanitizeText(payload.subtitle, 260),
     title,
   };
@@ -327,6 +331,14 @@ async function sanitizePartialSiteProjectPayload(payload = {}) {
 
   if (Object.prototype.hasOwnProperty.call(payload, "position")) {
     data.position = Number.isSafeInteger(Number(payload.position)) ? Number(payload.position) : 0;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, "showOnHome")) {
+    data.showOnHome = Boolean(payload.showOnHome);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, "showOnChapter")) {
+    data.showOnChapter = Boolean(payload.showOnChapter);
   }
 
   if (!Object.keys(data).length) {

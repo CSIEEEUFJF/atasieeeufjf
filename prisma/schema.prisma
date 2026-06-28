@@ -89,6 +89,8 @@ model SiteProject {
   photoPositionX Int      @default(50) @map("photo_position_x")
   photoPositionY Int      @default(50) @map("photo_position_y")
   photoZoom      Int      @default(100) @map("photo_zoom")
+  showOnHome     Boolean  @default(true) @map("show_on_home")
+  showOnChapter  Boolean  @default(true) @map("show_on_chapter")
   isPublic       Boolean  @default(true) @map("is_public")
   position       Int      @default(0)
   createdAt      DateTime @default(now()) @map("created_at")
