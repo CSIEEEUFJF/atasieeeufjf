@@ -209,6 +209,7 @@ export default function SiteAdminPage({ user }) {
   const [projectForm, setProjectForm] = useState(emptyProjectForm);
   const [photoForm, setPhotoForm] = useState(emptyPhotoForm);
   const [historyPhotoForm, setHistoryPhotoForm] = useState(emptyHistoryPhotoForm);
+  const [historyPhotoFolderUrl, setHistoryPhotoFolderUrl] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
@@ -496,6 +497,29 @@ export default function SiteAdminPage({ user }) {
       setStatus({ tone: "success", text: isEditing ? "Foto historica atualizada." : "Foto historica adicionada." });
     } catch (error) {
       setStatus({ tone: "error", text: error.message || "Nao foi possivel salvar a foto historica." });
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function importHistoryPhotoFolder(event) {
+    event.preventDefault();
+    setIsSaving(true);
+    setStatus({ tone: "loading", text: "Importando fotos historicas do Google Drive." });
+
+    try {
+      const result = await submitJson(
+        "/api/site-history-photos/manage/import",
+        { driveFolderUrl: historyPhotoFolderUrl },
+        "POST",
+      );
+      await loadAll();
+      setStatus({
+        tone: "success",
+        text: `${result.created?.length || 0} foto(s) importada(s). ${result.skipped || 0} ja existiam.`,
+      });
+    } catch (error) {
+      setStatus({ tone: "error", text: error.message || "Nao foi possivel importar a pasta." });
     } finally {
       setIsSaving(false);
     }
@@ -939,6 +963,33 @@ export default function SiteAdminPage({ user }) {
                 <div className="site-admin-form-actions">
                   <button className="primary-button" disabled={isSaving || !historyPhotoForm.imageUrl}>{historyPhotoForm.id ? "Salvar foto" : "Adicionar foto"}</button>
                   {historyPhotoForm.id ? <button className="soft-button" type="button" onClick={() => setHistoryPhotoForm(emptyHistoryPhotoForm())}>Cancelar edicao</button> : null}
+                </div>
+              </form>
+            </article>
+
+            <article className="panel">
+              <div className="section-heading">
+                <p className="panel-kicker">Importar pasta</p>
+                <h2>Sincronizar Google Drive</h2>
+                <p>
+                  Use nomes como RNR 2024 Curitiba. O sistema usa o nome do arquivo como titulo e extrai o ano automaticamente.
+                </p>
+              </div>
+
+              <form className="internal-form" onSubmit={importHistoryPhotoFolder}>
+                <label className="field">
+                  <span>Pasta de fotos historicas</span>
+                  <input
+                    value={historyPhotoFolderUrl}
+                    onChange={(event) => setHistoryPhotoFolderUrl(event.target.value)}
+                    placeholder="https://drive.google.com/drive/folders/..."
+                    required
+                  />
+                </label>
+                <div className="site-admin-form-actions">
+                  <button className="primary-button" disabled={isSaving || !historyPhotoFolderUrl}>
+                    Importar fotos da pasta
+                  </button>
                 </div>
               </form>
             </article>
