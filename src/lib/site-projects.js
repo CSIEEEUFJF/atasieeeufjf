@@ -13,6 +13,15 @@ function sanitizeText(value, maxLength = 300) {
   return value.replace(/\s+/g, " ").trim().slice(0, maxLength);
 }
 
+function clampNumber(value, min, max, fallback) {
+  const numberValue = Number(value);
+  if (!Number.isFinite(numberValue)) {
+    return fallback;
+  }
+
+  return Math.min(max, Math.max(min, Math.round(numberValue)));
+}
+
 function getGoogleDriveFileId(value) {
   try {
     const url = new URL(value);
@@ -210,12 +219,16 @@ function publicSiteProject(row) {
 
   return {
     chapter: normalizeChapter(row.chapter),
+    description: row.description || "",
     driveFolderUrl: sanitizeDriveFolderUrl(row.driveFolderUrl),
     galleryImages: sanitizeGalleryImages(row.galleryImages),
     id: row.id,
     imageUrl: sanitizeUrl(row.imageUrl),
     isPublic: Boolean(row.isPublic),
     linkUrl: sanitizeUrl(row.linkUrl),
+    photoPositionX: clampNumber(row.photoPositionX, 0, 100, 50),
+    photoPositionY: clampNumber(row.photoPositionY, 0, 100, 50),
+    photoZoom: clampNumber(row.photoZoom, 100, 200, 100),
     position: row.position || 0,
     subtitle: row.subtitle || "",
     title: row.title,
@@ -238,11 +251,15 @@ async function sanitizeSiteProjectPayload(payload = {}) {
 
   return {
     chapter: normalizeChapter(payload.chapter),
+    description: sanitizeText(payload.description, 900),
     driveFolderUrl,
     galleryImages: await resolveGalleryImages({ ...payload, driveFolderUrl }),
     imageUrl: sanitizeUrl(payload.imageUrl),
     isPublic: typeof payload.isPublic === "boolean" ? Boolean(payload.isPublic) : true,
     linkUrl: sanitizeUrl(payload.linkUrl),
+    photoPositionX: clampNumber(payload.photoPositionX, 0, 100, 50),
+    photoPositionY: clampNumber(payload.photoPositionY, 0, 100, 50),
+    photoZoom: clampNumber(payload.photoZoom, 100, 200, 100),
     position: Number.isSafeInteger(Number(payload.position)) ? Number(payload.position) : 0,
     subtitle: sanitizeText(payload.subtitle, 260),
     title,
@@ -261,6 +278,10 @@ async function sanitizePartialSiteProjectPayload(payload = {}) {
 
   if (Object.prototype.hasOwnProperty.call(payload, "subtitle")) {
     data.subtitle = sanitizeText(payload.subtitle, 260);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, "description")) {
+    data.description = sanitizeText(payload.description, 900);
   }
 
   if (Object.prototype.hasOwnProperty.call(payload, "chapter")) {
@@ -290,6 +311,18 @@ async function sanitizePartialSiteProjectPayload(payload = {}) {
 
   if (Object.prototype.hasOwnProperty.call(payload, "isPublic")) {
     data.isPublic = Boolean(payload.isPublic);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, "photoPositionX")) {
+    data.photoPositionX = clampNumber(payload.photoPositionX, 0, 100, 50);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, "photoPositionY")) {
+    data.photoPositionY = clampNumber(payload.photoPositionY, 0, 100, 50);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, "photoZoom")) {
+    data.photoZoom = clampNumber(payload.photoZoom, 100, 200, 100);
   }
 
   if (Object.prototype.hasOwnProperty.call(payload, "position")) {
