@@ -432,6 +432,12 @@ export default function HomeDashboard({ demoMode = false } = {}) {
       text: "Veja os horários agendados e eventos do Ramo e dos capítulos.",
     },
     {
+      href: demoMode ?"/demo" : "/arquivos",
+      kicker: "Arquivos",
+      title: "Armazenamento",
+      text: "Envie e baixe arquivos pessoais do sistema interno.",
+    },
+    {
       href: demoMode ?"/demo/diretoria" : "/diretoria",
       kicker: "Gestão",
       title: "Diretoria",

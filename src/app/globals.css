@@ -179,6 +179,63 @@ html[data-theme="dark"] .loading-ball {
   line-height: 1.65;
 }
 
+.offline-page {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 28px;
+  background:
+    radial-gradient(circle at top left, rgba(0, 98, 155, 0.12), transparent 34rem),
+    var(--off-white);
+}
+
+.offline-card {
+  display: grid;
+  width: min(100%, 860px);
+  gap: 34px;
+  padding: clamp(28px, 5vw, 56px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.offline-brand {
+  justify-content: flex-start;
+  color: var(--text-strong);
+}
+
+.offline-brand .home-branch-divider {
+  background: var(--border-strong);
+}
+
+.offline-content h1 {
+  max-width: 720px;
+  margin: 14px 0 16px;
+  color: var(--text-strong);
+  font-size: clamp(2.4rem, 7vw, 5rem);
+  line-height: 0.98;
+}
+
+.offline-content p:last-child {
+  max-width: 620px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+.offline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.offline-actions .primary-button,
+.offline-actions .soft-button {
+  width: auto;
+}
+
 .auth-form {
   display: flex;
   flex-direction: column;
@@ -1538,6 +1595,69 @@ html[data-theme="dark"] .saved-card-topline span {
   align-items: start;
 }
 
+.files-page-main {
+  max-width: 1280px;
+}
+
+.files-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.78fr) minmax(0, 1.22fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.file-upload-panel {
+  position: sticky;
+  top: 94px;
+}
+
+.file-list {
+  display: grid;
+  gap: 14px;
+}
+
+.file-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 16px;
+  border: 1px solid rgba(0, 98, 155, 0.14);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: var(--shadow-soft);
+}
+
+.file-row strong {
+  display: block;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+
+.file-row span {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+.file-row p {
+  margin: 8px 0 0;
+  color: var(--text);
+}
+
+.file-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.danger-text {
+  color: #ab4435;
+}
+
 .member-create-dialog {
   width: min(100%, 620px);
   max-height: min(880px, calc(100vh - 48px));
@@ -2195,7 +2315,7 @@ html[data-theme="dark"] .pdf-progress {
 }
 
 .home-action-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .home-action-grid .board-action-card {
@@ -2662,6 +2782,7 @@ html[data-theme="dark"] .soft-button:hover,
 html[data-theme="dark"] .sidebar-action-list .ghost-button,
 html[data-theme="dark"] .output-pill,
 html[data-theme="dark"] .registered-member-picker,
+html[data-theme="dark"] .file-row,
 html[data-theme="dark"] .chapter-section,
 html[data-theme="dark"] .member-admin-toggle,
 html[data-theme="dark"] .chapter-checklist.compact,
@@ -2698,6 +2819,10 @@ html[data-theme="dark"] .field textarea:focus {
   }
 
   .internal-create-panel {
+    position: static;
+  }
+
+  .file-upload-panel {
     position: static;
   }
 }
@@ -2937,6 +3062,15 @@ html[data-theme="dark"] .field textarea:focus {
 
   .member-metrics-row span {
     justify-items: start;
+  }
+
+  .files-layout,
+  .file-row {
+    grid-template-columns: 1fr;
+  }
+
+  .file-row-actions {
+    justify-content: flex-start;
   }
 
   .internal-toolbar {

@@ -850,6 +850,7 @@ export default function InternalDashboard({ page = "tasks", demoMode = false }) 
           <li><a href={demoMode ?"/demo/atas" : "/atas"}>Atas</a></li>
           <li><a href={demoMode ?"/demo/tarefas" : "/tarefas"} aria-current={activeTab === "tasks" ?"page" : undefined}>Tarefas</a></li>
           <li><a href={demoMode ?"/demo/calendario" : "/calendario"} aria-current={activeTab === "calendar" ?"page" : undefined}>Calendário</a></li>
+          <li><a href={demoMode ?"/demo" : "/arquivos"}>Arquivos</a></li>
           {auth.user.canManageMembers ?<li><a href={demoMode ?"/demo/diretoria" : "/diretoria"}>Diretoria</a></li> : null}
         </ul>
 

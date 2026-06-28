@@ -26,6 +26,7 @@ model User {
   createdTasks     InternalTask[]  @relation("InternalTaskCreator")
   chapters         UserChapter[]
   memberContact    MemberContact?
+  internalFiles     InternalFile[]  @relation("InternalFileOwner")
   sessions         Session[]
 
   @@map("users")
@@ -153,6 +154,26 @@ model AtaAttachment {
 
   @@index([ataId, position], map: "idx_attachments_ata_position")
   @@map("ata_attachments")
+}
+
+model InternalFile {
+  id           Int      @id @default(autoincrement())
+  ownerId      Int      @map("owner_id")
+  originalName String   @map("original_name")
+  storedName   String   @unique @map("stored_name")
+  storageKey   String   @unique @map("storage_key")
+  mimeType     String   @default("application/octet-stream") @map("mime_type")
+  extension    String   @default("")
+  category     String   @default("other")
+  size         Int      @default(0)
+  checksum     String   @default("")
+  description  String   @default("")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  owner        User     @relation("InternalFileOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId, createdAt], map: "idx_internal_files_owner_created")
+  @@map("internal_files")
 }
 
 model InternalTask {
