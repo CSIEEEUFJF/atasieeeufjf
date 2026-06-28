@@ -3,6 +3,7 @@ import { canManageMembers } from "./auth";
 import { getPrisma } from "./db";
 
 const CHAPTER_KEYS = Object.keys(SOCIEDADES);
+const SITE_PROJECT_CHAPTER_KEYS = new Set([...CHAPTER_KEYS, "SIGHT", "WIE"]);
 const MAX_GALLERY_IMAGES = 24;
 
 function sanitizeText(value, maxLength = 300) {
@@ -209,7 +210,7 @@ async function resolveGalleryImages(payload = {}) {
 function normalizeChapter(value) {
   const cleanValue = String(value || "").trim();
   const chapter = normalizarSociedadeChave(cleanValue, "");
-  return CHAPTER_KEYS.includes(chapter) ? chapter : "Ramo";
+  return SITE_PROJECT_CHAPTER_KEYS.has(chapter) ? chapter : "Ramo";
 }
 
 function publicSiteProject(row) {
