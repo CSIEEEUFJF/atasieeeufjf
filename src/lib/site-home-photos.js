@@ -102,7 +102,7 @@ function sanitizePhotoZoom(value, fallback = 100) {
     return fallback;
   }
 
-  return Math.min(220, Math.max(100, Math.round(numberValue)));
+  return Math.min(260, Math.max(100, Math.round(numberValue)));
 }
 
 function sanitizeHomePhotoPayload(payload = {}) {

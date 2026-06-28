@@ -101,6 +101,47 @@ function photoFrameStyle(item = {}) {
   };
 }
 
+function clampCropValue(value, min, max, fallback) {
+  const numberValue = Number(value);
+  if (!Number.isFinite(numberValue)) {
+    return fallback;
+  }
+
+  return Math.min(max, Math.max(min, Math.round(numberValue)));
+}
+
+function CropControls({ disabled, item, onChange, onNudge, onPreset }) {
+  return (
+    <div className="site-admin-crop-controls">
+      <label className="field">
+        <span><span>Horizontal</span><strong>{item.photoPositionX ?? 50}%</strong></span>
+        <input type="range" min="0" max="100" step="1" value={item.photoPositionX ?? 50} onChange={(event) => onChange("photoPositionX", Number(event.target.value))} />
+      </label>
+      <label className="field">
+        <span><span>Vertical</span><strong>{item.photoPositionY ?? 50}%</strong></span>
+        <input type="range" min="0" max="100" step="1" value={item.photoPositionY ?? 50} onChange={(event) => onChange("photoPositionY", Number(event.target.value))} />
+      </label>
+      <label className="field">
+        <span><span>Zoom</span><strong>{item.photoZoom ?? 100}%</strong></span>
+        <input type="range" min="100" max="260" step="1" value={item.photoZoom ?? 100} onChange={(event) => onChange("photoZoom", Number(event.target.value))} />
+      </label>
+      <div className="site-admin-crop-nudges" aria-label="Ajustes finos do enquadramento">
+        <button type="button" onClick={() => onNudge({ photoPositionY: -5 })} disabled={disabled}>↑</button>
+        <button type="button" onClick={() => onNudge({ photoPositionX: -5 })} disabled={disabled}>←</button>
+        <button type="button" onClick={() => onNudge({ photoPositionX: 5 })} disabled={disabled}>→</button>
+        <button type="button" onClick={() => onNudge({ photoPositionY: 5 })} disabled={disabled}>↓</button>
+        <button type="button" onClick={() => onNudge({ photoZoom: -10 })} disabled={disabled}>- zoom</button>
+        <button type="button" onClick={() => onNudge({ photoZoom: 10 })} disabled={disabled}>+ zoom</button>
+      </div>
+      <div className="site-admin-crop-presets">
+        <button type="button" onClick={() => onPreset()} disabled={disabled}>Centro</button>
+        <button type="button" onClick={() => onPreset({ photoPositionY: 0, photoZoom: 120 })} disabled={disabled}>Topo</button>
+        <button type="button" onClick={() => onPreset({ photoPositionY: 100, photoZoom: 120 })} disabled={disabled}>Base</button>
+      </div>
+    </div>
+  );
+}
+
 function isInlineImageUrl(value) {
   return /^data:image\//i.test(String(value || ""));
 }
@@ -247,6 +288,24 @@ export default function SiteAdminPage({ user }) {
 
   function updatePhoto(field, value) {
     setPhotoForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function nudgeCrop(setter, changes) {
+    setter((current) => ({
+      ...current,
+      photoPositionX: clampCropValue((current.photoPositionX ?? 50) + (changes.photoPositionX || 0), 0, 100, 50),
+      photoPositionY: clampCropValue((current.photoPositionY ?? 50) + (changes.photoPositionY || 0), 0, 100, 50),
+      photoZoom: clampCropValue((current.photoZoom ?? 100) + (changes.photoZoom || 0), 100, 260, 100),
+    }));
+  }
+
+  function presetCrop(setter, preset = {}) {
+    setter((current) => ({
+      ...current,
+      photoPositionX: clampCropValue(preset.photoPositionX ?? 50, 0, 100, 50),
+      photoPositionY: clampCropValue(preset.photoPositionY ?? 50, 0, 100, 50),
+      photoZoom: clampCropValue(preset.photoZoom ?? 100, 100, 260, 100),
+    }));
   }
 
   function toggleMemberChapter(chapterKey) {
@@ -568,20 +627,13 @@ export default function SiteAdminPage({ user }) {
                   </div>
                 ) : null}
 
-                <div className="site-admin-crop-controls">
-                  <label className="field">
-                    <span>Horizontal</span>
-                    <input type="range" min="0" max="100" value={projectForm.photoPositionX} onChange={(event) => updateProject("photoPositionX", Number(event.target.value))} />
-                  </label>
-                  <label className="field">
-                    <span>Vertical</span>
-                    <input type="range" min="0" max="100" value={projectForm.photoPositionY} onChange={(event) => updateProject("photoPositionY", Number(event.target.value))} />
-                  </label>
-                  <label className="field">
-                    <span>Zoom</span>
-                    <input type="range" min="100" max="200" value={projectForm.photoZoom} onChange={(event) => updateProject("photoZoom", Number(event.target.value))} />
-                  </label>
-                </div>
+                <CropControls
+                  disabled={isSaving}
+                  item={projectForm}
+                  onChange={updateProject}
+                  onNudge={(changes) => nudgeCrop(setProjectForm, changes)}
+                  onPreset={(preset) => presetCrop(setProjectForm, preset)}
+                />
 
                 <div className="site-admin-form-actions">
                   <button className="primary-button" disabled={isSaving}>{projectForm.id ? "Salvar projeto" : "Criar projeto"}</button>
@@ -666,20 +718,13 @@ export default function SiteAdminPage({ user }) {
                   </div>
                 ) : null}
 
-                <div className="site-admin-crop-controls">
-                  <label className="field">
-                    <span>Horizontal</span>
-                    <input type="range" min="0" max="100" value={memberForm.photoPositionX} onChange={(event) => updateMember("photoPositionX", Number(event.target.value))} />
-                  </label>
-                  <label className="field">
-                    <span>Vertical</span>
-                    <input type="range" min="0" max="100" value={memberForm.photoPositionY} onChange={(event) => updateMember("photoPositionY", Number(event.target.value))} />
-                  </label>
-                  <label className="field">
-                    <span>Zoom</span>
-                    <input type="range" min="100" max="200" value={memberForm.photoZoom} onChange={(event) => updateMember("photoZoom", Number(event.target.value))} />
-                  </label>
-                </div>
+                <CropControls
+                  disabled={isSaving}
+                  item={memberForm}
+                  onChange={updateMember}
+                  onNudge={(changes) => nudgeCrop(setMemberForm, changes)}
+                  onPreset={(preset) => presetCrop(setMemberForm, preset)}
+                />
 
                 <div className="site-admin-form-actions">
                   <button className="primary-button" disabled={isSaving}>{memberForm.id ? "Salvar membro" : "Criar membro"}</button>
@@ -742,20 +787,13 @@ export default function SiteAdminPage({ user }) {
                   </div>
                 ) : null}
 
-                <div className="site-admin-crop-controls">
-                  <label className="field">
-                    <span>Horizontal</span>
-                    <input type="range" min="0" max="100" value={photoForm.photoPositionX} onChange={(event) => updatePhoto("photoPositionX", Number(event.target.value))} />
-                  </label>
-                  <label className="field">
-                    <span>Vertical</span>
-                    <input type="range" min="0" max="100" value={photoForm.photoPositionY} onChange={(event) => updatePhoto("photoPositionY", Number(event.target.value))} />
-                  </label>
-                  <label className="field">
-                    <span>Zoom</span>
-                    <input type="range" min="100" max="220" value={photoForm.photoZoom} onChange={(event) => updatePhoto("photoZoom", Number(event.target.value))} />
-                  </label>
-                </div>
+                <CropControls
+                  disabled={isSaving}
+                  item={photoForm}
+                  onChange={updatePhoto}
+                  onNudge={(changes) => nudgeCrop(setPhotoForm, changes)}
+                  onPreset={(preset) => presetCrop(setPhotoForm, preset)}
+                />
 
                 <div className="site-admin-form-actions">
                   <button className="primary-button" disabled={isSaving || !photoForm.imageUrl}>{photoForm.id ? "Salvar foto" : "Adicionar foto"}</button>

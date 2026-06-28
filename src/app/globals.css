@@ -2436,6 +2436,37 @@ html[data-theme="dark"] .pdf-progress {
 
 .site-admin-crop-controls {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+}
+
+.site-admin-crop-controls .field > span {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.site-admin-crop-controls .field strong {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.site-admin-crop-nudges,
+.site-admin-crop-presets {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.site-admin-crop-nudges button,
+.site-admin-crop-presets button {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 800;
+  padding: 9px 12px;
 }
 
 .site-admin-form-actions {
@@ -2444,7 +2475,8 @@ html[data-theme="dark"] .pdf-progress {
 
 .site-admin-crop-preview {
   position: relative;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 1;
+  width: min(360px, 100%);
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -2453,7 +2485,7 @@ html[data-theme="dark"] .pdf-progress {
 
 .site-admin-crop-preview--square {
   aspect-ratio: 1;
-  width: min(260px, 100%);
+  width: min(360px, 100%);
 }
 
 .site-admin-crop-preview img,

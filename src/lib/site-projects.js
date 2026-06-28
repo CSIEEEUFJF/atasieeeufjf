@@ -238,7 +238,7 @@ function publicSiteProject(row) {
     linkUrl: sanitizeUrl(row.linkUrl),
     photoPositionX: clampNumber(row.photoPositionX, 0, 100, 50),
     photoPositionY: clampNumber(row.photoPositionY, 0, 100, 50),
-    photoZoom: clampNumber(row.photoZoom, 100, 200, 100),
+    photoZoom: clampNumber(row.photoZoom, 100, 260, 100),
     position: row.position || 0,
     showOnChapter: typeof row.showOnChapter === "boolean" ? row.showOnChapter : true,
     showOnHome: typeof row.showOnHome === "boolean" ? row.showOnHome : true,
@@ -271,7 +271,7 @@ async function sanitizeSiteProjectPayload(payload = {}) {
     linkUrl: sanitizeUrl(payload.linkUrl),
     photoPositionX: clampNumber(payload.photoPositionX, 0, 100, 50),
     photoPositionY: clampNumber(payload.photoPositionY, 0, 100, 50),
-    photoZoom: clampNumber(payload.photoZoom, 100, 200, 100),
+    photoZoom: clampNumber(payload.photoZoom, 100, 260, 100),
     position: Number.isSafeInteger(Number(payload.position)) ? Number(payload.position) : 0,
     showOnChapter: typeof payload.showOnChapter === "boolean" ? Boolean(payload.showOnChapter) : true,
     showOnHome: typeof payload.showOnHome === "boolean" ? Boolean(payload.showOnHome) : true,
@@ -336,7 +336,7 @@ async function sanitizePartialSiteProjectPayload(payload = {}) {
   }
 
   if (Object.prototype.hasOwnProperty.call(payload, "photoZoom")) {
-    data.photoZoom = clampNumber(payload.photoZoom, 100, 200, 100);
+    data.photoZoom = clampNumber(payload.photoZoom, 100, 260, 100);
   }
 
   if (Object.prototype.hasOwnProperty.call(payload, "position")) {
