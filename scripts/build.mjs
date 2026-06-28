@@ -47,8 +47,12 @@ copyPdftexMapToPublic();
 
 if (process.env.DATABASE_URL) {
   runNodeScript("node_modules/prisma/build/index.js", ["db", "push", "--accept-data-loss"]);
+
+  if (process.env.SITE_PROJECTS_SEED_ON_BUILD !== "false") {
+    runNodeScript("scripts/seed-site-chapter-projects.mjs", []);
+  }
 } else {
-  console.warn("DATABASE_URL nao definida; pulando prisma db push.");
+  console.warn("DATABASE_URL nao definida; pulando prisma db push e seed de projetos do site.");
 }
 
 runNodeScript("node_modules/next/dist/bin/next", ["build"]);
