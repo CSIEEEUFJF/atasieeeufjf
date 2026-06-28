@@ -642,10 +642,16 @@ Variavel de ambiente obrigatoria:
 
 - `DATABASE_URL` - string de conexao PostgreSQL usada pelo Prisma
 
+Variavel opcional para traducao automatica de biografias dos membros do site:
+
+- `DEEPL_API_KEY` - chave da DeepL API. Quando uma biografia em portugues ou ingles e salva sem a outra versao, o sistema tenta preencher automaticamente a traducao.
+- `DEEPL_API_URL` - endpoint customizado da DeepL, se necessario. Por padrao, chaves Free usam `https://api-free.deepl.com/v2/translate` e as demais usam `https://api.deepl.com/v2/translate`.
+
 Exemplo local:
 
 ```bash
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require"
+DEEPL_API_KEY="sua-chave-deepl"
 ```
 
 Comandos principais:

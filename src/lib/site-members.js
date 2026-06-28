@@ -1,6 +1,7 @@
 ﻿import { normalizarSociedadeChave, SOCIEDADES } from "./ata";
 import { canManageMembers } from "./auth";
 import { getPrisma } from "./db";
+import { fillMissingBiographyTranslation } from "./deepl-translation";
 
 const CHAPTER_KEYS = Object.keys(SOCIEDADES);
 const MEMBER_ROLE_OPTIONS = [
@@ -131,6 +132,36 @@ function publicSiteMember(row) {
   };
 }
 
+async function fillAndPersistMissingBiography(row) {
+  if (!row || (row.bio && row.bioEn) || (!row.bio && !row.bioEn)) {
+    return row;
+  }
+
+  const translatedData = await fillMissingBiographyTranslation({
+    bio: row.bio || "",
+    bioEn: row.bioEn || "",
+  });
+
+  if (translatedData.bio === row.bio && translatedData.bioEn === row.bioEn) {
+    return row;
+  }
+
+  try {
+    return await getPrisma().siteMember.update({
+      data: translatedData,
+      where: { id: row.id },
+    });
+  } catch (error) {
+    console.warn("Nao foi possivel salvar a traducao da biografia do membro do site.", error);
+    return row;
+  }
+}
+
+async function publicSiteMembers(rows) {
+  const translatedRows = await Promise.all(rows.map(fillAndPersistMissingBiography));
+  return translatedRows.map(publicSiteMember).filter(Boolean);
+}
+
 function requireSiteMemberManagement(user) {
   if (!canManageMembers(user)) {
     throw new Error("Você não tem permissão para gerenciar membros do site.");
@@ -221,7 +252,7 @@ export async function listPublicSiteMembers() {
     where: { isPublic: true },
   });
 
-  return rows.map(publicSiteMember).filter(Boolean);
+  return publicSiteMembers(rows);
 }
 
 export async function listManagedSiteMembers(currentUser) {
@@ -231,14 +262,15 @@ export async function listManagedSiteMembers(currentUser) {
     orderBy: [{ position: "asc" }, { name: "asc" }],
   });
 
-  return rows.map(publicSiteMember).filter(Boolean);
+  return publicSiteMembers(rows);
 }
 
 export async function createSiteMember(currentUser, payload = {}) {
   requireSiteMemberManagement(currentUser);
+  const data = await fillMissingBiographyTranslation(sanitizeSiteMemberPayload(payload));
 
   const row = await getPrisma().siteMember.create({
-    data: sanitizeSiteMemberPayload(payload),
+    data,
   });
 
   return publicSiteMember(row);
@@ -246,9 +278,10 @@ export async function createSiteMember(currentUser, payload = {}) {
 
 export async function updateSiteMember(currentUser, memberId, payload = {}) {
   requireSiteMemberManagement(currentUser);
+  const data = await fillMissingBiographyTranslation(sanitizePartialSiteMemberPayload(payload));
 
   const row = await getPrisma().siteMember.update({
-    data: sanitizePartialSiteMemberPayload(payload),
+    data,
     where: { id: memberId },
   });
 
