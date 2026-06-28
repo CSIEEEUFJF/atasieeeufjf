@@ -119,6 +119,84 @@ function sanitizeGalleryImages(value) {
   return images;
 }
 
+async function fetchTextWithTimeout(url, timeoutMs = 6000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 IEEE-UFJF-SiteProjectGallery/1.0",
+      },
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      return "";
+    }
+
+    return response.text();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function listGoogleDriveFolderImages(folderUrl) {
+  const folderId = getGoogleDriveFolderId(folderUrl);
+  if (!folderId) {
+    return [];
+  }
+
+  const urls = [
+    `https://drive.google.com/embeddedfolderview?id=${encodeURIComponent(folderId)}#grid`,
+    `https://drive.google.com/drive/folders/${encodeURIComponent(folderId)}`,
+  ];
+  const ids = [];
+  const seen = new Set([folderId]);
+
+  for (const url of urls) {
+    const html = await fetchTextWithTimeout(url);
+    const matches = [
+      ...html.matchAll(/\/file\/d\/([a-zA-Z0-9_-]{20,})/g),
+      ...html.matchAll(/["'](?:id|docid)["']\s*[:,]\s*["']([a-zA-Z0-9_-]{20,})["']/g),
+      ...html.matchAll(/data-id=["']([a-zA-Z0-9_-]{20,})["']/g),
+    ];
+
+    for (const match of matches) {
+      const id = match[1];
+      if (!id || seen.has(id)) {
+        continue;
+      }
+
+      seen.add(id);
+      ids.push(id);
+
+      if (ids.length >= MAX_GALLERY_IMAGES) {
+        break;
+      }
+    }
+
+    if (ids.length) {
+      break;
+    }
+  }
+
+  return ids.map((id) => `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w1400`);
+}
+
+async function resolveGalleryImages(payload = {}) {
+  const providedImages = sanitizeGalleryImages(payload.galleryImages);
+  if (providedImages.length || !payload.driveFolderUrl) {
+    return providedImages;
+  }
+
+  try {
+    return await listGoogleDriveFolderImages(payload.driveFolderUrl);
+  } catch {
+    return [];
+  }
+}
+
 function normalizeChapter(value) {
   const cleanValue = String(value || "").trim();
   const chapter = normalizarSociedadeChave(cleanValue, "");
@@ -150,16 +228,18 @@ function requireSiteProjectManagement(user) {
   }
 }
 
-function sanitizeSiteProjectPayload(payload = {}) {
+async function sanitizeSiteProjectPayload(payload = {}) {
   const title = sanitizeText(payload.title, 160);
   if (!title) {
     throw new Error("Informe o título do projeto.");
   }
 
+  const driveFolderUrl = sanitizeDriveFolderUrl(payload.driveFolderUrl);
+
   return {
     chapter: normalizeChapter(payload.chapter),
-    driveFolderUrl: sanitizeDriveFolderUrl(payload.driveFolderUrl),
-    galleryImages: sanitizeGalleryImages(payload.galleryImages),
+    driveFolderUrl,
+    galleryImages: await resolveGalleryImages({ ...payload, driveFolderUrl }),
     imageUrl: sanitizeUrl(payload.imageUrl),
     isPublic: typeof payload.isPublic === "boolean" ? Boolean(payload.isPublic) : true,
     linkUrl: sanitizeUrl(payload.linkUrl),
@@ -169,7 +249,7 @@ function sanitizeSiteProjectPayload(payload = {}) {
   };
 }
 
-function sanitizePartialSiteProjectPayload(payload = {}) {
+async function sanitizePartialSiteProjectPayload(payload = {}) {
   const data = {};
 
   if (Object.prototype.hasOwnProperty.call(payload, "title")) {
@@ -197,6 +277,11 @@ function sanitizePartialSiteProjectPayload(payload = {}) {
 
   if (Object.prototype.hasOwnProperty.call(payload, "galleryImages")) {
     data.galleryImages = sanitizeGalleryImages(payload.galleryImages);
+  } else if (Object.prototype.hasOwnProperty.call(payload, "driveFolderUrl")) {
+    data.galleryImages = await resolveGalleryImages({
+      ...payload,
+      driveFolderUrl: data.driveFolderUrl,
+    });
   }
 
   if (Object.prototype.hasOwnProperty.call(payload, "linkUrl")) {
@@ -241,7 +326,7 @@ export async function createSiteProject(currentUser, payload = {}) {
   requireSiteProjectManagement(currentUser);
 
   const row = await getPrisma().siteProject.create({
-    data: sanitizeSiteProjectPayload(payload),
+    data: await sanitizeSiteProjectPayload(payload),
   });
 
   return publicSiteProject(row);
@@ -251,7 +336,7 @@ export async function updateSiteProject(currentUser, projectId, payload = {}) {
   requireSiteProjectManagement(currentUser);
 
   const row = await getPrisma().siteProject.update({
-    data: sanitizePartialSiteProjectPayload(payload),
+    data: await sanitizePartialSiteProjectPayload(payload),
     where: { id: projectId },
   });
 
