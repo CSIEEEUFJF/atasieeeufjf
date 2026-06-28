@@ -207,6 +207,14 @@ export default function BoardHomePage({ demoMode = false } = {}) {
             <strong>Membros e acessos</strong>
             <p>Cadastre novos membros, defina capítulos, cargos e permissões de diretoria.</p>
           </a>
+
+          {!demoMode ?(
+            <a className="board-action-card" href="/diretoria/site">
+              <span>Site</span>
+              <strong>Site do Ramo</strong>
+              <p>Gerencie membros, projetos e fotos publicados no site institucional.</p>
+            </a>
+          ) : null}
         </section>
       </main>
     </div>
