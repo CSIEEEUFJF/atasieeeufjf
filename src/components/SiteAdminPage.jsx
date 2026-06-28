@@ -82,6 +82,21 @@ function emptyPhotoForm() {
   };
 }
 
+function emptyHistoryPhotoForm() {
+  return {
+    description: "",
+    id: null,
+    imageUrl: "",
+    isPublic: true,
+    photoPositionX: 50,
+    photoPositionY: 50,
+    photoZoom: 100,
+    position: 0,
+    title: "",
+    year: new Date().getFullYear(),
+  };
+}
+
 function projectToForm(project = {}) {
   return {
     ...emptyProjectForm(),
@@ -189,9 +204,11 @@ export default function SiteAdminPage({ user }) {
   const [members, setMembers] = useState([]);
   const [projects, setProjects] = useState([]);
   const [photos, setPhotos] = useState([]);
+  const [historyPhotos, setHistoryPhotos] = useState([]);
   const [memberForm, setMemberForm] = useState(emptyMemberForm);
   const [projectForm, setProjectForm] = useState(emptyProjectForm);
   const [photoForm, setPhotoForm] = useState(emptyPhotoForm);
+  const [historyPhotoForm, setHistoryPhotoForm] = useState(emptyHistoryPhotoForm);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
@@ -231,16 +248,21 @@ export default function SiteAdminPage({ user }) {
     () => photos.reduce((maxPosition, photo) => Math.max(maxPosition, Number(photo.position) || 0), -1) + 1,
     [photos],
   );
+  const nextHistoryPhotoPosition = useMemo(
+    () => historyPhotos.reduce((maxPosition, photo) => Math.max(maxPosition, Number(photo.position) || 0), -1) + 1,
+    [historyPhotos],
+  );
 
   async function loadAll() {
     setIsLoading(true);
     setStatus({ tone: "loading", text: "Atualizando administracao do site." });
 
     try {
-      const [membersResponse, projectsResponse, photosResponse] = await Promise.all([
+      const [membersResponse, projectsResponse, photosResponse, historyPhotosResponse] = await Promise.all([
         fetch("/api/site-members/manage", { cache: "no-store" }),
         fetch("/api/site-projects/manage", { cache: "no-store" }),
         fetch("/api/site-home-photos/manage", { cache: "no-store" }),
+        fetch("/api/site-history-photos/manage", { cache: "no-store" }),
       ]);
 
       if (!membersResponse.ok) {
@@ -252,16 +274,21 @@ export default function SiteAdminPage({ user }) {
       if (!photosResponse.ok) {
         throw new Error(await readApiError(photosResponse, "Nao foi possivel carregar fotos da homepage."));
       }
+      if (!historyPhotosResponse.ok) {
+        throw new Error(await readApiError(historyPhotosResponse, "Nao foi possivel carregar fotos historicas."));
+      }
 
-      const [membersPayload, projectsPayload, photosPayload] = await Promise.all([
+      const [membersPayload, projectsPayload, photosPayload, historyPhotosPayload] = await Promise.all([
         membersResponse.json(),
         projectsResponse.json(),
         photosResponse.json(),
+        historyPhotosResponse.json(),
       ]);
 
       setMembers(Array.isArray(membersPayload.members) ? membersPayload.members : []);
       setProjects(Array.isArray(projectsPayload.projects) ? projectsPayload.projects : []);
       setPhotos(Array.isArray(photosPayload.photos) ? photosPayload.photos : []);
+      setHistoryPhotos(Array.isArray(historyPhotosPayload.photos) ? historyPhotosPayload.photos : []);
       setStatus({ tone: "success", text: "Administracao do site atualizada." });
     } catch (error) {
       setStatus({ tone: "error", text: error.message || "Nao foi possivel carregar a administracao do site." });
@@ -288,6 +315,10 @@ export default function SiteAdminPage({ user }) {
 
   function updatePhoto(field, value) {
     setPhotoForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function updateHistoryPhoto(field, value) {
+    setHistoryPhotoForm((current) => ({ ...current, [field]: value }));
   }
 
   function nudgeCrop(setter, changes) {
@@ -444,12 +475,39 @@ export default function SiteAdminPage({ user }) {
     }
   }
 
+  async function saveHistoryPhoto(event) {
+    event.preventDefault();
+    const isEditing = Boolean(historyPhotoForm.id);
+    setIsSaving(true);
+    setStatus({ tone: "loading", text: isEditing ? "Atualizando foto historica." : "Criando foto historica." });
+
+    try {
+      const payload = {
+        ...historyPhotoForm,
+        position: isEditing ? historyPhotoForm.position : nextHistoryPhotoPosition,
+      };
+      await submitJson(
+        isEditing ? `/api/site-history-photos/manage/${historyPhotoForm.id}` : "/api/site-history-photos/manage",
+        payload,
+        isEditing ? "PATCH" : "POST",
+      );
+      setHistoryPhotoForm(emptyHistoryPhotoForm());
+      await loadAll();
+      setStatus({ tone: "success", text: isEditing ? "Foto historica atualizada." : "Foto historica adicionada." });
+    } catch (error) {
+      setStatus({ tone: "error", text: error.message || "Nao foi possivel salvar a foto historica." });
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   async function removeItem(kind, id) {
     if (!window.confirm("Remover este item do site?")) {
       return;
     }
 
     const pathByKind = {
+      historyPhoto: "site-history-photos",
       member: "site-members",
       photo: "site-home-photos",
       project: "site-projects",
@@ -488,6 +546,12 @@ export default function SiteAdminPage({ user }) {
     setActiveTab("photos");
     setPhotoForm({ ...emptyPhotoForm(), ...photo });
     setStatus({ tone: "idle", text: `Editando ${photo.title || "foto da homepage"}.` });
+  }
+
+  function editHistoryPhoto(photo) {
+    setActiveTab("historyPhotos");
+    setHistoryPhotoForm({ ...emptyHistoryPhotoForm(), ...photo });
+    setStatus({ tone: "idle", text: `Editando ${photo.title || "foto historica"}.` });
   }
 
   if (isLoading) {
@@ -548,6 +612,7 @@ export default function SiteAdminPage({ user }) {
             ["projects", "Projetos"],
             ["members", "Membros"],
             ["photos", "Fotos da homepage"],
+            ["historyPhotos", "Fotos historicas"],
           ].map(([tab, label]) => (
             <button
               key={tab}
@@ -820,6 +885,82 @@ export default function SiteAdminPage({ user }) {
                 </article>
               )}
               title="Fotos publicadas"
+            />
+          </section>
+        ) : null}
+
+        {activeTab === "historyPhotos" ? (
+          <section className="site-admin-layout">
+            <article className="panel">
+              <div className="section-heading">
+                <p className="panel-kicker">{historyPhotoForm.id ? "Editar foto historica" : "Nova foto historica"}</p>
+                <h2>{historyPhotoForm.id ? historyPhotoForm.title || "Foto historica" : "Foto historica"}</h2>
+              </div>
+
+              <form className="internal-form" onSubmit={saveHistoryPhoto}>
+                <div className="internal-form-grid">
+                  <label className="field">
+                    <span>Titulo</span>
+                    <input value={historyPhotoForm.title} onChange={(event) => updateHistoryPhoto("title", event.target.value)} required />
+                  </label>
+                  <label className="field">
+                    <span>Ano</span>
+                    <input type="number" min="1900" max="2100" value={historyPhotoForm.year} onChange={(event) => updateHistoryPhoto("year", Number(event.target.value))} />
+                  </label>
+                  <label className="field field-span-2">
+                    <span>Descricao</span>
+                    <textarea value={historyPhotoForm.description} onChange={(event) => updateHistoryPhoto("description", event.target.value)} />
+                  </label>
+                  <label className="field field-span-2">
+                    <span>Link da imagem ou Google Drive</span>
+                    <input value={historyPhotoForm.imageUrl} onChange={(event) => updateHistoryPhoto("imageUrl", event.target.value)} placeholder="https://drive.google.com/file/d/..." required />
+                  </label>
+                </div>
+
+                <label className="field inline-check">
+                  <input type="checkbox" checked={historyPhotoForm.isPublic} onChange={(event) => updateHistoryPhoto("isPublic", event.target.checked)} />
+                  <span>Publicado</span>
+                </label>
+
+                {historyPhotoForm.imageUrl ? (
+                  <div className="site-admin-crop-preview">
+                    <img src={historyPhotoForm.imageUrl} alt="" style={photoFrameStyle(historyPhotoForm)} />
+                  </div>
+                ) : null}
+
+                <CropControls
+                  disabled={isSaving}
+                  item={historyPhotoForm}
+                  onChange={updateHistoryPhoto}
+                  onNudge={(changes) => nudgeCrop(setHistoryPhotoForm, changes)}
+                  onPreset={(preset) => presetCrop(setHistoryPhotoForm, preset)}
+                />
+
+                <div className="site-admin-form-actions">
+                  <button className="primary-button" disabled={isSaving || !historyPhotoForm.imageUrl}>{historyPhotoForm.id ? "Salvar foto" : "Adicionar foto"}</button>
+                  {historyPhotoForm.id ? <button className="soft-button" type="button" onClick={() => setHistoryPhotoForm(emptyHistoryPhotoForm())}>Cancelar edicao</button> : null}
+                </div>
+              </form>
+            </article>
+
+            <AdminList
+              emptyText="Nenhuma foto historica cadastrada."
+              items={historyPhotos}
+              renderItem={(photo) => (
+                <article className="site-admin-row" key={photo.id}>
+                  <div className="site-admin-row-thumb">{photo.imageUrl ? <img src={photo.imageUrl} alt="" style={photoFrameStyle(photo)} /> : null}</div>
+                  <div>
+                    <span>{photo.year || "Sem ano"}</span>
+                    <strong>{photo.title || "Foto historica"}</strong>
+                    <p>{photo.description || (photo.isPublic ? "Publicada" : "Oculta")}</p>
+                  </div>
+                  <div className="site-admin-row-actions">
+                    <button className="text-button" type="button" onClick={() => editHistoryPhoto(photo)}>Editar</button>
+                    <button className="text-button danger" type="button" onClick={() => removeItem("historyPhoto", photo.id)}>Remover</button>
+                  </div>
+                </article>
+              )}
+              title="Fotos historicas publicadas"
             />
           </section>
         ) : null}

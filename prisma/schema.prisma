@@ -117,6 +117,24 @@ model SiteHomePhoto {
   @@map("site_home_photos")
 }
 
+model SiteHistoryPhoto {
+  id             Int      @id @default(autoincrement())
+  title          String
+  description    String   @default("")
+  year           Int      @default(0)
+  imageUrl       String   @map("image_url")
+  photoPositionX Int      @default(50) @map("photo_position_x")
+  photoPositionY Int      @default(50) @map("photo_position_y")
+  photoZoom      Int      @default(100) @map("photo_zoom")
+  isPublic       Boolean  @default(true) @map("is_public")
+  position       Int      @default(0)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([isPublic, year, position, id], map: "idx_site_history_photos_public_order")
+  @@map("site_history_photos")
+}
+
 model MemberContact {
   id               Int       @id @default(autoincrement())
   name             String
