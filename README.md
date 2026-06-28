@@ -4,6 +4,8 @@ Documentacao principal do projeto `Template-LaTex-ATAIEEE`.
 
 Ultima revisao desta documentacao: `2026-04-22`
 
+> Documentacao modular atualizada do Sistema Interno: [`DOCUMENTACAO_MODULOS.md`](./DOCUMENTACAO_MODULOS.md).
+
 ## 1. Visao geral
 
 Este projeto implementa uma aplicacao web local para criacao, armazenamento e
