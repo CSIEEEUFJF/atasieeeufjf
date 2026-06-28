@@ -1,12 +1,31 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentUser, isSameOriginRequest } from "../../../../lib/auth";
-import { listInternalFiles, saveInternalFile } from "../../../../lib/internal-files";
+import {
+  listInternalFiles,
+  saveInternalFile,
+  StorageDisabledError,
+  StorageUnavailableError,
+} from "../../../../lib/internal-files";
 
 export const runtime = "nodejs";
 
 function unauthorized() {
   return NextResponse.json({ detail: "Autenticação necessária." }, { status: 401 });
+}
+
+function storageUnavailable(error) {
+  return NextResponse.json(
+    { code: "storage_unavailable", detail: error.message || "Serviço de dados indisponível." },
+    { status: 503 },
+  );
+}
+
+function storageDisabled(error) {
+  return NextResponse.json(
+    { code: "storage_disabled", detail: error.message || "Armazenamento desabilitado por enquanto." },
+    { status: 503 },
+  );
 }
 
 export async function GET() {
@@ -15,7 +34,17 @@ export async function GET() {
     return unauthorized();
   }
 
-  return NextResponse.json({ files: await listInternalFiles(user) });
+  try {
+    return NextResponse.json({ files: await listInternalFiles(user) });
+  } catch (error) {
+    if (error instanceof StorageDisabledError) {
+      return storageDisabled(error);
+    }
+    if (error instanceof StorageUnavailableError) {
+      return storageUnavailable(error);
+    }
+    throw error;
+  }
 }
 
 export async function POST(request) {
@@ -50,6 +79,13 @@ export async function POST(request) {
       { status: 201 },
     );
   } catch (error) {
+    if (error instanceof StorageDisabledError) {
+      return storageDisabled(error);
+    }
+    if (error instanceof StorageUnavailableError) {
+      return storageUnavailable(error);
+    }
+
     return NextResponse.json(
       { detail: error.message || "Não foi possível salvar o arquivo." },
       { status: 400 },

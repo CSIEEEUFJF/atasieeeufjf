@@ -8,6 +8,10 @@ import UserPasswordDialog from "./UserPasswordDialog";
 async function readApiError(response, fallback) {
   try {
     const payload = await response.json();
+    if (response.status === 503 && payload.code === "storage_unavailable") {
+      window.location.href = "/offline";
+      return payload.detail || "Serviço de dados indisponível.";
+    }
     return payload.detail || fallback;
   } catch {
     return fallback;
@@ -43,6 +47,7 @@ export default function FilesPage() {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState({ tone: "idle", text: "Carregando arquivos." });
+  const [isStorageDisabled, setIsStorageDisabled] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
@@ -102,10 +107,10 @@ export default function FilesPage() {
     }
   }, [auth.user]);
 
-  const nextTheme = theme === "dark" ?"light" : "dark";
+  const nextTheme = theme === "dark" ? "light" : "dark";
 
   function toggleTheme() {
-    setTheme((current) => (current === "dark" ?"light" : "dark"));
+    setTheme((current) => (current === "dark" ? "light" : "dark"));
   }
 
   async function loadFiles() {
@@ -113,12 +118,30 @@ export default function FilesPage() {
     setStatus({ tone: "loading", text: "Atualizando arquivos." });
     try {
       const response = await fetch("/api/internal/files", { cache: "no-store" });
+      if (response.status === 503) {
+        const payload = await response.json().catch(() => ({}));
+        if (payload.code === "storage_disabled") {
+          setIsStorageDisabled(true);
+          setFiles([]);
+          setStatus({
+            tone: "error",
+            text: payload.detail || "Armazenamento desabilitado por enquanto.",
+          });
+          return;
+        }
+        if (payload.code === "storage_unavailable") {
+          window.location.href = "/offline";
+          return;
+        }
+      }
+
       if (!response.ok) {
         throw new Error(await readApiError(response, "Não foi possível carregar arquivos."));
       }
 
       const payload = await response.json();
-      setFiles(Array.isArray(payload.files) ?payload.files : []);
+      setIsStorageDisabled(false);
+      setFiles(Array.isArray(payload.files) ? payload.files : []);
       setStatus({ tone: "success", text: "Arquivos atualizados." });
     } catch (error) {
       setStatus({ tone: "error", text: error.message || "Não foi possível carregar arquivos." });
@@ -137,6 +160,11 @@ export default function FilesPage() {
 
   async function handleUpload(event) {
     event.preventDefault();
+    if (isStorageDisabled) {
+      setStatus({ tone: "error", text: "Armazenamento desabilitado por enquanto." });
+      return;
+    }
+
     if (!selectedFiles.length) {
       setStatus({ tone: "error", text: "Selecione pelo menos um arquivo." });
       return;
@@ -157,12 +185,12 @@ export default function FilesPage() {
       }
 
       const payload = await response.json();
-      const savedFiles = Array.isArray(payload.files) ?payload.files : [payload.file].filter(Boolean);
+      const savedFiles = Array.isArray(payload.files) ? payload.files : [payload.file].filter(Boolean);
       setFiles((current) => [...savedFiles, ...current].filter(Boolean));
       setSelectedFiles([]);
       setDescription("");
       event.currentTarget.reset();
-      setStatus({ tone: "success", text: savedFiles.length === 1 ?"Arquivo enviado." : "Arquivos enviados." });
+      setStatus({ tone: "success", text: savedFiles.length === 1 ? "Arquivo enviado." : "Arquivos enviados." });
     } catch (error) {
       setStatus({ tone: "error", text: error.message || "Não foi possível enviar o arquivo." });
     } finally {
@@ -196,12 +224,12 @@ export default function FilesPage() {
       data-theme-current={theme}
       onClick={toggleTheme}
       aria-pressed={theme === "dark"}
-      aria-label={`Alternar para tema ${nextTheme === "dark" ?"escuro" : "claro"}`}
-      title={`Trocar para tema ${nextTheme === "dark" ?"escuro" : "claro"}`}
+      aria-label={`Alternar para tema ${nextTheme === "dark" ? "escuro" : "claro"}`}
+      title={`Trocar para tema ${nextTheme === "dark" ? "escuro" : "claro"}`}
     >
       <span className="theme-toggle__icon" aria-hidden="true" />
       <span className="theme-toggle__label">
-        {theme === "dark" ?"Tema escuro" : "Tema claro"}
+        {theme === "dark" ? "Tema escuro" : "Tema claro"}
       </span>
     </button>
   );
@@ -227,7 +255,7 @@ export default function FilesPage() {
           <li><a href="/tarefas">Tarefas</a></li>
           <li><a href="/calendario">Calendário</a></li>
           <li><a href="/arquivos" aria-current="page">Arquivos</a></li>
-          {auth.user.canManageMembers ?<li><a href="/diretoria">Diretoria</a></li> : null}
+          {auth.user.canManageMembers ? <li><a href="/diretoria">Diretoria</a></li> : null}
         </ul>
 
         <div className="topbar-actions">
@@ -249,7 +277,7 @@ export default function FilesPage() {
       </header>
 
       {themeToggleButton}
-      {isPasswordDialogOpen ?(
+      {isPasswordDialogOpen ? (
         <UserPasswordDialog user={auth.user} onClose={() => setIsPasswordDialogOpen(false)} />
       ) : null}
 
@@ -277,12 +305,18 @@ export default function FilesPage() {
                 <h2>Enviar arquivo</h2>
               </div>
             </div>
+            {isStorageDisabled ? (
+              <div className="empty-state">
+                O armazenamento de arquivos está desabilitado por enquanto.
+              </div>
+            ) : null}
             <form className="member-form" onSubmit={handleUpload}>
               <label className="field">
                 <span>Arquivo</span>
                 <input
                   type="file"
                   multiple
+                  disabled={isStorageDisabled}
                   onChange={(event) => setSelectedFiles(Array.from(event.target.files || []))}
                 />
               </label>
@@ -291,12 +325,13 @@ export default function FilesPage() {
                 <textarea
                   rows={4}
                   value={description}
+                  disabled={isStorageDisabled}
                   onChange={(event) => setDescription(event.target.value)}
                   maxLength={500}
                 />
               </label>
-              <button className="primary-button" disabled={isUploading}>
-                {isUploading ?"Enviando..." : "Enviar arquivo"}
+              <button className="primary-button" disabled={isUploading || isStorageDisabled}>
+                {isUploading ? "Enviando..." : "Enviar arquivo"}
               </button>
             </form>
           </article>
@@ -305,17 +340,17 @@ export default function FilesPage() {
             <div className="panel-header">
               <div>
                 <p className="panel-kicker">Biblioteca</p>
-                <h2>{files.length ?`${files.length} arquivo(s)` : "Nenhum arquivo"}</h2>
+                <h2>{files.length ? `${files.length} arquivo(s)` : "Nenhum arquivo"}</h2>
               </div>
             </div>
 
             <div className="file-list">
-              {files.length ?files.map((file) => (
+              {files.length ? files.map((file) => (
                 <div className="file-row" key={file.id}>
                   <div>
                     <strong>{file.originalName}</strong>
                     <span>{file.category} · {formatBytes(file.size)} · {formatDate(file.createdAt)}</span>
-                    {file.description ?<p>{file.description}</p> : null}
+                    {file.description ? <p>{file.description}</p> : null}
                   </div>
                   <div className="file-row-actions">
                     <a className="soft-button" href={`/api/internal/files/${file.id}/download`}>
@@ -328,7 +363,7 @@ export default function FilesPage() {
                 </div>
               )) : (
                 <div className="empty-state">
-                  Nenhum arquivo enviado ainda.
+                  {isStorageDisabled ? "Armazenamento desabilitado por enquanto." : "Nenhum arquivo enviado ainda."}
                 </div>
               )}
             </div>

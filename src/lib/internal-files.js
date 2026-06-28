@@ -10,6 +10,10 @@ const STORAGE_ROOT = process.env.INTERNAL_STORAGE_DIR
   ? path.resolve(/* turbopackIgnore: true */ process.env.INTERNAL_STORAGE_DIR)
   : DEFAULT_STORAGE_ROOT;
 const MAX_FILE_BYTES = Number(process.env.INTERNAL_STORAGE_MAX_BYTES || DEFAULT_MAX_FILE_BYTES);
+const STORAGE_MODE = (process.env.INTERNAL_FILES_STORAGE_MODE || "remote").toLowerCase();
+const REMOTE_STORAGE_URL = String(process.env.INTERNAL_STORAGE_RECEIVER_URL || "").replace(/\/+$/, "");
+const REMOTE_STORAGE_TOKEN = process.env.INTERNAL_STORAGE_RECEIVER_TOKEN || "";
+const REMOTE_TIMEOUT_MS = Number(process.env.INTERNAL_STORAGE_RECEIVER_TIMEOUT_MS || 5000);
 
 const ALLOWED_EXTENSIONS = new Set([
   ".pdf",
@@ -78,6 +82,67 @@ const BLOCKED_EXTENSIONS = new Set([
   ".scr",
   ".sh",
 ]);
+
+export class StorageUnavailableError extends Error {
+  constructor(message = "Serviço de dados indisponível.") {
+    super(message);
+    this.name = "StorageUnavailableError";
+  }
+}
+
+export class StorageDisabledError extends Error {
+  constructor(message = "Armazenamento desabilitado por enquanto.") {
+    super(message);
+    this.name = "StorageDisabledError";
+  }
+}
+
+function assertStorageEnabled() {
+  if (STORAGE_MODE === "disabled") {
+    throw new StorageDisabledError();
+  }
+}
+
+function useRemoteStorage() {
+  return STORAGE_MODE !== "local";
+}
+
+function requireRemoteConfig() {
+  if (!REMOTE_STORAGE_URL || !REMOTE_STORAGE_TOKEN) {
+    throw new StorageUnavailableError("Serviço de dados não configurado.");
+  }
+}
+
+function remoteHeaders(extraHeaders = {}) {
+  return {
+    Authorization: `Bearer ${REMOTE_STORAGE_TOKEN}`,
+    ...extraHeaders,
+  };
+}
+
+function timeoutSignal() {
+  return AbortSignal.timeout(Math.max(1000, REMOTE_TIMEOUT_MS));
+}
+
+async function assertRemoteAvailable() {
+  requireRemoteConfig();
+
+  try {
+    const response = await fetch(`${REMOTE_STORAGE_URL}/health`, {
+      cache: "no-store",
+      headers: remoteHeaders(),
+      signal: timeoutSignal(),
+    });
+    if (!response.ok) {
+      throw new Error(`Healthcheck retornou ${response.status}.`);
+    }
+  } catch (error) {
+    if (error instanceof StorageUnavailableError) {
+      throw error;
+    }
+    throw new StorageUnavailableError("Serviço de dados offline.");
+  }
+}
 
 function cleanFileName(value) {
   const safeValue = String(value || "arquivo.bin").replace(/[\\/]+/g, "-");
@@ -159,7 +224,27 @@ function publicFile(row) {
   };
 }
 
+function publicFileFromRemote(remoteFile, row) {
+  return publicFile({
+    category: categoryForExtension(row.extension),
+    createdAt: row.createdAt,
+    description: row.description,
+    extension: row.extension,
+    id: row.id,
+    mimeType: remoteFile.mimeType || row.mimeType,
+    originalName: remoteFile.originalName || row.originalName,
+    size: Number(remoteFile.size || row.size || 0),
+    updatedAt: row.updatedAt,
+  });
+}
+
 export async function listInternalFiles(user) {
+  assertStorageEnabled();
+
+  if (useRemoteStorage()) {
+    await assertRemoteAvailable();
+  }
+
   const rows = await getPrisma().internalFile.findMany({
     orderBy: { createdAt: "desc" },
     where: { ownerId: user.id },
@@ -169,6 +254,8 @@ export async function listInternalFiles(user) {
 }
 
 export async function saveInternalFile(user, file, { description = "" } = {}) {
+  assertStorageEnabled();
+
   if (!file || typeof file.arrayBuffer !== "function") {
     throw new Error("Envie um arquivo válido.");
   }
@@ -178,6 +265,54 @@ export async function saveInternalFile(user, file, { description = "" } = {}) {
   const buffer = Buffer.from(await file.arrayBuffer());
   const size = Number(file.size || buffer.byteLength);
   assertAllowedFile({ buffer, extension, size });
+
+  if (useRemoteStorage()) {
+    await assertRemoteAvailable();
+
+    const formData = new FormData();
+    formData.append("files", new Blob([buffer], { type: file.type || "application/octet-stream" }), originalName);
+
+    let payload;
+    try {
+      const response = await fetch(`${REMOTE_STORAGE_URL}/upload?ownerId=${encodeURIComponent(user.id)}`, {
+        body: formData,
+        headers: remoteHeaders(),
+        method: "POST",
+        signal: timeoutSignal(),
+      });
+      payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.detail || "Upload remoto falhou.");
+      }
+    } catch (error) {
+      if (error instanceof StorageUnavailableError) {
+        throw error;
+      }
+      throw new StorageUnavailableError(error.message || "Serviço de dados offline.");
+    }
+
+    const remoteFile = Array.isArray(payload.files) ?payload.files[0] : null;
+    if (!remoteFile?.storedName || !remoteFile?.storageKey) {
+      throw new StorageUnavailableError("Resposta inválida do serviço de dados.");
+    }
+
+    const row = await getPrisma().internalFile.create({
+      data: {
+        category: categoryForExtension(extension),
+        checksum: String(remoteFile.checksum || crypto.createHash("sha256").update(buffer).digest("hex")),
+        description: String(description || "").trim().slice(0, 500),
+        extension,
+        mimeType: String(remoteFile.mimeType || file.type || "application/octet-stream").slice(0, 120),
+        originalName,
+        ownerId: user.id,
+        size: Number(remoteFile.size || size),
+        storageKey: String(remoteFile.storageKey),
+        storedName: String(remoteFile.storedName),
+      },
+    });
+
+    return publicFileFromRemote(remoteFile, row);
+  }
 
   const userSegment = userStorageSegment(user);
   const userDirectory = path.join(STORAGE_ROOT, userSegment);
@@ -208,6 +343,8 @@ export async function saveInternalFile(user, file, { description = "" } = {}) {
 }
 
 export async function getInternalFileForDownload(user, fileId) {
+  assertStorageEnabled();
+
   const id = Number.parseInt(String(fileId || ""), 10);
   if (!Number.isSafeInteger(id) || id <= 0) {
     return null;
@@ -218,6 +355,32 @@ export async function getInternalFileForDownload(user, fileId) {
   });
   if (!row) {
     return null;
+  }
+
+  if (useRemoteStorage()) {
+    await assertRemoteAvailable();
+    try {
+      const response = await fetch(
+        `${REMOTE_STORAGE_URL}/download/${encodeURIComponent(user.id)}/${encodeURIComponent(row.storedName)}`,
+        {
+          cache: "no-store",
+          headers: remoteHeaders(),
+          signal: timeoutSignal(),
+        },
+      );
+      if (!response.ok) {
+        return null;
+      }
+      return {
+        data: Buffer.from(await response.arrayBuffer()),
+        row,
+      };
+    } catch (error) {
+      if (error instanceof StorageUnavailableError) {
+        throw error;
+      }
+      throw new StorageUnavailableError("Serviço de dados offline.");
+    }
   }
 
   const filePath = path.join(STORAGE_ROOT, row.storageKey);
@@ -230,6 +393,8 @@ export async function getInternalFileForDownload(user, fileId) {
 }
 
 export async function deleteInternalFile(user, fileId) {
+  assertStorageEnabled();
+
   const id = Number.parseInt(String(fileId || ""), 10);
   if (!Number.isSafeInteger(id) || id <= 0) {
     return false;
@@ -240,6 +405,31 @@ export async function deleteInternalFile(user, fileId) {
   });
   if (!row) {
     return false;
+  }
+
+  if (useRemoteStorage()) {
+    await assertRemoteAvailable();
+    try {
+      const response = await fetch(
+        `${REMOTE_STORAGE_URL}/files/${encodeURIComponent(user.id)}/${encodeURIComponent(row.storedName)}`,
+        {
+          headers: remoteHeaders(),
+          method: "DELETE",
+          signal: timeoutSignal(),
+        },
+      );
+      if (!response.ok && response.status !== 404) {
+        throw new Error("Remoção remota falhou.");
+      }
+    } catch (error) {
+      if (error instanceof StorageUnavailableError) {
+        throw error;
+      }
+      throw new StorageUnavailableError("Serviço de dados offline.");
+    }
+
+    await getPrisma().internalFile.delete({ where: { id: row.id } });
+    return true;
   }
 
   const filePath = path.join(STORAGE_ROOT, row.storageKey);

@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentUser } from "../../../../../../lib/auth";
-import { getInternalFileForDownload } from "../../../../../../lib/internal-files";
+import {
+  getInternalFileForDownload,
+  StorageDisabledError,
+  StorageUnavailableError,
+} from "../../../../../../lib/internal-files";
 
 export const runtime = "nodejs";
 
@@ -12,16 +16,27 @@ function safeDownloadName(value) {
     .slice(0, 180);
 }
 
-export async function GET(_request, context) {
+export async function GET(request, context) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ detail: "Autenticação necessária." }, { status: 401 });
   }
 
-  const params = await context.params;
-  const result = await getInternalFileForDownload(user, params.id);
-  if (!result) {
-    return NextResponse.json({ detail: "Arquivo não encontrado." }, { status: 404 });
+  let result;
+  try {
+    const params = await context.params;
+    result = await getInternalFileForDownload(user, params.id);
+    if (!result) {
+      return NextResponse.json({ detail: "Arquivo não encontrado." }, { status: 404 });
+    }
+  } catch (error) {
+    if (error instanceof StorageDisabledError) {
+      return NextResponse.redirect(new URL("/arquivos", request.url), 302);
+    }
+    if (error instanceof StorageUnavailableError) {
+      return NextResponse.redirect(new URL("/offline", request.url), 302);
+    }
+    throw error;
   }
 
   const fileName = safeDownloadName(result.row.originalName);
