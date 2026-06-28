@@ -3,70 +3,127 @@ import { getPrisma } from "../src/lib/db.js";
 
 const projects = [
   {
+    chapter: "CS",
+    title: "Sistema Interno",
+    subtitle: "Sistema para gerenciamento do Ramo",
+    description:
+      "Sistema Interno do Ramo Estudantil IEEE UFJF, reunindo atas, tarefas, calendário, membros e rotinas de gestão em uma única plataforma.",
+    imageUrl: "/assets/ramo-ieee-ufjf-blue.svg",
+    linkUrl: "https://interno.ieeeufjf.com.br/demo",
+    showOnChapter: true,
+    showOnHome: true,
+  },
+  {
+    chapter: "IAS",
+    title: "ENTENSE",
+    subtitle: "Encontro de Tecnologias e Engenharia",
+    description:
+      "Evento desenvolvido pela IAS para aproximar estudantes, profissionais e empresas em torno de tecnologia, inovação e engenharia.",
+    imageUrl: "/assets/projects/entense-preview.png",
+    linkUrl: "https://entense.ieeeufjf.com.br",
+    showOnChapter: true,
+    showOnHome: true,
+  },
+  {
+    chapter: "EdSoc",
+    title: "HELPIEEE",
+    subtitle: "Guia do Calouro",
+    description:
+      "Projeto desenvolvido pela EdSoc para apoiar estudantes ingressantes com informações úteis sobre a UFJF, cursos, rotina acadêmica e vida universitária.",
+    imageUrl: "/assets/projects/helpieee-preview.png",
+    linkUrl: "https://help.ieeeufjf.com.br",
+    showOnChapter: true,
+    showOnHome: true,
+  },
+  {
     chapter: "RAS",
     title: "Elevador Didático",
     description:
-      "Réplica funcional voltada ao ensino de robótica, reunindo comunicação, programação e saídas de controle em uma estrutura inspirada em sistemas industriais.",
+      "Visando um maior ensinamento da robótica, o projeto tem como principal objetivo o ensino e o desenvolvimento do estudo da robótica. É uma réplica real de sistemas industriais, compondo comunicação, programação e saídas de controle.",
   },
   {
     chapter: "RAS",
     title: "Lego NXT 2.0",
     description:
-      "Montagens com diferentes funções para incentivar crianças a se interessarem por Engenharia em escolas e feiras de ciências.",
+      "Várias montagens para diferentes funções, com o objetivo de incentivar crianças a ingressarem na Engenharia, levando robôs a escolas e feiras de ciências da região.",
   },
   {
     chapter: "RAS",
     title: "Braço Robótico",
     description:
-      "Sistema com motores DC, Arduino UNO e comando via Bluetooth, usado em apresentações e atividades práticas.",
+      "Sistema com cinco motores DC para movimentar um braço robótico, usando Arduino UNO e comando via Bluetooth em conexão com celular, voltado a apresentações e atividades práticas.",
   },
   {
     chapter: "RAS",
     title: "Seguidor de Linha",
     description:
-      "Carro autônomo de alta performance com sensores de refletância, microcontrolador e motores, voltado ao cenário competitivo de robótica.",
+      "Carro autônomo de alta performance com sensores de refletância, microcontrolador e motores, desenvolvido para seguir faixas no menor tempo possível em cenários competitivos de robótica.",
   },
   {
     chapter: "IAS",
     title: "Aquecedor Solar de Baixo Custo",
     description:
-      "Construção de um painel de captação solar para aquecer água de forma sustentável, usando materiais baratos e acessíveis.",
+      "Construção de um painel de captação solar para aquecer água de maneira sustentável, usando materiais baratos e acessíveis a pequenas comunidades e famílias de baixa renda.",
   },
   {
     chapter: "IAS",
     title: "Visitas Técnicas",
     description:
-      "Atividades de integração estudantil-profissional, aproximando membros de ambientes reais de trabalho e pesquisa.",
+      "Visitas técnicas voltadas à interação estudantil-profissional, aproximando membros do futuro ambiente de trabalho, pesquisa e inovação.",
   },
   {
     chapter: "IAS",
-    title: "Organização de Eventos",
+    title: "Organização de eventos",
     description:
-      "Participação na organização de eventos técnicos, como a COBEP, ampliando contato com empresas, investidores e pesquisadores.",
+      "Participação na organização da COBEP, agregando experiência em eventos técnicos e ampliando a interação com empresas, investidores e pesquisadores da área.",
   },
   {
     chapter: "PES",
     title: "Ação Solidária de Conserto de Equipamentos",
     description:
-      "Ação de reparo de eletrodomésticos e eletroeletrônicos para famílias atingidas por chuvas em Juiz de Fora, em parceria com a TPF Soluções.",
+      "Ação solidária de conserto de eletrodomésticos e eletroeletrônicos de famílias atingidas pelas chuvas em Juiz de Fora, em parceria com a TPF Soluções.",
   },
   {
     chapter: "PES",
     title: "Projeto Biodigestor",
     description:
-      "Pesquisa e desenvolvimento de biodigestor em parceria com o IEEE SIGHT UFJF, a partir de resultados no Desafio Biomassa.",
+      "Pesquisa, desenvolvimento e estudo de um biodigestor doado ao projeto após o bom resultado de equipe do Ramo no Desafio Biomassa, em parceria com o IEEE SIGHT UFJF.",
   },
   {
     chapter: "PES",
-    title: "Projeto RES",
+    title: "Gerador Síncrono Didático",
     description:
-      "Iniciativa para divulgar fontes renováveis de energia a estudantes do ensino básico e públicos leigos, usando kits didáticos de energia solar, eólica e eletrólise.",
+      "Projeto construído com sucata para tornar mais didática a explicação sobre geração de energia, demandando estudos sobre princípios de geração e grande comprometimento dos membros.",
+  },
+  {
+    chapter: "PES",
+    title: "Levitador Magnético",
+    description:
+      "Projeto construído no segundo período de 2017, permitindo visualizar um anel metálico levitando em torno de uma barra e exigindo estudos sobre eletromagnetismo.",
+  },
+  {
+    chapter: "PES",
+    title: "Projeto RES (Renewable Energy in Schools)",
+    description:
+      "Projeto global da PES para divulgar fontes renováveis de energia a estudantes do ensino básico e públicos leigos, com apresentações em escolas, feiras e estandes.",
+  },
+  {
+    chapter: "PES",
+    title: "Projeto RES 2.0",
+    description:
+      "Nova versão do Projeto RES, organizada em apresentações para Ensino Médio e Ensino Fundamental II, além da exibição do Kit RES em palestras e eventos.",
   },
   {
     chapter: "PES",
     title: "Smart City",
     description:
-      "Maquete de cidade inteligente movida por fontes renováveis, usada para estudar distribuição e proporções entre fontes renováveis e não renováveis.",
+      "Construção de uma maquete de cidade inteligente movida por fontes renováveis, estudando proporções entre fontes renováveis e não renováveis e redes de distribuição.",
+  },
+  {
+    chapter: "PES",
+    title: "Projeto REC (Renewable Energy in College)",
+    description:
+      "Extensão do Projeto RES para graduação, abordando a situação de energias renováveis no Brasil e no mundo em aulas, palestras e apresentações na UFJF.",
   },
   {
     chapter: "CS",
@@ -84,7 +141,7 @@ const projects = [
     chapter: "WIE",
     title: "Circuito Científico",
     description:
-      "Laboratório de ciências acessível, em parceria com o IEEE SIGHT UFJF, que estimula estudantes da educação básica a se interessarem por exatas.",
+      "Projeto em parceria com o IEEE SIGHT UFJF e extensão da UFJF desde 2018, apresentado como laboratório de ciências acessível para incentivar estudantes da educação básica nas áreas de exatas.",
   },
   {
     chapter: "WIE",
@@ -96,37 +153,49 @@ const projects = [
     chapter: "WIE",
     title: "Motiva WIE",
     description:
-      "Eventos, palestras, treinamentos e intervenções de incentivo para meninas e meninos da engenharia.",
+      "Projeto voltado a incentivar meninas e meninos da engenharia por meio de eventos, palestras, treinamentos e intervenções na Faculdade de Engenharia da UFJF.",
   },
   {
     chapter: "WIE",
     title: "Mutirão Tecnológico",
     description:
-      "Ações voltadas a mulheres em vulnerabilidade social, levando conhecimento técnico diretamente à sociedade.",
+      "Ações voltadas a mulheres em vulnerabilidade social, levando conhecimento técnico diretamente à sociedade em temas como instalações elétricas residenciais.",
+  },
+  {
+    chapter: "WIE",
+    title: "WIE Tech",
+    description:
+      "Projeto que reúne treinamentos ministrados aos membros WIE UFJF e à comunidade externa, incluindo grupo de programação, oficina de Libras e capacitações técnicas.",
   },
   {
     chapter: "SIGHT",
     title: "Projeto HumanizAÇÃO",
     description:
-      "Iniciativa em comunidades vulneráveis com frentes de civil, elétrica, conscientização ambiental, atividades para crianças e rodas de conversa com adolescentes.",
+      "Projeto voltado a ensinar e atuar em comunidades em vulnerabilidade social, com frentes de civil, elétrica, conscientização ambiental, crianças e rodas de conversa.",
   },
   {
     chapter: "SIGHT",
     title: "Domótica",
     description:
-      "Projeto em parceria com a CAS para desenvolver aplicações de automação residencial voltadas à autonomia de pessoas com limitações físicas.",
+      "Projeto em parceria com a CAS para desenvolver e aplicar tecnologias de automação residencial voltadas à autonomia de pessoas com limitações físicas.",
   },
   {
     chapter: "SIGHT",
     title: "MATLAB",
     description:
-      "Capacitação de membros para ministrar minicursos e apoiar alunos de graduação no domínio da ferramenta.",
+      "Projeto para capacitar membros do IEEE SIGHT UFJF a ministrarem minicursos para alunos da Faculdade de Engenharia da UFJF.",
+  },
+  {
+    chapter: "SIGHT",
+    title: "Circuito Científico",
+    description:
+      "Projeto em parceria com o IEEE WIE UFJF para ensinar ciências de forma divertida e dinâmica a alunos da rede básica, com laboratório itinerante de baixo custo.",
   },
   {
     chapter: "SIGHT",
     title: "Campanhas Sociais",
     description:
-      "Campanhas como Doe Futuros e Campanha do Agasalho, arrecadando materiais escolares e roupas para pessoas em vulnerabilidade.",
+      "Ações sociais como Doe Futuros, com doação de materiais escolares, e Campanha do Agasalho, em parceria com a ONG Anjos da Rua de Juiz de Fora.",
   },
 ];
 
@@ -142,11 +211,11 @@ for (const [index, project] of projects.entries()) {
 
   const data = {
     ...project,
-    subtitle: project.title,
+    subtitle: project.subtitle || project.title,
     isPublic: true,
     position: index,
-    showOnChapter: true,
-    showOnHome: false,
+    showOnChapter: typeof project.showOnChapter === "boolean" ? project.showOnChapter : true,
+    showOnHome: typeof project.showOnHome === "boolean" ? project.showOnHome : false,
   };
 
   if (existing) {
@@ -161,4 +230,4 @@ for (const [index, project] of projects.entries()) {
 }
 
 await prisma.$disconnect();
-console.log(`Projetos de capítulos sincronizados: ${projects.length}`);
+console.log(`Projetos antigos do site sincronizados: ${projects.length}`);
