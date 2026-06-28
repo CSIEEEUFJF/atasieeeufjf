@@ -179,34 +179,16 @@ html[data-theme="dark"] .loading-ball {
   line-height: 1.65;
 }
 
-.offline-page {
+.offline-main {
   display: grid;
-  min-height: 100vh;
-  place-items: center;
-  padding: 28px;
-  background:
-    radial-gradient(circle at top left, rgba(0, 98, 155, 0.12), transparent 34rem),
-    var(--off-white);
+  min-height: calc(100vh - 120px);
+  align-items: center;
+  max-width: 1180px;
 }
 
 .offline-card {
   display: grid;
-  width: min(100%, 860px);
-  gap: 34px;
-  padding: clamp(28px, 5vw, 56px);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  background: var(--surface);
-  box-shadow: var(--shadow);
-}
-
-.offline-brand {
-  justify-content: flex-start;
-  color: var(--text-strong);
-}
-
-.offline-brand .home-branch-divider {
-  background: var(--border-strong);
+  gap: 28px;
 }
 
 .offline-content h1 {
@@ -221,7 +203,7 @@ html[data-theme="dark"] .loading-ball {
   max-width: 620px;
   margin: 0;
   color: var(--text-muted);
-  font-size: 1rem;
+  font-size: 1.02rem;
   line-height: 1.7;
 }
 
