@@ -1,1064 +1,695 @@
-# Gerador Web de Atas IEEE com React, Prisma Postgres e SwiftLaTeX
+# Sistema Interno IEEE UFJF
 
-Documentacao principal do projeto `Template-LaTex-ATAIEEE`.
+Documentacao principal do projeto `atasieeeufjf`.
 
-Ultima revisao desta documentacao: `2026-04-22`
-
-> Documentacao modular atualizada do Sistema Interno: [`DOCUMENTACAO_MODULOS.md`](./DOCUMENTACAO_MODULOS.md).
+Ultima revisao desta documentacao: `2026-06-28`
 
 ## 1. Visao geral
 
-Este projeto implementa uma aplicacao web local para criacao, armazenamento e
-geracao de atas de capitulos IEEE, com:
+Este repositorio implementa o **Sistema Interno IEEE UFJF**, publicado em
+`interno.ieeeufjf.com.br`.
 
-- interface React/Next.js para preencher atas
-- autenticacao simples por nome de usuario e senha
-- controle de acesso por capitulo
-- banco PostgreSQL acessado via Prisma ORM para usuarios, sessoes, atas e anexos
-- templates LaTeX por sociedade/capitulo em `classes/`
-- compilacao de PDF no navegador com SwiftLaTeX/WebAssembly
-- APIs do proprio Next.js para entregar templates, assets, persistencia e autenticacao
+O projeto comecou como sistema de geracao e banco de atas, mas hoje e a
+plataforma interna do Ramo Estudantil IEEE UFJF. Ele centraliza:
 
-O ponto mais importante da arquitetura atual e que o backend nao executa
-`pdflatex`. A compilacao final do documento acontece no browser, usando
-SwiftLaTeX e o bundle local de pacotes TeX. O backend serve dados, templates,
-assets e persistencia em Postgres.
+- autenticacao de usuarios;
+- homepage interna com atalhos dos modulos;
+- geracao, salvamento e consulta de atas;
+- tarefas internas por capitulo;
+- calendario interno com eventos recorrentes;
+- area de diretoria;
+- metricas de tarefas por membro;
+- cadastro e gestao de membros;
+- administracao do conteudo do site publico;
+- modo demo aberto para visitantes;
+- notificacoes por e-mail;
+- sincronizacao de tarefas e eventos com Firebase;
+- modulo de arquivos pessoais, atualmente configuravel/desabilitavel.
+
+O sistema foi desenhado para manter as funcoes originais de atas e, ao mesmo
+tempo, permitir a gestao interna do Ramo e dos capitulos.
 
 ## 2. Estado atual
 
 Funciona hoje:
 
-- primeiro acesso cria um usuario administrador
-- login/logout por nome de usuario e senha
-- troca de senha pelo proprio usuario ao clicar no nome no header
-- sessoes persistidas em cookie HTTP-only
-- APIs para cadastro de membros por administradores e gestores de capitulo
-- APIs para cadastro de novos administradores por administradores
-- APIs para edicao de permissao de administrador de outros usuarios
-- pagina `/membros` disponivel para administradores e usuarios com cargo diferente de `Membro`
-- cargo/função cadastrado por sociedade no usuario
-- associacao de membros a capitulos especificos
-- isolamento de atas por capitulo no backend
-- formulario web para criar atas
-- selecao de membros cadastrados ao preencher presenca da ata
-- importacao e exportacao de rascunho JSON
-- upload de anexos pelo navegador
-- salvamento de atas e anexos no Postgres
-- nome personalizavel para atas salvas
-- pagina `/atas` com biblioteca separada por capitulo
-- clique em ata salva para gerar PDF diretamente quando a ata nao depende de anexos reenviados
-- opcao "Abrir no gerador" para editar ata salva antes de gerar
-- barra de progresso com estimativa durante a geracao de PDF
-- geracao de PDF no navegador com SwiftLaTeX
-- suporte aos templates atuais em `classes/`
+- login em `/login`;
+- redirecionamento automatico de usuarios deslogados para login;
+- homepage interna em `/`;
+- modo demo publico em `/demo`;
+- hub de atas em `/atas`;
+- banco de atas salvas em `/atas/banco`;
+- criacao de nova ata em `/atas/nova`;
+- geracao de PDF no navegador com SwiftLaTeX;
+- templates de ata para Ramo e capitulos;
+- salvamento de atas e metadados de anexos no PostgreSQL;
+- pagina de tarefas em `/tarefas`;
+- pagina de calendario em `/calendario`;
+- pagina de membros em `/membros`;
+- area restrita de diretoria em `/diretoria`;
+- subrotas de diretoria para membros, metricas e site;
+- administracao de membros publicados no site;
+- administracao de projetos publicados no site;
+- administracao de fotos da homepage do site;
+- administracao e importacao de fotos historicas do site;
+- APIs publicas para o site `SiteRamo`;
+- notificacoes via Resend;
+- sincronizacao com Firebase;
+- protecoes de login, sessao, permissao e rate limit.
 
-Pontos importantes do estado atual:
+Pontos importantes:
 
-- a compilacao de PDF e client-side
-- a conexao do banco usa `DATABASE_URL`
-- schema do banco fica em `prisma/schema.prisma` e e sincronizado por `prisma db push`
-- anexos salvos ficam somente como metadados no Postgres; arquivos binarios nao sao persistidos
-- o primeiro usuario criado vira admin e membro de todos os capitulos
-- membros sem vinculo com um capitulo nao conseguem acessar atas daquele capitulo
-- a implementacao antiga em `web_atas/` foi mantida apenas como referencia
-- ainda ha um warning conhecido do Turbopack ligado a rota dinamica do bundle TeX
+- a antiga rota publica `/admin` foi removida;
+- a administracao do site fica dentro de `/diretoria/site`;
+- o sistema de atas continua existindo, mas agora e um modulo do Sistema Interno;
+- o banco PostgreSQL e a fonte primaria de dados;
+- o Firebase e usado para sincronizacao com o aplicativo;
+- o modulo de arquivos pode ser desabilitado com `INTERNAL_FILES_STORAGE_MODE=disabled`;
+- o modo demo nao deve gravar dados reais nem enviar PDF ao servidor.
 
-## 3. Stack e runtime
+## 3. Tecnologias
 
-## 3.1 Plataforma
+Principais tecnologias:
 
-- Framework web: `Next.js 16`
-- Interface: `React 19`
-- Runtime: `Node.js 20.19+`
-- Banco: `PostgreSQL`
-- ORM: `Prisma`
-- Driver: `pg` via `@prisma/adapter-pg`
-- Compilador LaTeX no browser: `SwiftLaTeX`
-- Motor usado pelo app: `PdfTeXEngine`
-- Assets do motor: `public/swiftlatex/`
-- Bundle TeX local: `texlive/local/pdftex/`
+- Next.js 16;
+- React 19;
+- Prisma 7;
+- PostgreSQL;
+- Resend;
+- SwiftLaTeX/WebAssembly;
+- templates LaTeX por capitulo;
+- Firebase para sincronizacao com o aplicativo;
+- DeepL para traducao automatica de biografias;
+- CSS global em `src/app/globals.css`.
 
-## 3.2 Scripts npm
+Scripts principais:
 
-Definidos em [`package.json`](./package.json):
+```bash
+npm run dev
+npm run build
+npm run start
+npm run db:generate
+npm run db:push
+npm run db:studio
+```
 
-- `npm run dev` - inicia o Next.js em modo desenvolvimento
-- `npm run build` - gera Prisma Client, sincroniza o schema quando `DATABASE_URL` existe e gera build de producao
-- `npm run vercel-build` - alias do build usado para Vercel
-- `npm start` - inicia o servidor de producao apos build
-- `npm run db:generate` - gera Prisma Client
-- `npm run db:push` - sincroniza o schema Prisma no banco
-- `npm run db:deploy` - alias de `prisma db push` para deploy
-- `npm run db:studio` - abre Prisma Studio
-- `npm run vendor:texlive` - regenera o bundle local de pacotes TeX
+Scripts auxiliares:
 
-## 3.3 Requisitos
-
-Ambiente esperado:
-
-- `Node.js >= 20.19.0`
-- `npm`
-- banco PostgreSQL acessivel pela aplicacao
-- variavel `DATABASE_URL`
-- navegador moderno com suporte a WebAssembly
-
-Nao e necessario instalar:
-
-- `pdflatex`
-- TeX Live completo no sistema
+```bash
+npm run members:import-contacts
+npm run site-projects:seed-chapters
+npm run vendor:texlive
+```
 
 ## 4. Estrutura do repositorio
 
 Principais diretorios:
 
-- [`classes`](./classes): classes LaTeX e imagens por capitulo/sociedade
-- [`exemplos`](./exemplos): payloads JSON de exemplo
-- [`public/swiftlatex`](./public/swiftlatex): runtime SwiftLaTeX/WASM servido estaticamente
-- [`prisma`](./prisma): schema Prisma do banco PostgreSQL
-- [`scripts`](./scripts): scripts auxiliares, incluindo vendor do TeX Live
-- [`src/app`](./src/app): rotas App Router do Next.js
-- [`src/components`](./src/components): componentes React principais
-- [`src/lib`](./src/lib): regras de negocio, banco, auth e compilacao
-- [`texlive/local`](./texlive/local): bundle local de arquivos TeX usado pelo SwiftLaTeX
-- [`web_atas`](./web_atas): implementacao anterior mantida como referencia
+- [`src/app`](./src/app): rotas App Router, paginas e APIs.
+- [`src/components`](./src/components): telas e componentes React.
+- [`src/lib`](./src/lib): regras de negocio, banco, auth, atas, e-mails e integracoes.
+- [`prisma`](./prisma): schema Prisma do banco PostgreSQL.
+- [`classes`](./classes): templates LaTeX por capitulo.
+- [`public`](./public): logos, fontes, fotos, SwiftLaTeX e assets.
+- [`scripts`](./scripts): scripts de manutencao, importacao e build.
+- [`ata-receiver`](./ata-receiver): servico auxiliar para recebimento externo de arquivos/PDFs.
+- [`texlive`](./texlive): arquivos TeX locais usados pelo SwiftLaTeX.
 
-Arquivos principais:
+Arquivos mais importantes:
 
-- [`src/components/AtaApp.jsx`](./src/components/AtaApp.jsx): gerador principal de atas
-- [`src/components/SavedAtasPage.jsx`](./src/components/SavedAtasPage.jsx): biblioteca de atas salvas
-- [`src/components/MembersPage.jsx`](./src/components/MembersPage.jsx): gestao visivel de membros, cargos e admins
-- [`src/lib/ata.js`](./src/lib/ata.js): sociedades, renderizacao LaTeX e utilitarios herdados
-- [`src/lib/auth.js`](./src/lib/auth.js): usuarios, senhas, sessoes e autorizacao
-- [`src/lib/db.js`](./src/lib/db.js): cliente Prisma e conexao Postgres
-- [`src/lib/saved-atas.js`](./src/lib/saved-atas.js): persistencia e controle de acesso das atas
-- [`src/lib/swiftlatex-client.js`](./src/lib/swiftlatex-client.js): compilacao PDF no navegador
-- [`src/app/api`](./src/app/api): rotas HTTP do backend Next.js
-- [`next.config.mjs`](./next.config.mjs): configuracao do Next.js
-- [`start_web.sh`](./start_web.sh): bootstrap auxiliar para ambiente web
+- [`middleware.js`](./middleware.js): protecao de rotas e redirecionamento para login.
+- [`src/app/layout.jsx`](./src/app/layout.jsx): layout raiz e metadados.
+- [`src/app/globals.css`](./src/app/globals.css): tema visual do sistema.
+- [`prisma/schema.prisma`](./prisma/schema.prisma): modelos de dados.
+- [`src/lib/auth.js`](./src/lib/auth.js): autenticacao, usuarios, sessoes e permissoes.
+- [`src/lib/ata.js`](./src/lib/ata.js): templates, sociedades e renderizacao LaTeX.
+- [`src/lib/saved-atas.js`](./src/lib/saved-atas.js): banco de atas salvas.
+- [`src/lib/internal.js`](./src/lib/internal.js): tarefas, calendario e metricas.
+- [`src/lib/email-notifications.js`](./src/lib/email-notifications.js): e-mails do sistema.
+- [`src/lib/firebase-sync.js`](./src/lib/firebase-sync.js): sincronizacao com Firebase.
+- [`src/lib/site-members.js`](./src/lib/site-members.js): membros do site publico.
+- [`src/lib/site-projects.js`](./src/lib/site-projects.js): projetos do site publico.
+- [`src/lib/site-home-photos.js`](./src/lib/site-home-photos.js): fotos da home do site.
+- [`src/lib/site-history-photos.js`](./src/lib/site-history-photos.js): fotos historicas do site.
+- [`src/lib/internal-files.js`](./src/lib/internal-files.js): arquivos pessoais.
 
-## 5. Arquitetura de software
+## 5. Paginas do sistema
 
-## 5.1 Camadas principais
+## 5.1 `/login`
 
-- Interface React
-  - renderiza formularios
-  - controla estado local
-  - faz chamadas para as APIs
-  - executa a compilacao SwiftLaTeX no navegador
+Pagina de autenticacao.
 
-- API Next.js
-  - autentica usuarios
-  - entrega sociedades disponiveis
-  - entrega templates LaTeX e imagens
-  - salva e recupera atas
-  - aplica autorizacao por capitulo
-  - serve arquivos do bundle TeX local
+Funcoes:
 
-- Banco PostgreSQL/Prisma
-  - persiste usuarios
-  - persiste sessoes
-  - persiste associacoes usuario-capitulo
-  - persiste atas
-  - persiste anexos
+- exibir o formulario de login;
+- permitir acesso ao modo demo;
+- redirecionar usuario autenticado para a homepage;
+- usar layout em tela cheia com identidade visual do Ramo.
 
-- Templates LaTeX
-  - ficam em `classes/<CAPITULO>/`
-  - incluem `.cls` e pasta `imagens/`
-  - sao enviados para o navegador pela API `/api/latex/project`
+Rotas de API relacionadas:
 
-- Runtime SwiftLaTeX
-  - fica em `public/swiftlatex/`
-  - e carregado no browser
-  - usa arquivos TeX sob demanda pela rota `/api/swiftlatex/texlive/...`
+- `POST /api/auth/login`
+- `POST /api/auth/setup`
+- `GET /api/auth/me`
 
-## 5.2 Componentes React
+## 5.2 `/`
 
-[`src/components/AtaApp.jsx`](./src/components/AtaApp.jsx):
+Homepage interna.
 
-- tela inicial de login/setup
-- formulario completo da ata
-- selecao de capitulo permitido ao usuario
-- cadastro de membros presentes
-- selecao de membros cadastrados com cargo preenchido automaticamente conforme a sociedade da ata
-- cadastro de pautas e resultados
-- anexos opcionais
-- importacao/exportacao de rascunho JSON
-- salvamento da ata no banco
-- abertura de ata salva via `/?ata=<id>`
-- geracao de PDF pelo SwiftLaTeX
+Funcoes:
 
-[`src/components/SavedAtasPage.jsx`](./src/components/SavedAtasPage.jsx):
+- saudar o usuario;
+- exibir slideshow/fotos do Ramo quando configurado;
+- oferecer atalhos para atas, tarefas, calendario e diretoria;
+- mostrar o botao de diretoria apenas para usuarios autorizados;
+- permitir alternancia de tema.
 
-- listagem de atas separadas por capitulo
-- geracao de PDF ao clicar em uma ata
-- botao explicito `Gerar PDF`
-- link `Abrir no gerador`
-- exclusao de atas
+## 5.3 `/atas`
 
-## 5.3 Bibliotecas internas
+Hub do modulo de atas.
 
-[`src/lib/ata.js`](./src/lib/ata.js):
+Funcoes:
 
-- registra os capitulos/sociedades suportados
-- lista sociedades
-- normaliza nomes de arquivo
-- escapa texto para LaTeX
-- renderiza o conteudo `.tex`
-- mantem funcoes legadas de geracao backend, sem uso principal no fluxo atual
+- perguntar se o usuario quer consultar banco de atas ou criar nova ata;
+- direcionar para `/atas/banco` ou `/atas/nova`;
+- manter o fluxo de atas separado da homepage.
 
-[`src/lib/auth.js`](./src/lib/auth.js):
+## 5.4 `/atas/nova`
 
-- cria usuarios
-- normaliza nomes de usuario
-- gera hash de senha com `scrypt`
-- valida credenciais
-- altera senha do proprio usuario apos confirmar a senha atual
-- cria sessoes
-- limpa sessoes expiradas
-- aplica cookie HTTP-only
-- lista capitulos disponiveis
-- lista usuarios para admins
+Gerador de atas.
 
-[`src/lib/db.js`](./src/lib/db.js):
+Funcoes:
 
-- cria o Prisma Client sob demanda
-- usa `DATABASE_URL` como string de conexao
-- usa `@prisma/adapter-pg` para falar com PostgreSQL
-- mantem a conexao lazy para evitar acesso ao banco durante import/build
-- o schema estrutural fica em [`prisma/schema.prisma`](./prisma/schema.prisma)
-
-[`src/lib/saved-atas.js`](./src/lib/saved-atas.js):
-
-- normaliza payloads de atas
-- processa JSON com dados da ata
-- extrai e salva somente metadados de anexos
-- salva, atualiza, renomeia, lista, abre e remove atas
-- aplica controle de acesso por capitulo em todas as operacoes
-
-[`src/lib/swiftlatex-client.js`](./src/lib/swiftlatex-client.js):
-
-- carrega `PdfTeXEngine.js`
-- gera/cacheia o formato `swiftlatexpdftex.fmt`
-- carrega `pdftex.map` com cache-buster
-- cria um worker SwiftLaTeX novo por compilacao
-- escreve templates, imagens, anexos e `main.tex` no filesystem em memoria
-- compila e retorna um `Blob` PDF
-
-## 5.4 Fronteira client/server
-
-No servidor:
-
-- PostgreSQL via Prisma
-- autenticacao
-- autorizacao
-- APIs REST
-- leitura de arquivos do repositorio
-- entrega de assets TeX e templates
-
-No navegador:
-
-- estado do formulario
-- leitura de anexos selecionados
-- reconstrucao de anexos salvos em `File`
-- montagem do projeto LaTeX em memoria
-- execucao do SwiftLaTeX/WebAssembly
-- download do PDF gerado
-
-## 6. Fluxos principais
-
-## 6.1 Primeiro acesso
-
-1. Usuario abre `http://127.0.0.1:3000`.
-2. A UI chama `GET /api/auth/me`.
-3. Se nao houver usuarios, a API retorna `setupRequired: true`.
-4. A tela pede nome, nome de usuario e senha.
-5. O frontend envia `POST /api/auth/setup`.
-6. O backend cria o primeiro usuario como admin.
-7. O backend associa esse admin a todos os capitulos.
-8. O backend cria a sessao e envia cookie HTTP-only.
-9. A UI libera o gerador.
-
-## 6.2 Login normal
-
-1. Usuario informa nome de usuario e senha.
-2. Frontend envia `POST /api/auth/login`.
-3. Backend busca `users.username`.
-4. Senha e validada com `scrypt`.
-5. Backend cria uma sessao em `sessions`.
-6. Cookie `atas_ieee_session` e gravado no navegador.
-7. `GET /api/auth/me` passa a retornar o usuario autenticado.
-
-Parametros atuais:
-
-- identificador: nome de usuario
-- senha minima: `6` caracteres
-- validade da sessao: `14 dias`
-- cookie: HTTP-only, `SameSite=Lax`
-
-## 6.3 Criacao e geracao de ata pelo gerador
-
-1. Usuario entra no gerador em `/`.
-2. A UI carrega sociedades por `GET /api/sociedades`.
-3. A UI filtra os capitulos conforme `user.chapters`.
-4. Usuario preenche dados da reuniao.
-5. Usuario adiciona membros presentes.
-6. Usuario adiciona pautas e resultados.
-7. Usuario adiciona anexos opcionais.
-8. Ao clicar em `Gerar PDF`, a UI valida campos obrigatorios.
-9. A UI salva ou atualiza automaticamente a ata no banco.
-10. A UI exibe uma barra de progresso com tempo estimado.
-11. A UI chama `compileAtaPdfInBrowser()`.
-12. O navegador busca o bundle da sociedade por `GET /api/latex/project`.
-13. O navegador carrega SwiftLaTeX e arquivos TeX necessarios.
-14. O navegador monta `main.tex` e anexos em memoria.
-15. O SwiftLaTeX gera o PDF.
-16. O download e iniciado no navegador.
-
-## 6.4 Salvamento de ata
-
-1. Usuario preenche ou abre uma ata.
-2. Opcionalmente informa `Nome da ata`, usado na biblioteca.
-3. Clica em `Salvar ata` ou `Atualizar ata`.
-4. Frontend envia JSON para `/api/atas`.
-5. Payload contem nome da ata, dados da ata e metadados dos anexos.
-6. Arquivos binarios dos anexos nao sao enviados para salvamento.
-7. Backend valida sessao.
-8. Backend valida se o usuario pertence ao capitulo selecionado.
-9. Backend salva a ata em `atas`.
-10. Backend salva anexos em `ata_attachments`.
-11. A UI informa `Ata salva com sucesso`.
-
-## 6.5 Geracao de PDF a partir de ata salva
-
-1. Usuario abre `/atas`.
-2. A pagina lista atas agrupadas por capitulo.
-3. Usuario clica no card de uma ata ou no botao `Gerar PDF`.
-4. Frontend busca detalhes por `GET /api/atas/:id`.
-5. Backend so retorna a ata se o usuario tiver acesso ao capitulo.
-6. Frontend reconstrui anexos salvos como `File`.
-7. Frontend valida campos obrigatorios.
-8. Frontend chama `compileAtaPdfInBrowser()`.
-9. PDF e gerado e baixado no navegador.
-
-## 6.6 Abrir ata salva no gerador
-
-1. Usuario clica em `Abrir no gerador`.
-2. Navegador abre `/?ata=<id>`.
-3. O gerador detecta o parametro `ata`.
-4. A UI busca `GET /api/atas/:id`.
-5. O formulario e preenchido com os dados salvos.
-6. Usuario pode editar, salvar novamente ou gerar PDF.
-
-## 6.7 APIs de membros por admin ou gestor de capitulo
-
-1. Admin ou gestor de capitulo abre `/membros`.
-2. Cliente autenticado envia `POST /api/users`.
-3. Backend valida que o solicitante e admin ou tem cargo diferente de `Membro` no capitulo.
-4. Backend cria o usuario com nome, nome de usuario, cargo/função padrao e senha inicial.
-5. Se o solicitante for gestor de capitulo, o novo usuario e criado como `Membro` apenas nos capitulos gerenciados.
-6. Se for admin, backend associa o usuario a todos os capitulos.
-7. Novo usuario passa a acessar o escopo associado ao seu perfil.
-8. Admins podem editar nome, cargos por sociedade, capitulos e permissao por `PATCH /api/users/:id`.
-9. A API bloqueia alteracao da propria permissao de administrador.
-
-## 6.8 Importacao e exportacao de rascunho
-
-Exportacao:
-
-1. Usuario clica em `Baixar rascunho`.
-2. A UI monta JSON com os campos da ata.
-3. O arquivo e baixado no navegador.
-
-Importacao:
-
-1. Usuario clica em `Importar rascunho`.
-2. Seleciona um JSON.
-3. A UI preenche o formulario.
-4. Se houver anexos, os arquivos precisam ser reenviados antes de gerar PDF.
-
-Observacao:
-
-- rascunho JSON nao carrega o conteudo binario dos anexos
-- atas salvas no Postgres tambem preservam somente metadados de anexos
-
-## 7. Interface web
-
-## 7.1 Rotas visiveis
-
-- `/` - gerador principal de atas
-- `/atas` - biblioteca de atas salvas
-- `/membros` - gestao de membros, cargos, capitulos e admins, com acesso para admins e gestores de capitulo
-
-## 7.2 Gerador principal
-
-Areas principais:
-
-- login/setup quando nao ha sessao
-- selecao de capitulo/sociedade
-- dados principais da reuniao
-- membros presentes, manualmente ou a partir de membros cadastrados
-- pautas
-- resultados
-- anexos
-- painel lateral de saida
-- sidebar de atalhos para salvar, importar, exportar, limpar e navegar
-- painel de geracao de PDF
+- escolher template visual por capitulo;
+- preencher dados da reuniao;
+- adicionar membros presentes;
+- adicionar pautas;
+- adicionar resultados;
+- adicionar anexos;
+- salvar ata;
+- gerar PDF no navegador;
+- abrir rascunhos;
+- importar/exportar JSON.
 
 Comportamento importante:
 
-- capitulos indisponiveis para o usuario nao aparecem
-- seletor de membros usa `GET /api/users?scope=accessible&chapter=<SOCIEDADE>`
-- usuarios com cargo `Membro` nao acessam a gestao de membros; eles apenas selecionam membros cadastrados durante o preenchimento da ata
-- ao escolher um membro cadastrado, nome e cargo/função da sociedade selecionada sao preenchidos na presenca
-- o bloco `Status` do painel de geracao aparece somente depois do clique em `Gerar PDF`
-- clicar em `Gerar PDF` salva ou atualiza a ata automaticamente antes da compilacao
-- se uma ata e aberta via `/?ata=<id>`, o formulario carrega automaticamente
-- se uma ata aberta for salva novamente, a API usa `PUT /api/atas/:id`
-- se for uma nova ata, a API usa `POST /api/atas`
-- `Nome da ata` define o titulo exibido na biblioteca; se ficar vazio, o nome do PDF e usado
+- o cargo dos membros e calculado conforme o capitulo da ata;
+- atas do Ramo mostram cargos no formato `CARGO-Capitulo`;
+- atas de capitulo mostram diretoria do capitulo apenas com o cargo;
+- presidente de outro capitulo aparece como `Presidente-Capitulo`;
+- demais membros aparecem como `Membro`.
 
-## 7.3 Pagina de atas salvas
+## 5.5 `/atas/banco`
 
-Areas principais:
+Banco de atas salvas.
 
-- status da biblioteca
-- agrupamento por capitulo
-- cards de atas
-- botao `Gerar PDF`
-- link `Abrir no gerador`
-- botao `Renomear`
-- botao `Excluir`
+Funcoes:
 
-Comportamento importante:
+- listar atas por capitulo;
+- respeitar capitulos visiveis ao usuario;
+- abrir ata no gerador;
+- gerar PDF de ata salva;
+- renomear ata;
+- excluir ata.
 
-- clicar no card gera PDF
-- `Abrir no gerador` nao gera PDF; apenas abre para edicao
-- `Renomear` atualiza somente o titulo exibido da ata, preservando conteudo e metadados
-- exclusao remove a ata e seus anexos por cascade no Postgres/Prisma
-- membros comuns veem apenas seus capitulos
-- admins veem todos os capitulos
-- a pagina `/atas` nao exibe cadastro/listagem de membros
+## 5.6 `/tarefas`
 
-## 7.4 Pagina de gestao de membros
+Modulo de tarefas internas.
 
-Areas principais:
+Funcoes:
 
-- cadastro de novo membro
-- campo `Cargo / função padrao` no cadastro
-- caixa expansivel `Sociedades` para controlar capitulos permitidos e cargos por sociedade
-- opcao para criar ou remover permissao de admin
-- lista de usuarios cadastrados
-- edicao de nome, cargos por sociedade, capitulos e permissao de admin
+- listar tarefas abertas e concluidas;
+- filtrar por capitulo;
+- criar tarefa por popup;
+- escolher prioridade, prazo, status e responsavel;
+- criar tarefa para um usuario especifico ou para o capitulo;
+- editar tarefa;
+- concluir tarefa;
+- excluir tarefa;
+- sincronizar com Firebase;
+- enviar notificacoes por e-mail quando habilitado.
 
-Comportamento importante:
+## 5.7 `/calendario`
 
-- admins acessam todos os capitulos em `/membros`
-- usuarios com cargo diferente de `Membro` acessam `/membros` apenas para cadastrar novos membros nos capitulos que gerenciam
-- a rota `/membros` redireciona usuarios sem permissao de gestao para o gerador
-- admins nao podem remover a propria permissao de administrador
-- usuario admin recebe acesso a todos os capitulos
-- o cargo salvo para a sociedade selecionada aparece no seletor de membros do gerador de atas
-- cargos aceitos: `Membro`, `Presidente`, `Vice-Presidente`, `Tesoureiro`, `Webmaster`, `Secretário` e `Conselheiro`
+Modulo de calendario.
 
-## 7.5 Tema visual
+Funcoes:
 
-A interface tem tema claro/escuro:
+- listar eventos;
+- exibir calendario do dia;
+- mostrar horarios agendados;
+- criar evento por popup;
+- editar evento;
+- excluir evento;
+- excluir serie recorrente;
+- criar eventos recorrentes;
+- usar datas/horas em BRT;
+- sincronizar com Firebase;
+- enviar e-mail de notificacao quando habilitado.
 
-- preferencia salva em `localStorage`
-- chave: `atas-ieee-theme`
-- fallback: preferencia do sistema operacional
-- controle visual fica fixo no canto inferior direito
+## 5.8 `/membros`
 
-## 8. Rotas de API
+Lista de membros visiveis.
 
-Todas as rotas de API rodam no runtime `nodejs`.
+Funcoes:
 
-## 8.1 Saude e metadados
+- pesquisar membros;
+- listar membros por escopo permitido;
+- apoiar o preenchimento de atas;
+- mostrar cargos e capitulos.
 
-`GET /api/health`
+## 5.9 `/diretoria`
 
-- retorna status basico da aplicacao
-- resposta esperada: `{ "status": "ok" }`
+Painel restrito de diretoria.
 
-`GET /api/sociedades`
+Funcoes:
 
-- retorna capitulos/sociedades suportados
-- usado pelo gerador para montar os cards de template
+- centralizar atalhos de gestao;
+- abrir cadastro de membros;
+- abrir metricas de tarefas;
+- abrir administracao do site;
+- mostrar acesso negado para usuarios sem permissao.
 
-## 8.2 Autenticacao
+## 5.10 `/diretoria/membros`
 
-`GET /api/auth/me`
+Cadastro e gestao de usuarios.
 
-- retorna usuario autenticado, capitulos e estado de setup
-- tambem informa se ainda e necessario criar o primeiro usuario
+Funcoes:
 
-`POST /api/auth/setup`
+- criar novo usuario/membro;
+- informar e-mail;
+- definir capitulos;
+- definir cargos por capitulo;
+- editar membros existentes;
+- controlar permissao de administrador quando o usuario atual pode;
+- enviar e-mail de boas-vindas quando habilitado.
 
-- cria o primeiro usuario
-- so funciona se ainda nao houver usuarios
-- usuario criado vira admin
-- usuario criado recebe todos os capitulos
+## 5.11 `/diretoria/tarefas`
 
-Payload:
+Metricas de tarefas.
 
-```json
-{
-  "name": "Nome",
-  "username": "usuario",
-  "password": "123456"
-}
-```
+Funcoes:
 
-`POST /api/auth/login`
+- exibir tarefas registradas por membro;
+- exibir tarefas concluidas por membro;
+- separar dados por capitulo;
+- restringir visualizacao conforme cargo.
 
-- autentica por nome de usuario e senha
-- cria cookie de sessao
+Regras:
 
-Payload:
+- diretoria do Ramo ve todos os capitulos;
+- presidente/diretoria de capitulo ve apenas o proprio capitulo.
 
-```json
-{
-  "username": "usuario",
-  "password": "123456"
-}
-```
+## 5.12 `/diretoria/site`
 
-`POST /api/auth/logout`
+Administracao do conteudo do site publico.
 
-- remove sessao atual
-- limpa cookie de sessao
+Funcoes:
 
-## 8.3 Usuarios e membros
+- cadastrar membros exibidos no site;
+- cadastrar projetos exibidos no site;
+- cadastrar fotos da homepage;
+- cadastrar fotos historicas;
+- importar fotos historicas a partir de pasta publica do Google Drive;
+- controlar se um projeto aparece na home, no capitulo, ou em ambos;
+- configurar fotos, zoom e posicao;
+- preencher/traduzir biografias.
 
-`GET /api/users`
+## 5.13 `/arquivos`
 
-- lista usuarios gerenciaveis
-- admins recebem todos os usuarios
-- gestores de capitulo recebem apenas usuarios dos capitulos que gerenciam
+Modulo de armazenamento pessoal.
 
-`GET /api/users?scope=accessible&chapter=CS`
+Estado atual:
 
-- lista opcoes de membros para o seletor de presenca no gerador
-- aceita `chapter=<SOCIEDADE>` para limitar a lista ao capitulo da ata atual
-- usuarios comuns recebem apenas membros associados ao capitulo solicitado e permitido
-- admins podem solicitar qualquer capitulo
-- usado pelo gerador para preencher membros presentes com nome e cargo da sociedade selecionada
+- pode ficar desabilitado;
+- quando desabilitado, o usuario deve ver pagina/estado de indisponibilidade;
+- quando habilitado, separa arquivos por usuario.
 
-`POST /api/users`
+Funcoes previstas/implementadas:
 
-- cria usuario membro
-- exige usuario admin ou gestor de capitulo
-- associa o membro aos capitulos informados
-- se `isAdmin` for `true`, associa o usuario a todos os capitulos
-- gestores de capitulo nao podem criar admins e sempre criam usuarios com cargo `Membro`
-- aceita `cargo` para preencher a funcao padrao do usuario
-- aceita `chapterRoles` para gravar cargos especificos por sociedade
+- upload de arquivos permitidos;
+- download do proprio arquivo;
+- exclusao do proprio arquivo;
+- uso de armazenamento local ou servico remoto.
 
-Payload:
+## 5.14 `/offline`
 
-```json
-{
-  "cargo": "Secretário",
-  "chapterRoles": {
-    "CS": "Secretário"
-  },
-  "name": "Membro CS",
-  "username": "membro.cs",
-  "password": "123456",
-  "chapters": ["CS"],
-  "isAdmin": false
-}
-```
+Pagina de indisponibilidade do servico de dados.
 
-`PATCH /api/users/:id`
+Uso:
 
-- edita nome, cargo padrao, cargos por sociedade, capitulos e permissao de administrador
-- exige usuario admin
-- recebe campos como `{ "name": "Novo nome", "cargo": "Presidente", "chapterRoles": { "CS": "Presidente" }, "chapters": ["CS"], "isAdmin": true }`
-- quando promove para admin, garante acesso a todos os capitulos
-- bloqueia alteracao da propria permissao de administrador
+- indicar que o servico externo de arquivos/dados esta fora do ar;
+- manter o padrao visual do sistema;
+- oferecer retorno para a homepage.
 
-## 8.4 Atas
+## 5.15 `/demo`
 
-`GET /api/atas`
+Modo demonstracao.
 
-- lista atas dos capitulos acessiveis ao usuario
-- aceita filtro opcional `?capitulo=CS`
-- retorna `403` se o usuario tentar filtrar capitulo sem acesso
+Funcoes:
 
-`POST /api/atas`
+- apresentar o sistema para visitantes externos;
+- demonstrar atas, tarefas, calendario e diretoria;
+- usar dados ficticios;
+- nao gravar dados reais;
+- nao enviar PDF ao servidor;
+- exibir contato comercial quando o visitante quiser implementar o sistema.
 
-- cria nova ata
-- recebe JSON com payload da ata e metadados de anexos
-- exige que o usuario pertenca ao capitulo da ata
+## 6. Modulos internos
 
-`GET /api/atas/:id`
+## 6.1 Autenticacao e sessoes
 
-- retorna ata completa, incluindo metadados de anexos
-- retorna `404` se a ata nao existir ou se o usuario nao tiver acesso ao capitulo
+Arquivo principal:
 
-`PUT /api/atas/:id`
+- [`src/lib/auth.js`](./src/lib/auth.js)
 
-- atualiza ata existente
-- substitui metadados de anexos anteriores pelos metadados enviados
-- exige acesso ao capitulo original e ao capitulo novo informado no payload
+Responsabilidades:
 
-`PATCH /api/atas/:id`
+- criar o primeiro usuario;
+- autenticar credenciais;
+- criar sessoes;
+- destruir sessoes;
+- validar usuario atual;
+- aplicar rate limit;
+- bloquear tentativas invalidas;
+- validar politica de senha;
+- definir permissoes por capitulo.
 
-- renomeia ata existente
-- recebe `{ "title": "Novo nome" }`
-- preserva conteudo da ata e metadados de anexos
-- exige acesso ao capitulo da ata
+Regras principais:
 
-`DELETE /api/atas/:id`
+- cookie: `atas_ieee_session`;
+- senha minima: 10 caracteres;
+- senha exige maiuscula, minuscula e numero;
+- limite de sessoes por usuario: 5;
+- lockout apos falhas de login;
+- sessoes expiradas sao removidas automaticamente.
 
-- remove ata
-- remove anexos por cascade
-- exige acesso ao capitulo da ata
+## 6.2 Usuarios, capitulos e cargos
 
-## 8.5 Templates e TeX
+Modelos:
 
-`GET /api/latex/project?sociedade=CS`
+- `User`
+- `UserChapter`
 
-- retorna `documentclass`
-- retorna `.cls`
-- retorna imagens da pasta `imagens/`
-- usado pelo SwiftLaTeX no navegador
+Regras:
 
-`GET /api/swiftlatex/texlive/:engine/:arquivo`
+- todo usuario precisa estar ligado a pelo menos um capitulo;
+- cargo padrao e `Membro`;
+- cargos de diretoria ficam em `chapterRoles`;
+- `isAdmin` libera acesso global;
+- diretoria de capitulo gerencia apenas seus capitulos;
+- diretoria do Ramo tem visao ampla.
 
-- proxy local do bundle TeX
-- atualmente restrito a `pdftex`
-- usa `texlive/local/pdftex/manifest.json`
-- possui validacao de caminho canonico
-- retorna `404 no-store` para arquivo ausente
+## 6.3 Atas e LaTeX
 
-## 9. Modelo de dados
+Arquivos:
 
-## 9.1 Banco PostgreSQL com Prisma
+- [`src/lib/ata.js`](./src/lib/ata.js)
+- [`src/lib/saved-atas.js`](./src/lib/saved-atas.js)
+- [`src/lib/swiftlatex-client.js`](./src/lib/swiftlatex-client.js)
 
-O banco e definido por [`prisma/schema.prisma`](./prisma/schema.prisma) e
-sincronizado diretamente com `prisma db push`.
+Responsabilidades:
 
-Variavel de ambiente obrigatoria:
+- registrar capitulos suportados;
+- carregar classes LaTeX;
+- renderizar `.tex`;
+- escapar texto para LaTeX;
+- montar projeto no navegador;
+- compilar com SwiftLaTeX;
+- salvar ata e metadados.
 
-- `DATABASE_URL` - string de conexao PostgreSQL usada pelo Prisma
+## 6.4 Tarefas e eventos
 
-Variavel opcional para traducao automatica de biografias dos membros do site:
+Arquivo:
 
-- `DEEPL_API_KEY` - chave da DeepL API. Quando uma biografia em portugues ou ingles e salva sem a outra versao, o sistema tenta preencher automaticamente a traducao.
-- `DEEPL_API_URL` - endpoint customizado da DeepL, se necessario. Por padrao, chaves Free usam `https://api-free.deepl.com/v2/translate` e as demais usam `https://api.deepl.com/v2/translate`.
+- [`src/lib/internal.js`](./src/lib/internal.js)
 
-Exemplo local:
+Responsabilidades:
 
-```bash
-DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require"
-DEEPL_API_KEY="sua-chave-deepl"
-```
+- listar tarefas;
+- criar tarefas;
+- editar tarefas;
+- excluir tarefas;
+- listar eventos;
+- criar eventos;
+- editar eventos;
+- excluir eventos;
+- criar recorrencias;
+- calcular metricas.
 
-Comandos principais:
+## 6.5 Notificacoes por e-mail
 
-```bash
-npm run db:generate
-npm run db:push
-npm run db:deploy
-npm run db:studio
-```
+Arquivo:
 
-## 9.2 Tabela `users`
+- [`src/lib/email-notifications.js`](./src/lib/email-notifications.js)
 
-Responsabilidade:
+Responsabilidades:
 
-- guardar membros e administradores
+- e-mail de boas-vindas;
+- e-mail de nova tarefa;
+- e-mail de novo evento;
+- personalizacao por destinatario;
+- limite de 10 e-mails por segundo;
+- filtro para nao enviar a `@local.atas-ieee`.
 
-Campos principais:
+## 6.6 Conteudo do site publico
 
-- `id`
-- `name`
-- `cargo`
-- `chapter_roles`
-- `username`
-- `email`
-- `password_hash`
-- `password_salt`
-- `is_admin`
-- `created_at`
-- `updated_at`
+Arquivos:
 
-Observacoes:
+- [`src/lib/site-members.js`](./src/lib/site-members.js)
+- [`src/lib/site-projects.js`](./src/lib/site-projects.js)
+- [`src/lib/site-home-photos.js`](./src/lib/site-home-photos.js)
+- [`src/lib/site-history-photos.js`](./src/lib/site-history-photos.js)
 
-- a autenticacao usa `username`
-- `email` foi mantido internamente como campo unico auxiliar
-- novos usuarios recebem email interno no formato `<username>@local.atas-ieee`
-- `cargo` funciona como fallback legado
-- `chapter_roles` guarda um objeto JSON com cargos por chave de sociedade, por exemplo `{ "CS": "Presidente" }`
+Responsabilidades:
 
-## 9.3 Tabela `sessions`
+- CRUD de membros do site;
+- CRUD de projetos do site;
+- CRUD de fotos da home;
+- CRUD e importacao de fotos historicas;
+- normalizacao de links do Google Drive;
+- exposicao de APIs publicas para o site.
 
-Responsabilidade:
+## 6.7 Firebase
 
-- guardar sessoes ativas
+Arquivo:
 
-Campos principais:
+- [`src/lib/firebase-sync.js`](./src/lib/firebase-sync.js)
 
-- `id`
-- `user_id`
-- `token_hash`
-- `expires_at`
-- `created_at`
-- `last_seen_at`
+Responsabilidades:
 
-Observacoes:
+- sincronizar tarefas;
+- excluir tarefas no Firebase;
+- sincronizar eventos;
+- excluir eventos no Firebase.
 
-- o token real fica apenas no cookie do navegador
-- o banco guarda somente hash SHA-256 do token
-- sessoes expiradas sao removidas durante verificacoes de usuario
+O PostgreSQL continua sendo a fonte primaria. Firebase e uma integracao para o aplicativo do Ramo.
 
-## 9.4 Tabela `user_chapters`
+## 6.8 Arquivos pessoais
 
-Responsabilidade:
+Arquivo:
 
-- associar usuarios a capitulos
+- [`src/lib/internal-files.js`](./src/lib/internal-files.js)
 
-Campos principais:
+Responsabilidades:
 
-- `user_id`
-- `chapter_key`
-- `created_at`
+- validar arquivos;
+- bloquear extensoes perigosas;
+- separar arquivos por usuario;
+- operar em modo local, remoto ou desabilitado;
+- controlar download e exclusao.
 
-Regra:
+## 7. APIs principais
 
-- acesso a atas e sempre filtrado por `chapter_key`
-- admins criados no setup sao associados a todos os capitulos quando nenhum capitulo especifico e enviado
+## 7.1 Autenticacao
 
-## 9.5 Tabela `atas`
-
-Responsabilidade:
-
-- guardar metadados e payload JSON das atas
-
-Campos principais:
-
-- `id`
-- `user_id`
-- `title`
-- `sociedade`
-- `output_name`
-- `payload_json`
-- `created_at`
-- `updated_at`
-
-Observacoes:
-
-- `sociedade` funciona como chave de capitulo
-- `payload_json` guarda o formulario normalizado
-- a listagem e abertura dependem do capitulo da ata
-
-## 9.6 Tabela `ata_attachments`
-
-Responsabilidade:
-
-- guardar anexos das atas
-
-Campos principais:
-
-- `id`
-- `ata_id`
-- `client_id`
-- `legenda`
-- `file_name`
-- `mime_type`
-- `size`
-- `position`
-
-Observacoes:
-
-- o conteudo binario do arquivo nao e salvo no Postgres
-- para gerar PDF com anexos a partir de uma ata salva, reabra no gerador e reenvie os arquivos
-
-## 10. Capitulos e templates LaTeX
-
-## 10.1 Capitulos suportados
-
-Capitulos/sociedades atuais:
-
-- `AESS`
-- `APS`
-- `CS`
-- `EdSoc`
-- `IAS`
-- `MTTS`
-- `PES`
-- `RAS`
-- `Ramo`
-- `VTS`
-
-Definidos em [`src/lib/ata.js`](./src/lib/ata.js), no objeto `SOCIEDADES`.
-
-## 10.2 Estrutura de um template
-
-Cada capitulo fica em:
-
-```text
-classes/<CAPITULO>/
-```
-
-Arquivos esperados:
-
-- uma classe `.cls`
-- uma pasta `imagens/`
-- opcionalmente exemplos `.tex`
-
-Exemplo:
-
-```text
-classes/CS/
-├── ataCS.cls
-├── ata.tex
-└── imagens/
-```
-
-## 10.3 Contrato do LaTeX gerado
-
-O app gera um `main.tex` com:
-
-- `\documentclass{...}`
-- `\cabecalho`
-- `\info{data_elaboracao}{autor}{data_reuniao}{local}`
-- ambiente `membros`
-- comandos `\membro`
-- ambiente `pautas`
-- comandos `\pauta`
-- ambiente `resultados`
-- comandos `\resultado`
-- ambiente `anexos`
-- comandos `\anexo`
-- `\assinaturas`
-
-As classes `.cls` precisam implementar esses comandos/ambientes.
-
-## 10.4 Adicionar novo capitulo
-
-Passos esperados:
-
-1. Criar pasta em `classes/<NOVO_CAPITULO>`.
-2. Adicionar `.cls` compatível com o contrato acima.
-3. Adicionar `imagens/` com logos e assets necessarios.
-4. Registrar o capitulo em `SOCIEDADES` em [`src/lib/ata.js`](./src/lib/ata.js).
-5. Registrar o nome amigavel em `SOCIEDADE_LABELS`.
-6. Testar `GET /api/latex/project?sociedade=<NOVO_CAPITULO>`.
-7. Gerar PDF pelo navegador.
-8. Validar salvamento e acesso por capitulo.
-
-## 11. SwiftLaTeX e bundle TeX
-
-## 11.1 Runtime SwiftLaTeX
-
-Arquivos servidos de [`public/swiftlatex`](./public/swiftlatex):
-
-- `PdfTeXEngine.js`
-- `swiftlatexpdftex.js`
-- `swiftlatexpdftex.wasm`
-- outros runtimes mantidos como apoio
-
-O app usa `PdfTeXEngine`.
-
-## 11.2 Formato local
-
-O navegador gera o formato:
-
-```text
-swiftlatexpdftex.fmt
-```
-
-Esse formato e cacheado em memoria pela pagina enquanto ela esta aberta.
-
-## 11.3 `pdftex.map`
-
-O app carrega `pdftex.map` explicitamente antes da compilacao.
-
-Motivo:
-
-- evitar falhas de fonte como `cmssbx10 not found`
-- evitar cache ruim de respostas `404`
-- garantir que o worker do SwiftLaTeX tenha o mapa de fontes certo
-
-## 11.4 Bundle TeX local
-
-Bundle atual:
-
-```text
-texlive/local/pdftex/
-```
-
-Manifest:
-
-```text
-texlive/local/pdftex/manifest.json
-```
-
-Regeneracao:
-
-```bash
-npm run vendor:texlive
-```
-
-## 11.5 Fluxo de compilacao no navegador
-
-1. Carrega runtime SwiftLaTeX.
-2. Cria novo worker `PdfTeXEngine`.
-3. Injeta `swiftlatexpdftex.fmt`.
-4. Injeta `pdftex.map`.
-5. Baixa bundle da sociedade.
-6. Escreve `.cls`, imagens e anexos no filesystem em memoria.
-7. Escreve `main.tex`.
-8. Define `main.tex` como arquivo principal.
-9. Executa `compileLaTeX()`.
-10. Fecha o worker.
-11. Retorna `Blob` PDF.
-
-## 12. Persistencia
-
-## 12.1 O que fica no Postgres
-
-Ficam persistidos:
-
-- usuarios
-- hashes de senha
-- sessoes
-- associacoes usuario-capitulo
-- atas salvas
-- payload JSON das atas
-- metadados de anexos
-
-Nao ficam persistidos:
-
-- arquivos binarios dos anexos
-- estado visual do formulario nao salvo
-- caches SwiftLaTeX do navegador
-- arquivos temporarios de build
-- arquivos `.next/`
-
-## 12.2 Rascunhos JSON
-
-Rascunhos exportados pelo botao `Baixar rascunho` contem:
-
-- sociedade
-- nome de saida
-- datas
-- autor
-- local
-- membros
-- pautas
-- resultados
-- metadados de anexos
-
-Importante:
-
-- rascunhos nao embutem os arquivos binarios dos anexos
-- ao importar rascunho com anexos, o usuario deve reenviar os arquivos
-
-## 12.3 Atas salvas
-
-Atas salvas no banco guardam somente metadados dos anexos.
-
-Ao gerar PDF pela pagina `/atas`:
-
-- atas sem anexos podem ser compiladas diretamente
-- atas com anexos exigem reenvio dos arquivos pelo gerador
-- o compilador recebe apenas arquivos que existem na sessao atual do navegador
-
-## 13. Seguranca
-
-## 13.1 Autenticacao
-
-Modelo atual:
-
-- nome de usuario + senha
-- senha com hash `scrypt`
-- salt individual por usuario
-- cookie HTTP-only
-- token de sessao aleatorio
-- hash do token salvo no banco
-- troca de senha exige sessao ativa e senha atual
-
-Regras de username:
-
-- `3` a `40` caracteres
-- letras, numeros, ponto, hifen ou underline
-- normalizado para minusculas
-- espacos viram ponto
-
-## 13.2 Autorizacao por capitulo
-
-Todas as operacoes de ata passam por autorizacao de capitulo:
-
-- listar
-- filtrar
-- abrir
-- criar
-- atualizar
-- excluir
-- gerar PDF de ata salva
-
-Comportamento:
-
-- usuario sem acesso recebe `403` ao filtrar capitulo proibido
-- usuario sem acesso recebe `404` ao tentar abrir/excluir ata especifica
-- o `404` evita revelar existencia de atas de outro capitulo
-
-## 13.3 Protecoes de API
-
-As rotas mutantes verificam origem:
-
+- `GET /api/auth/me`
 - `POST /api/auth/setup`
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
 - `POST /api/auth/password`
-- `POST /api/atas`
-- `PUT /api/atas/:id`
-- `PATCH /api/atas/:id`
-- `DELETE /api/atas/:id`
+
+## 7.2 Usuarios
+
+- `GET /api/users`
 - `POST /api/users`
-- `PATCH /api/users/:id`
+- `PATCH /api/users/[id]`
 
-A funcao `isSameOriginRequest()` bloqueia origens diferentes quando o header
-`Origin` esta presente.
+## 7.3 Atas
 
-## 13.4 Limitacoes atuais de seguranca
+- `GET /api/atas`
+- `POST /api/atas`
+- `GET /api/atas/[id]`
+- `PUT /api/atas/[id]`
+- `PATCH /api/atas/[id]`
+- `DELETE /api/atas/[id]`
 
-Ainda nao ha:
+## 7.4 Tarefas
 
-- recuperacao de senha
-- edicao de usuario existente
-- remocao de usuario pela UI
-- politicas avancadas de senha
-- rate limit de login
-- auditoria de acoes administrativas
+- `GET /api/internal/tasks`
+- `POST /api/internal/tasks`
+- `PATCH /api/internal/tasks/[id]`
+- `DELETE /api/internal/tasks/[id]`
+- `GET /api/internal/task-metrics`
 
-## 14. Desenvolvimento local
+## 7.5 Eventos
 
-## 14.1 Instalacao
+- `GET /api/internal/events`
+- `POST /api/internal/events`
+- `PATCH /api/internal/events/[id]`
+- `DELETE /api/internal/events/[id]`
 
-Na raiz do repositorio:
+## 7.6 Site publico
+
+Leitura publica:
+
+- `GET /api/site-members`
+- `GET /api/site-projects`
+- `GET /api/site-home-photos`
+- `GET /api/site-history-photos`
+
+Gerenciamento:
+
+- `GET/POST /api/site-members/manage`
+- `PATCH/DELETE /api/site-members/manage/[id]`
+- `GET/POST /api/site-projects/manage`
+- `PATCH/DELETE /api/site-projects/manage/[id]`
+- `GET/POST /api/site-home-photos/manage`
+- `PATCH/DELETE /api/site-home-photos/manage/[id]`
+- `GET/POST /api/site-history-photos/manage`
+- `PATCH/DELETE /api/site-history-photos/manage/[id]`
+- `POST /api/site-history-photos/manage/import`
+
+## 7.7 Arquivos
+
+- `GET /api/internal/files`
+- `POST /api/internal/files`
+- `DELETE /api/internal/files/[id]`
+- `GET /api/internal/files/[id]/download`
+
+## 7.8 PDF e LaTeX
+
+- `GET /api/latex/project`
+- `GET /api/swiftlatex/texlive/[engine]/[...slug]`
+- `POST /api/pdf-forward/session`
+- `POST /api/pdf-forward`
+
+## 8. Modelo de dados
+
+Modelos principais em [`prisma/schema.prisma`](./prisma/schema.prisma):
+
+- `User`: usuario do sistema.
+- `Session`: sessao autenticada.
+- `UserChapter`: relacao usuario-capitulo.
+- `Ata`: ata salva.
+- `AtaAttachment`: metadados dos anexos da ata.
+- `InternalTask`: tarefa interna.
+- `InternalEvent`: evento interno.
+- `InternalFile`: arquivo pessoal.
+- `SiteMember`: membro publicado no site.
+- `SiteProject`: projeto publicado no site.
+- `SiteHomePhoto`: foto do slideshow da homepage do site.
+- `SiteHistoryPhoto`: foto historica do site.
+- `MemberContact`: contatos importados da base de membros.
+
+## 9. Capitulos suportados
+
+Capitulos/sociedades registrados:
+
+- AESS
+- APS
+- CAS
+- CS
+- EdSoc
+- IAS
+- MTTS
+- PES
+- RAS
+- Ramo
+- SIGHT
+- VTS
+- WIE
+
+Cada capitulo com template de ata deve ter pasta em `classes/<CAPITULO>` com `.cls` compativel com o contrato do gerador.
+
+## 10. Variaveis de ambiente
+
+Banco:
+
+```env
+DATABASE_URL=
+POSTGRES_URL=
+PRISMA_DATABASE_URL=
+```
+
+E-mail:
+
+```env
+EMAIL_NOTIFICATIONS_ENABLED=true
+RESEND_API_KEY=
+EMAIL_FROM=
+```
+
+Firebase:
+
+```env
+FIREBASE_SERVICE_ACCOUNT=
+FIREBASE_PROJECT_ID=
+```
+
+DeepL:
+
+```env
+DEEPL_API_KEY=
+DEEPL_API_URL=
+```
+
+Arquivos:
+
+```env
+INTERNAL_FILES_STORAGE_MODE=disabled
+INTERNAL_STORAGE_DIR=
+INTERNAL_STORAGE_MAX_BYTES=
+INTERNAL_STORAGE_RECEIVER_URL=
+INTERNAL_STORAGE_RECEIVER_TOKEN=
+INTERNAL_STORAGE_RECEIVER_TIMEOUT_MS=
+```
+
+PDF forward:
+
+```env
+PDF_FORWARD_URL=
+PDF_FORWARD_TOKEN=
+PDF_FORWARD_MAX_BYTES=
+```
+
+## 11. Desenvolvimento local
+
+Instalar dependencias:
 
 ```bash
 npm install
 ```
 
-Criar `.env` a partir do exemplo e informar a URL do Postgres:
+Configurar `.env`:
 
 ```bash
 cp .env.example .env
 ```
 
-Sincronizar o schema no banco de desenvolvimento:
+Gerar Prisma Client:
+
+```bash
+npm run db:generate
+```
+
+Sincronizar schema em banco de teste:
 
 ```bash
 npm run db:push
 ```
 
-## 14.2 Modo desenvolvimento
+Rodar localmente:
 
 ```bash
 npm run dev
@@ -1067,42 +698,10 @@ npm run dev
 Abrir:
 
 - `http://127.0.0.1:3000`
-- `http://127.0.0.1:3000/atas`
+- `http://127.0.0.1:3000/login`
+- `http://127.0.0.1:3000/demo`
 
-## 14.3 Build de producao
-
-```bash
-npm run build
-npm start
-```
-
-Para deploy na Vercel, configure `DATABASE_URL` nas variaveis do projeto e use
-o comando de build:
-
-```bash
-npm run vercel-build
-```
-
-Esse comando gera o Prisma Client, executa `prisma db push --accept-data-loss`
-quando `DATABASE_URL` existe e entao roda o build do Next.js.
-
-## 14.4 Bootstrap auxiliar
-
-Script:
-
-```bash
-./start_web.sh
-```
-
-Responsabilidades:
-
-- validar assets SwiftLaTeX
-- garantir manifest TeX quando ausente
-- iniciar fluxo web esperado
-
-## 15. Build e validacao
-
-## 15.1 Comandos principais
+## 12. Build e deploy
 
 Build:
 
@@ -1110,244 +709,89 @@ Build:
 npm run build
 ```
 
-Auditoria de dependencias:
+Start de producao:
 
 ```bash
-npm audit
+npm start
 ```
 
-Regenerar TeX local:
+Build na Vercel:
 
 ```bash
-npm run vendor:texlive
+npm run vercel-build
 ```
 
-Validar schema Prisma:
+Observacoes:
 
-```bash
-npx prisma validate
-```
+- `postinstall` executa `prisma generate`;
+- `npm run build` usa `scripts/build.mjs`;
+- o deploy precisa das variaveis de ambiente configuradas;
+- o banco deve estar sincronizado antes do uso em producao.
 
-## 15.2 Checklist rapido de validacao
+## 13. Seguranca
 
-Depois de mudancas importantes, validar:
+Controles atuais:
 
-1. `npm install`
-2. configurar `DATABASE_URL`
-3. `npm run db:push` em banco de desenvolvimento
-4. `npx prisma validate`
-5. `npm run build`
-6. `npm audit`
-7. primeira criacao de admin
-8. login por nome de usuario
-9. logout
-10. cadastro de membro em `/membros`
-11. edicao de cargo/função por sociedade do membro
-12. associacao de membro a um unico capitulo
-13. promocao/remocao de permissao de admin para outro usuario
-14. bloqueio de edicao da propria permissao de admin
-15. seletor de membro cadastrado no gerador
-16. bloqueio de acesso cruzado entre capitulos
-17. criacao de ata no gerador
-18. salvamento de ata no banco
-19. nome personalizavel da ata salva
-20. renomear ata em `/atas`
-21. listagem em `/atas`
-22. geracao de PDF clicando em ata salva sem anexos
-23. barra de progresso durante geracao de PDF
-24. abertura de ata salva no gerador
-25. geracao de PDF pelo gerador principal
-26. exclusao de ata salva
-27. importacao/exportacao de rascunho JSON
-
-## 15.3 Checklist de SwiftLaTeX
-
-Validar ao mexer em templates, TeX ou assets:
-
-1. `GET /api/latex/project?sociedade=CS`
-2. `GET /api/swiftlatex/texlive/pdftex/11/pdftex.map`
-3. geracao de PDF para `CS`
-4. geracao de PDF para `PES`
-5. geracao de PDF para `IAS`
-6. geracao com anexo de imagem
-7. geracao repetida na mesma aba
-8. hard refresh e nova geracao
-
-## 16. Arquivos importantes para manutencao
-
-- [`src/components/AtaApp.jsx`](./src/components/AtaApp.jsx)
-- [`src/components/SavedAtasPage.jsx`](./src/components/SavedAtasPage.jsx)
-- [`src/components/MembersPage.jsx`](./src/components/MembersPage.jsx)
-- [`src/lib/ata.js`](./src/lib/ata.js)
-- [`src/lib/auth.js`](./src/lib/auth.js)
-- [`src/lib/db.js`](./src/lib/db.js)
-- [`src/lib/saved-atas.js`](./src/lib/saved-atas.js)
-- [`src/lib/swiftlatex-client.js`](./src/lib/swiftlatex-client.js)
-- [`prisma/schema.prisma`](./prisma/schema.prisma)
-- [`src/app/api/atas/route.js`](./src/app/api/atas/route.js)
-- [`src/app/api/atas/[id]/route.js`](./src/app/api/atas/[id]/route.js)
-- [`src/app/api/auth/me/route.js`](./src/app/api/auth/me/route.js)
-- [`src/app/api/auth/login/route.js`](./src/app/api/auth/login/route.js)
-- [`src/app/api/auth/setup/route.js`](./src/app/api/auth/setup/route.js)
-- [`src/app/api/users/route.js`](./src/app/api/users/route.js)
-- [`src/app/api/users/[id]/route.js`](./src/app/api/users/%5Bid%5D/route.js)
-- [`src/app/api/latex/project/route.js`](./src/app/api/latex/project/route.js)
-- [`src/app/api/swiftlatex/texlive/[engine]/[...slug]/route.js`](./src/app/api/swiftlatex/texlive/%5Bengine%5D/%5B...slug%5D/route.js)
-- [`scripts/vendor-texlive.mjs`](./scripts/vendor-texlive.mjs)
-- [`next.config.mjs`](./next.config.mjs)
-
-## 17. Limitacoes e cuidados
-
-## 17.1 SwiftLaTeX
+- senha com hash `scrypt`;
+- salt individual;
+- cookie HTTP-only;
+- `sameSite=lax`;
+- `secure` em producao;
+- rate limit em login, troca de senha e setup;
+- lockout temporario apos falhas;
+- validacao de origem em mutacoes sensiveis;
+- permissao por capitulo;
+- escopo de arquivos por usuario;
+- bloqueio de extensoes perigosas;
+- validacao basica de magic bytes de PDF, PNG e JPG;
+- sanitizacao de URLs;
+- limite de envio de e-mails por segundo;
+- modo demo sem gravacao real.
 
 Cuidados:
 
-- a primeira compilacao pode demorar mais
-- caches antigos do navegador podem afetar assets TeX
-- hard refresh pode ser necessario apos atualizar runtime/manifest
-- pacotes LaTeX novos podem exigir atualizar `scripts/vendor-texlive.mjs`
+- nunca versionar `.env`;
+- nunca expor `DATABASE_URL`;
+- nunca expor tokens Firebase, Resend ou receptor de arquivos;
+- revisar rotas novas que aceitem upload;
+- manter `/diretoria/site` restrito;
+- manter o modulo de arquivos desabilitado enquanto o servico remoto nao estiver pronto.
 
-## 17.2 Banco PostgreSQL/Prisma
+## 14. Checklist de validacao
 
-Cuidados:
+Depois de mudancas importantes:
 
-- `DATABASE_URL` deve apontar para um Postgres acessivel pelo ambiente de deploy
-- o schema de producao deve ser sincronizado com `npm run db:deploy`
-- backups devem ser feitos no provedor Postgres escolhido
-- anexos ficam fora do banco; se for necessario persistir arquivos, considerar storage externo no futuro
-- o schema fica em `prisma/schema.prisma`
+1. `npm run build`.
+2. Login em `/login`.
+3. Redirecionamento de usuario deslogado.
+4. Homepage interna `/`.
+5. Modo demo `/demo`.
+6. Criar ata em `/atas/nova`.
+7. Salvar ata.
+8. Abrir banco em `/atas/banco`.
+9. Gerar PDF.
+10. Criar tarefa.
+11. Atualizar status de tarefa.
+12. Criar evento simples.
+13. Criar evento recorrente.
+14. Editar evento.
+15. Excluir serie recorrente.
+16. Acessar diretoria com usuario autorizado.
+17. Confirmar acesso negado para usuario sem permissao.
+18. Criar membro.
+19. Pesquisar membro.
+20. Ver metricas.
+21. Criar projeto do site.
+22. Publicar membro do site.
+23. Importar fotos historicas do Google Drive.
+24. Consumir `/api/site-projects` pelo site publico.
+25. Testar e-mail com notificacoes habilitadas.
+26. Testar arquivos com `INTERNAL_FILES_STORAGE_MODE=disabled`.
 
-## 17.3 Anexos
+## 15. Documentacao complementar
 
-Cuidados:
+Documentacao mais detalhada dos modulos:
 
-- anexos ficam em memoria durante compilacao
-- anexos salvos preservam nome, tipo MIME, tamanho e legenda
-- rascunhos JSON e atas salvas nao preservam os binarios dos anexos
+- [`DOCUMENTACAO_MODULOS.md`](./DOCUMENTACAO_MODULOS.md)
 
-## 17.4 Backend legado
-
-A pasta [`web_atas`](./web_atas) nao e o fluxo principal.
-
-Cuidados:
-
-- nao usar como backend de producao do app atual
-- tratar como referencia historica
-- manter alteracoes principais na stack Next.js da raiz
-
-## 17.5 Warning conhecido do Turbopack
-
-O build pode mostrar warning de tracing relacionado a:
-
-```text
-src/app/api/swiftlatex/texlive/[engine]/[...slug]/route.js
-```
-
-Estado atual:
-
-- a build passa
-- a geracao de PDF funciona
-- o warning esta ligado ao rastreamento dinamico de arquivos do bundle TeX
-
-## 18. Troubleshooting
-
-## 18.1 `Nao foi possivel carregar pdftex.map (404)`
-
-Possiveis causas:
-
-- servidor Next antigo ainda rodando
-- cache antigo do navegador
-- `texlive/local/pdftex/manifest.json` ausente
-- bundle local nao gerado
-
-Acoes:
-
-1. Reiniciar o servidor Next.
-2. Dar hard refresh no navegador.
-3. Rodar `npm run vendor:texlive`.
-4. Conferir `GET /api/swiftlatex/texlive/pdftex/11/pdftex.map`.
-
-## 18.2 `Font cmssbx10 not found`
-
-Possiveis causas:
-
-- `pdftex.map` nao foi carregado
-- cache antigo de resposta `404`
-- bundle de fontes incompleto
-
-Acoes:
-
-1. Reiniciar o servidor.
-2. Hard refresh.
-3. Regenerar bundle TeX.
-4. Confirmar que `pdftex.map` retorna `200`.
-
-## 18.3 Usuario nao ve um capitulo
-
-Possiveis causas:
-
-- usuario nao esta associado ao capitulo
-- admin ainda nao cadastrou permissao
-- sessao antiga sem dados atualizados
-
-Acoes:
-
-1. Entrar como admin.
-2. Conferir membros por `GET /api/users`.
-3. Criar ou ajustar o membro com o capitulo correto pelas APIs de usuarios.
-4. Fazer logout/login do membro.
-
-## 18.4 Ata nao gera PDF pela pagina `/atas`
-
-Possiveis causas:
-
-- ata salva esta incompleta
-- anexos salvos nao possuem conteudo binario; reabra no gerador e reenvie os arquivos
-- usuario perdeu acesso ao capitulo
-- SwiftLaTeX falhou ao carregar runtime
-
-Acoes:
-
-1. Abrir a ata pelo link `Abrir no gerador`.
-2. Conferir campos obrigatorios.
-3. Reenviar anexos se necessario.
-4. Salvar novamente.
-5. Gerar PDF de novo.
-
-## 18.5 Banco local com dados de teste
-
-Para resetar ambiente local:
-
-1. Parar o servidor Next.
-2. Confirmar que `DATABASE_URL` aponta para um banco de teste.
-3. Executar `npx prisma db push --force-reset`.
-4. Iniciar o app novamente.
-5. Criar o primeiro usuario admin.
-
-## 19. Roadmap tecnico sugerido
-
-Melhorias futuras naturais:
-
-- edicao de membros
-- remocao de membros
-- troca de senha
-- reset de senha por admin
-- backups/exportacao do banco
-- testes automatizados de API
-- teste end-to-end com navegador para SwiftLaTeX
-- tela dedicada de configuracoes
-- filtros e busca em `/atas`
-- download em lote de atas por capitulo
-- historico/auditoria de acoes administrativas
-
-## 20. Documentos auxiliares
-
-Arquivos de apoio atuais:
-
-- [`exemplos/dados_exemplo.json`](./exemplos/dados_exemplo.json): exemplo de payload
-- [`start_web.sh`](./start_web.sh): bootstrap auxiliar
-- [`scripts/vendor-texlive.mjs`](./scripts/vendor-texlive.mjs): geracao do bundle TeX local
-- [`web_atas`](./web_atas): implementacao anterior preservada como referencia
-
-Este `README.md` deve ser tratado como a documentacao principal e mais completa
-do projeto.
+Este `README.md` deve ser tratado como a documentacao principal do sistema atual.

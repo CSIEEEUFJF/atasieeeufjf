@@ -78,7 +78,6 @@ Scripts de manutencao:
 
 ```bash
 npm run members:import-contacts
-npm run members:copy-ras-to-cas
 npm run site-projects:seed-chapters
 npm run vendor:texlive
 ```
