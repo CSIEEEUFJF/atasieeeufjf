@@ -1,7 +1,10 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 
-const FIRESTORE_SCOPE = "https://www.googleapis.com/auth/datastore";
+const FIREBASE_SCOPES = [
+  "https://www.googleapis.com/auth/datastore",
+  "https://www.googleapis.com/auth/firebase.messaging",
+];
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 
 let accessTokenCache;
@@ -45,7 +48,7 @@ function signJwt(serviceAccount) {
     exp: now + 3600,
     iat: now,
     iss: serviceAccount.client_email,
-    scope: FIRESTORE_SCOPE,
+    scope: FIREBASE_SCOPES.join(" "),
   };
   const unsignedToken = `${base64Url(JSON.stringify(header))}.${base64Url(JSON.stringify(claim))}`;
   const signature = crypto
@@ -94,6 +97,7 @@ async function getFirestoreContext() {
 
   return {
     baseUrl: `https://firestore.googleapis.com/v1/projects/${serviceAccount.project_id}/databases/(default)/documents`,
+    messagingUrl: `https://fcm.googleapis.com/v1/projects/${serviceAccount.project_id}/messages:send`,
     token: await getAccessToken(serviceAccount),
   };
 }
@@ -185,6 +189,17 @@ function notificationDocumentId(kind, item) {
   return `atas-${kind}-${item.id}`;
 }
 
+function fcmChapterTopic(chapter) {
+  const normalized = String(chapter || "")
+    .normalize("NFD")
+    .replace(/\p{Mark}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9_.~-]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+  return normalized ? `chapter_${normalized}` : "";
+}
+
 function taskNotificationPayload(task) {
   const responsible = task.assignedTo?.name ? ` Responsável: ${task.assignedTo.name}.` : "";
   return {
@@ -266,14 +281,59 @@ export async function syncTaskToFirebase(task) {
   );
 }
 
+async function sendTopicPush(context, chapter, notification) {
+  const topic = fcmChapterTopic(chapter);
+  if (!topic) {
+    return;
+  }
+
+  const response = await fetch(context.messagingUrl, {
+    body: JSON.stringify({
+      message: {
+        topic,
+        notification: {
+          title: notification.title,
+          body: notification.message,
+        },
+        data: {
+          chapter: String(notification.chapter || ""),
+          message: String(notification.message || ""),
+          source: String(notification.source || ""),
+          sourceId: String(notification.sourceId || ""),
+          title: String(notification.title || ""),
+          type: String(notification.type || ""),
+        },
+        android: {
+          notification: {
+            channel_id: "ramo_internal_updates",
+          },
+        },
+      },
+    }),
+    headers: {
+      Authorization: `Bearer ${context.token}`,
+      "Content-Type": "application/json",
+    },
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Falha ao enviar push FCM para ${topic} (${response.status}).`);
+  }
+}
+
 export async function notifyTaskCreatedInFirebase(task) {
+  const notification = taskNotificationPayload(task);
   await safeFirebaseSync((context) =>
-    patchDocument(
-      context,
-      "notifications",
-      notificationDocumentId("task", task),
-      taskNotificationPayload(task),
-    ),
+    Promise.all([
+      patchDocument(
+        context,
+        "notifications",
+        notificationDocumentId("task", task),
+        notification,
+      ),
+      sendTopicPush(context, task.chapter, notification),
+    ]),
   );
 }
 
@@ -301,13 +361,18 @@ export async function notifyEventsCreatedInFirebase(events) {
     return;
   }
 
+  const notification = eventNotificationPayload(firstEvent, events.length);
+
   await safeFirebaseSync((context) =>
-    patchDocument(
-      context,
-      "notifications",
-      notificationDocumentId("event", firstEvent),
-      eventNotificationPayload(firstEvent, events.length),
-    ),
+    Promise.all([
+      patchDocument(
+        context,
+        "notifications",
+        notificationDocumentId("event", firstEvent),
+        notification,
+      ),
+      sendTopicPush(context, firstEvent.chapter, notification),
+    ]),
   );
 }
 
