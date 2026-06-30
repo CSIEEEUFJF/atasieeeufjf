@@ -2,7 +2,7 @@
 
 Documentacao principal dos modulos do projeto `atasieeeufjf`.
 
-Ultima revisao desta documentacao: `2026-06-28`
+Ultima revisao desta documentacao: `2026-06-30`
 
 ## 1. Visao geral
 
