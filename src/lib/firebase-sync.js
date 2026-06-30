@@ -214,12 +214,10 @@ function taskNotificationPayload(task) {
 }
 
 function eventNotificationPayload(event, count = 1) {
-  const start = event.startTime instanceof Date ? event.startTime : new Date(event.startTime);
-  const recurrence = count > 1 ? ` (${count} ocorrências)` : "";
   return {
     chapter: event.chapter,
     createdAt: new Date(),
-    message: `Novo evento em ${event.chapter}: ${event.title}${recurrence}. Início: ${start.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}.`,
+    message: `Um novo compromisso foi adicionado ao calendário. ${event.title || "Evento sem título"}`,
     read: false,
     source: "atas",
     sourceId: String(event.id),
