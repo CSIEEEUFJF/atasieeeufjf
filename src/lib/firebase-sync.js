@@ -201,11 +201,10 @@ function fcmChapterTopic(chapter) {
 }
 
 function taskNotificationPayload(task) {
-  const responsible = task.assignedTo?.name ? ` Responsável: ${task.assignedTo.name}.` : "";
   return {
     chapter: task.chapter,
     createdAt: new Date(),
-    message: `Nova tarefa em ${task.chapter}: ${task.title}.${responsible}`,
+    message: `Uma nova tarefa foi criada para você. ${task.title || "Tarefa sem título"}`,
     read: false,
     source: "atas",
     sourceId: String(task.id),
