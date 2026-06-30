@@ -10,6 +10,8 @@ import {
 import {
   deleteEventFromFirebase,
   deleteTaskFromFirebase,
+  notifyEventsCreatedInFirebase,
+  notifyTaskCreatedInFirebase,
   syncEventsToFirebase,
   syncEventToFirebase,
   syncTaskToFirebase,
@@ -367,6 +369,7 @@ export async function createInternalTask(user, payload = {}) {
   });
 
   await syncTaskToFirebase(task);
+  await notifyTaskCreatedInFirebase(task);
   if (payload.notifyMembers === true) {
     try {
       await notifyMembersAboutCreatedTask({ creator: user, task });
@@ -509,6 +512,7 @@ export async function createInternalEvent(user, payload = {}) {
   const events = await getPrisma().$transaction(eventCreates);
 
   await syncEventsToFirebase(events);
+  await notifyEventsCreatedInFirebase(events);
   if (payload.notifyMembers === true) {
     try {
       await notifyMembersAboutCreatedEvent({ creator: user, events });

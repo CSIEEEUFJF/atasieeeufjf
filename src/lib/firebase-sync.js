@@ -99,6 +99,10 @@ async function getFirestoreContext() {
 }
 
 function firestoreValue(value) {
+  if (value === null) {
+    return { nullValue: null };
+  }
+
   if (value instanceof Date) {
     return { timestampValue: value.toISOString() };
   }
@@ -132,11 +136,18 @@ function eventDocumentId(event) {
 
 function taskPayload(task) {
   return {
+    assignedToId: task.assignedToId || "",
+    assignedToName: task.assignedTo?.name || "",
     chapter: task.chapter,
     completed: task.status === "done",
+    createdAt: task.createdAt instanceof Date ? task.createdAt : new Date(task.createdAt || Date.now()),
+    createdByName: task.createdBy?.name || "",
     description: task.description || "",
+    dueDate: task.dueDate ? (task.dueDate instanceof Date ? task.dueDate : new Date(task.dueDate)) : null,
+    priority: task.priority || "normal",
     source: "atas",
     sourceId: String(task.id),
+    status: task.status || "pending",
     title: task.title || "",
     updatedAt: new Date(),
   };
@@ -145,18 +156,61 @@ function taskPayload(task) {
 function eventPayload(event) {
   return {
     chapter: event.chapter,
+    createdAt: event.createdAt instanceof Date ? event.createdAt : new Date(event.createdAt || Date.now()),
+    createdByName: event.createdBy?.name || "",
     description: event.description || "",
     endTime: event.endTime instanceof Date ?event.endTime : new Date(event.endTime),
     location: event.location || "",
-    recurrenceCount: event.recurrenceCount || "",
+    recurrenceCount: event.recurrenceCount == null
+      ? null
+      : Number.isInteger(Number(event.recurrenceCount))
+        ? Number(event.recurrenceCount)
+        : null,
     recurrenceFrequency: event.recurrenceFrequency || "",
-    recurrenceIndex: Number.isInteger(event.recurrenceIndex) ?event.recurrenceIndex : "",
+    recurrenceIndex: event.recurrenceIndex == null
+      ? null
+      : Number.isInteger(Number(event.recurrenceIndex))
+        ? Number(event.recurrenceIndex)
+        : null,
     recurrenceSeriesId: event.recurrenceSeriesId || "",
     source: "atas",
     sourceId: String(event.id),
     startTime: event.startTime instanceof Date ?event.startTime : new Date(event.startTime),
     title: event.title || "",
     updatedAt: new Date(),
+  };
+}
+
+function notificationDocumentId(kind, item) {
+  return `atas-${kind}-${item.id}`;
+}
+
+function taskNotificationPayload(task) {
+  const responsible = task.assignedTo?.name ? ` Responsável: ${task.assignedTo.name}.` : "";
+  return {
+    chapter: task.chapter,
+    createdAt: new Date(),
+    message: `Nova tarefa em ${task.chapter}: ${task.title}.${responsible}`,
+    read: false,
+    source: "atas",
+    sourceId: String(task.id),
+    title: task.title || "Nova tarefa",
+    type: "internal_task_created",
+  };
+}
+
+function eventNotificationPayload(event, count = 1) {
+  const start = event.startTime instanceof Date ? event.startTime : new Date(event.startTime);
+  const recurrence = count > 1 ? ` (${count} ocorrências)` : "";
+  return {
+    chapter: event.chapter,
+    createdAt: new Date(),
+    message: `Novo evento em ${event.chapter}: ${event.title}${recurrence}. Início: ${start.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}.`,
+    read: false,
+    source: "atas",
+    sourceId: String(event.id),
+    title: event.title || "Novo evento",
+    type: "internal_event_created",
   };
 }
 
@@ -212,6 +266,17 @@ export async function syncTaskToFirebase(task) {
   );
 }
 
+export async function notifyTaskCreatedInFirebase(task) {
+  await safeFirebaseSync((context) =>
+    patchDocument(
+      context,
+      "notifications",
+      notificationDocumentId("task", task),
+      taskNotificationPayload(task),
+    ),
+  );
+}
+
 export async function deleteTaskFromFirebase(task) {
   await safeFirebaseSync((context) => deleteDocument(context, "tasks", taskDocumentId(task)));
 }
@@ -227,6 +292,22 @@ export async function syncEventsToFirebase(events) {
     Promise.all(events.map((event) =>
       patchDocument(context, "events", eventDocumentId(event), eventPayload(event)),
     )),
+  );
+}
+
+export async function notifyEventsCreatedInFirebase(events) {
+  const firstEvent = Array.isArray(events) ? events[0] : null;
+  if (!firstEvent) {
+    return;
+  }
+
+  await safeFirebaseSync((context) =>
+    patchDocument(
+      context,
+      "notifications",
+      notificationDocumentId("event", firstEvent),
+      eventNotificationPayload(firstEvent, events.length),
+    ),
   );
 }
 
