@@ -10,9 +10,6 @@ import {
 import { getPrisma, nowDate } from "./db";
 import { notifyUserWelcome } from "./email-notifications";
 import {
-  syncFirebaseAuthUser,
-} from "./firebase-auth-admin";
-import {
   syncInternalUserToFirebase,
   syncInternalUsersToFirebase,
 } from "./firebase-sync";
@@ -52,6 +49,11 @@ const globalForSecurity = globalThis;
 
 if (!globalForSecurity.atasAuthRateLimits) {
   globalForSecurity.atasAuthRateLimits = new Map();
+}
+
+async function syncFirebaseAuthUser(user, options = {}) {
+  const { syncFirebaseAuthUser: syncUser } = await import("./firebase-auth-admin");
+  return syncUser(user, options);
 }
 
 export class AuthSecurityError extends Error {
@@ -438,14 +440,20 @@ export async function createUser(
 
 export async function verifyCredentials(username, password) {
   const cleanEmail = normalizeLoginEmail(username);
+  const cleanName = String(username || "").trim();
   const usernameCandidates = usernameLoginCandidates(username);
+  const lookupConditions = [
+    { email: cleanEmail },
+    ...usernameCandidates.map((candidate) => ({ username: candidate })),
+  ];
+  if (cleanName) {
+    lookupConditions.push({ name: { equals: cleanName, mode: "insensitive" } });
+  }
+
   const row = await getPrisma().user.findFirst({
     include: { chapters: true },
     where: {
-      OR: [
-        { email: cleanEmail },
-        ...usernameCandidates.map((candidate) => ({ username: candidate })),
-      ],
+      OR: lookupConditions,
     },
   });
 
@@ -490,12 +498,7 @@ export async function verifyCredentials(username, password) {
     });
   }
 
-  const authenticatedUser = publicUser(row);
-  const firebaseUid = await syncFirebaseAuthUser(authenticatedUser, {
-    password: String(password || ""),
-  });
-  await syncInternalUserToFirebase({ ...authenticatedUser, firebaseUid: firebaseUid || "" });
-  return authenticatedUser;
+  return publicUser(row);
 }
 
 export async function changeOwnPassword(userId, currentPassword, newPassword) {

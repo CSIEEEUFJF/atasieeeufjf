@@ -155,6 +155,10 @@ export default function LoginPage() {
 
   async function handleAuthSubmit(event) {
     event.preventDefault();
+    const loginIdentifier = authForm.username || authForm.name;
+    const authPayload = authMode === "login"
+      ? { ...authForm, name: loginIdentifier, username: loginIdentifier }
+      : authForm;
     setIsAuthenticating(true);
     setAuthMessage({
       tone: "loading",
@@ -163,7 +167,7 @@ export default function LoginPage() {
 
     try {
       const response = await fetch(`/api/auth/${authMode === "setup" ?"setup" : "login"}`, {
-        body: JSON.stringify(authForm),
+        body: JSON.stringify(authPayload),
         headers: {
           "Content-Type": "application/json",
         },

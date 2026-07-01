@@ -164,7 +164,14 @@ export async function POST(request) {
       );
     }
 
-    const user = await verifyCredentials(identifier, password);
+    let user = await verifyCredentials(identifier, password);
+    if (!user) {
+      const resolvedEmail = await resolveFromPrisma(identifier)
+        || await resolveFromInternalUsers(identifier);
+      if (resolvedEmail && resolvedEmail !== identifier) {
+        user = await verifyCredentials(resolvedEmail, password);
+      }
+    }
     if (!user?.email) {
       return NextResponse.json(
         { detail: "Usuário ou senha inválidos." },
