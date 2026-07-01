@@ -15,27 +15,27 @@ import {
 export const runtime = "nodejs";
 
 export async function POST(request) {
-  if (!isSameOriginRequest(request)) {
-    return NextResponse.json(
-      { detail: "Origem invalida." },
-      { headers: noStoreHeaders(), status: 403 },
-    );
-  }
-
-  const rateLimit = checkAuthRateLimit(request, "login");
-  if (rateLimit.limited) {
-    const { body, init } = rateLimitResponse(rateLimit.retryAfterSeconds);
-    return NextResponse.json(body, init);
-  }
-
-  if (!(await hasUsers())) {
-    return NextResponse.json(
-      { detail: "Crie o primeiro usuário antes de entrar." },
-      { headers: noStoreHeaders(), status: 428 },
-    );
-  }
-
   try {
+    if (!isSameOriginRequest(request)) {
+      return NextResponse.json(
+        { detail: "Origem invalida." },
+        { headers: noStoreHeaders(), status: 403 },
+      );
+    }
+
+    const rateLimit = checkAuthRateLimit(request, "login");
+    if (rateLimit.limited) {
+      const { body, init } = rateLimitResponse(rateLimit.retryAfterSeconds);
+      return NextResponse.json(body, init);
+    }
+
+    if (!(await hasUsers())) {
+      return NextResponse.json(
+        { detail: "Crie o primeiro usuário antes de entrar." },
+        { headers: noStoreHeaders(), status: 428 },
+      );
+    }
+
     const { password, username } = await request.json();
     const user = await verifyCredentials(username, password);
 
@@ -65,9 +65,11 @@ export async function POST(request) {
       );
     }
 
+    const message = error.message || "Não foi possível entrar.";
+    const status = message.includes("DATABASE_URL") ? 503 : 400;
     return NextResponse.json(
-      { detail: error.message || "Não foi possível entrar." },
-      { headers: noStoreHeaders(), status: 400 },
+      { detail: message },
+      { headers: noStoreHeaders(), status },
     );
   }
 }
