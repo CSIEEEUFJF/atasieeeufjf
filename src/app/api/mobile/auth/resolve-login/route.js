@@ -119,7 +119,12 @@ async function resolveFromInternalUsers(identifier) {
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
-  const identifier = String(searchParams.get("identifier") || "").trim();
+  const identifier = String(
+    searchParams.get("name") ||
+      searchParams.get("username") ||
+      searchParams.get("identifier") ||
+      "",
+  ).trim();
 
   if (!identifier) {
     return NextResponse.json(
