@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 
 import { getMobileSessionUser } from "../../../../../../lib/mobile-session";
 import {
-  deleteInternalTask,
+  deleteInternalEvent,
   InternalAccessError,
-  updateInternalTask,
+  updateInternalEvent,
 } from "../../../../../../lib/internal";
 
 export const runtime = "nodejs";
@@ -26,23 +26,23 @@ export async function PATCH(request, { params }) {
 
   const id = parseId(await params);
   if (!id) {
-    return NextResponse.json({ detail: "Tarefa invalida." }, { status: 400 });
+    return NextResponse.json({ detail: "Evento invalido." }, { status: 400 });
   }
 
   try {
-    const task = await updateInternalTask(user, id, await request.json());
-    if (!task) {
-      return NextResponse.json({ detail: "Tarefa não encontrada." }, { status: 404 });
+    const event = await updateInternalEvent(user, id, await request.json());
+    if (!event) {
+      return NextResponse.json({ detail: "Evento não encontrado." }, { status: 404 });
     }
 
-    return NextResponse.json({ task });
+    return NextResponse.json({ event });
   } catch (error) {
     if (error instanceof InternalAccessError) {
       return NextResponse.json({ detail: error.message }, { status: 403 });
     }
 
     return NextResponse.json(
-      { detail: error.message || "Não foi possível atualizar a tarefa." },
+      { detail: error.message || "Não foi possível atualizar o evento." },
       { status: 400 },
     );
   }
@@ -56,13 +56,16 @@ export async function DELETE(request, { params }) {
 
   const id = parseId(await params);
   if (!id) {
-    return NextResponse.json({ detail: "Tarefa invalida." }, { status: 400 });
+    return NextResponse.json({ detail: "Evento invalido." }, { status: 400 });
   }
 
   try {
-    const deleted = await deleteInternalTask(user, id);
+    const { searchParams } = new URL(request.url);
+    const deleted = await deleteInternalEvent(user, id, {
+      series: searchParams.get("series") === "true",
+    });
     if (!deleted) {
-      return NextResponse.json({ detail: "Tarefa não encontrada." }, { status: 404 });
+      return NextResponse.json({ detail: "Evento não encontrado." }, { status: 404 });
     }
 
     return NextResponse.json({ ok: true });
@@ -72,7 +75,7 @@ export async function DELETE(request, { params }) {
     }
 
     return NextResponse.json(
-      { detail: error.message || "Não foi possível excluir a tarefa." },
+      { detail: error.message || "Não foi possível excluir o evento." },
       { status: 400 },
     );
   }

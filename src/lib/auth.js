@@ -268,6 +268,8 @@ function publicUser(row) {
     isAdmin: Boolean(row.isAdmin),
     email: row.email || "",
     name: row.name,
+    phoneNumber: row.phoneNumber || "",
+    profilePictureUrl: row.profilePictureUrl || "",
     username: row.username,
   };
   const manageableChapters = getManageableChapterKeys(user);
@@ -290,6 +292,9 @@ function publicMemberOption(row, chapterKey = "") {
   return {
     cargo: normalizeMemberRole(row.cargo, row.cargo || ""),
     chapterRoles: roles,
+    chapters: Array.isArray(row.chapters)
+      ?row.chapters.map(chapterKeyFromRelation).filter(Boolean)
+      : [],
     email: row.email || "",
     id: row.id,
     name: row.name,
@@ -745,9 +750,31 @@ export async function updateUserManagement(currentUser, targetUserId, payload = 
   });
 
   const publicUpdatedUser = publicUser(updatedUser);
-  const firebaseUid = await syncFirebaseAuthUser(publicUpdatedUser);
-  await syncInternalUserToFirebase({ ...publicUpdatedUser, firebaseUid: firebaseUid || "" });
   return publicUpdatedUser;
+}
+
+export async function updateOwnMobileProfile(currentUser, payload = {}) {
+  const cleanName = typeof payload.name === "string" ?payload.name.trim() : currentUser.name;
+  const cleanPhone = typeof payload.phoneNumber === "string" ?payload.phoneNumber.trim() : currentUser.phoneNumber || "";
+  const cleanProfilePictureUrl = typeof payload.profilePictureUrl === "string"
+    ?payload.profilePictureUrl.trim()
+    : currentUser.profilePictureUrl || "";
+
+  if (!cleanName) {
+    throw new Error("Informe o nome do usuário.");
+  }
+
+  const updatedUser = await getPrisma().user.update({
+    data: {
+      name: cleanName,
+      phoneNumber: cleanPhone.slice(0, 40),
+      profilePictureUrl: cleanProfilePictureUrl.slice(0, 500),
+    },
+    include: { chapters: true },
+    where: { id: currentUser.id },
+  });
+
+  return publicUser(updatedUser);
 }
 
 export async function createSession(userId) {
@@ -847,6 +874,20 @@ export async function getUserByEmail(email) {
   const row = await getPrisma().user.findUnique({
     include: { chapters: true },
     where: { email: cleanEmail },
+  });
+
+  return publicUser(row);
+}
+
+export async function getUserById(id) {
+  const userId = Number(id);
+  if (!Number.isSafeInteger(userId) || userId <= 0) {
+    return null;
+  }
+
+  const row = await getPrisma().user.findUnique({
+    include: { chapters: true },
+    where: { id: userId },
   });
 
   return publicUser(row);

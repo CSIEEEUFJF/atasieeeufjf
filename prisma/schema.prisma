@@ -10,6 +10,8 @@ model User {
   id               Int           @id @default(autoincrement())
   name             String
   cargo            String        @default("")
+  phoneNumber      String        @default("") @map("phone_number")
+  profilePictureUrl String      @default("") @map("profile_picture_url")
   chapterRoles     Json          @default("{}") @map("chapter_roles")
   username         String        @unique
   email            String        @unique
@@ -26,6 +28,7 @@ model User {
   createdTasks     InternalTask[]  @relation("InternalTaskCreator")
   chapters         UserChapter[]
   memberContact    MemberContact?
+  doorProfiles     DoorProfile[]
   internalFiles     InternalFile[]  @relation("InternalFileOwner")
   sessions         Session[]
 
@@ -149,6 +152,37 @@ model MemberContact {
 
   @@index([source], map: "idx_member_contacts_source")
   @@map("member_contacts")
+}
+
+model DoorProfile {
+  id                     Int      @id @default(autoincrement())
+  userId                 Int?     @map("user_id")
+  internalUserIdText     String   @default("") @map("internal_user_id_text")
+  firebaseUid            String   @default("") @map("firebase_uid")
+  internalUserDocumentId String   @default("") @map("internal_user_document_id")
+  name                   String
+  email                  String   @default("")
+  username               String   @default("")
+  chapter                String   @default("")
+  role                   String   @default("")
+  chapterRoles           Json     @default("{}") @map("chapter_roles")
+  chapters               Json     @default("[]")
+  doorProfileIndex       Int      @unique @map("door_profile_index")
+  doorProfileName        String   @default("") @map("door_profile_name")
+  doorChapter            String   @default("") @map("door_chapter")
+  doorRole               String   @default("") @map("door_role")
+  cardCount              Int      @default(0) @map("card_count")
+  hasDoorCards           Boolean  @default(false) @map("has_door_cards")
+  doorSource             String   @default("") @map("door_source")
+  matchMethod            String   @default("") @map("match_method")
+  matchScore             Float    @default(0) @map("match_score")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+  user                   User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([name], map: "idx_door_profiles_name")
+  @@index([userId], map: "idx_door_profiles_user_id")
+  @@map("door_profiles")
 }
 
 model Ata {

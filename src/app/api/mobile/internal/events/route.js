@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 
 import { getMobileSessionUser } from "../../../../../lib/mobile-session";
 import {
-  createInternalTask,
+  createInternalEvent,
   InternalAccessError,
-  listInternalTasks,
+  listInternalEvents,
 } from "../../../../../lib/internal";
 
 export const runtime = "nodejs";
@@ -22,7 +22,7 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     return NextResponse.json({
-      tasks: await listInternalTasks(user, searchParams.get("chapter") || ""),
+      events: await listInternalEvents(user, searchParams.get("chapter") || ""),
     });
   } catch (error) {
     if (error instanceof InternalAccessError) {
@@ -40,15 +40,15 @@ export async function POST(request) {
   }
 
   try {
-    const task = await createInternalTask(user, await request.json());
-    return NextResponse.json({ task }, { status: 201 });
+    const events = await createInternalEvent(user, await request.json());
+    return NextResponse.json({ events }, { status: 201 });
   } catch (error) {
     if (error instanceof InternalAccessError) {
       return NextResponse.json({ detail: error.message }, { status: 403 });
     }
 
     return NextResponse.json(
-      { detail: error.message || "Não foi possível salvar a tarefa." },
+      { detail: error.message || "Não foi possível salvar o evento." },
       { status: 400 },
     );
   }

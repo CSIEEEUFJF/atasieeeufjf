@@ -1,22 +1,21 @@
 import { NextResponse } from "next/server";
 
-import { listVisibleUsers, syncUsersToFirebase } from "../../../../../lib/auth";
-import { getFirebaseMobileUser } from "../../../../../lib/firebase-mobile-auth";
+import { listVisibleUsers } from "../../../../../lib/auth";
+import { getMobileSessionUser } from "../../../../../lib/mobile-session";
 
 export const runtime = "nodejs";
 
 function unauthorized() {
-  return NextResponse.json({ detail: "Autenticacao Firebase necessaria." }, { status: 401 });
+  return NextResponse.json({ detail: "Autenticacao pelo sistema interno necessaria." }, { status: 401 });
 }
 
 export async function GET(request) {
-  const user = await getFirebaseMobileUser(request);
+  const user = await getMobileSessionUser(request);
   if (!user) {
     return unauthorized();
   }
 
   const { searchParams } = new URL(request.url);
-  await syncUsersToFirebase();
   return NextResponse.json({
     users: await listVisibleUsers(user, searchParams.get("chapter") || ""),
   });

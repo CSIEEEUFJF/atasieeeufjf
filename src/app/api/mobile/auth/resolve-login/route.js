@@ -5,7 +5,7 @@ import { getFirestore } from "firebase-admin/firestore";
 
 import { getPrisma } from "../../../../../lib/db";
 import { noStoreHeaders, verifyCredentials } from "../../../../../lib/auth";
-import { createFirebaseCustomTokenForUserStrict } from "../../../../../lib/firebase-auth-admin";
+import { createMobileSessionToken } from "../../../../../lib/mobile-session";
 
 export const runtime = "nodejs";
 
@@ -179,23 +179,11 @@ export async function POST(request) {
       );
     }
 
-    let customToken = "";
-    try {
-      customToken = await createFirebaseCustomTokenForUserStrict(user, { password });
-    } catch (tokenError) {
-      return NextResponse.json(
-        {
-          detail: tokenError.message ||
-            "Firebase Admin não conseguiu emitir token. Confira FIREBASE_SERVICE_ACCOUNT_JSON ou FIREBASE_SERVICE_ACCOUNT_BASE64 no deploy.",
-        },
-        { headers: noStoreHeaders(), status: 503 },
-      );
-    }
-
     return NextResponse.json(
       {
-        customToken,
         email: normalizeEmail(user.email),
+        sessionToken: createMobileSessionToken(user),
+        user,
       },
       { headers: noStoreHeaders() },
     );
