@@ -4,6 +4,7 @@ import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 
 import { getPrisma } from "../../../../../lib/db";
+import { noStoreHeaders, verifyCredentials } from "../../../../../lib/auth";
 
 export const runtime = "nodejs";
 
@@ -147,4 +148,36 @@ export async function GET(request) {
     { email: resolvedEmail },
     { headers: { "Cache-Control": "no-store" } },
   );
+}
+
+export async function POST(request) {
+  try {
+    const { name, password, username } = await request.json();
+    const identifier = String(name || username || "").trim();
+
+    if (!identifier || !password) {
+      return NextResponse.json(
+        { detail: "Informe usuário e senha." },
+        { headers: noStoreHeaders(), status: 400 },
+      );
+    }
+
+    const user = await verifyCredentials(identifier, password);
+    if (!user?.email) {
+      return NextResponse.json(
+        { detail: "Usuário ou senha inválidos." },
+        { headers: noStoreHeaders(), status: 401 },
+      );
+    }
+
+    return NextResponse.json(
+      { email: normalizeEmail(user.email) },
+      { headers: noStoreHeaders() },
+    );
+  } catch (error) {
+    return NextResponse.json(
+      { detail: error.message || "Não foi possível validar o login." },
+      { headers: noStoreHeaders(), status: 400 },
+    );
+  }
 }
