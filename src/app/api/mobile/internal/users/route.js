@@ -9,6 +9,16 @@ function unauthorized() {
   return NextResponse.json({ detail: "Autenticacao pelo sistema interno necessaria." }, { status: 401 });
 }
 
+function absolutizeUserPhoto(user, request) {
+  const photoUrl = String(user.profilePictureUrl || "");
+  return {
+    ...user,
+    profilePictureUrl: photoUrl.startsWith("/")
+      ?new URL(photoUrl, request.url).toString()
+      : photoUrl,
+  };
+}
+
 export async function GET(request) {
   const user = await getMobileSessionUser(request);
   if (!user) {
@@ -16,7 +26,8 @@ export async function GET(request) {
   }
 
   const { searchParams } = new URL(request.url);
+  const users = await listVisibleUsers(user, searchParams.get("chapter") || "");
   return NextResponse.json({
-    users: await listVisibleUsers(user, searchParams.get("chapter") || ""),
+    users: users.map((item) => absolutizeUserPhoto(item, request)),
   });
 }

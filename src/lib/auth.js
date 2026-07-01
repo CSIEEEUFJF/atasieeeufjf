@@ -332,6 +332,79 @@ function normalizeChapterKeys(chapters, { allowAll = false } = {}) {
   ];
 }
 
+function normalizePhotoMatchText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/\p{Mn}+/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function photoFromSiteMembers(user, siteMembers = []) {
+  if (user.profilePictureUrl) {
+    return user.profilePictureUrl;
+  }
+
+  const cleanName = normalizePhotoMatchText(user.name);
+  if (!cleanName) {
+    return "";
+  }
+
+  const userChapters = new Set(Array.isArray(user.chapters) ? user.chapters : []);
+  const candidates = siteMembers
+    .filter((member) => member.photoUrl)
+    .map((member) => {
+      const memberName = normalizePhotoMatchText(member.name);
+      const exactName = memberName === cleanName;
+      const containsName = memberName.includes(cleanName) || cleanName.includes(memberName);
+      if (!exactName && !containsName) {
+        return null;
+      }
+
+      const memberChapters = Array.isArray(member.chapters)
+        ?member.chapters.map((chapter) => normalizarSociedadeChave(chapter, "")).filter(Boolean)
+        : [];
+      const chapterOverlap = memberChapters.some((chapter) => userChapters.has(chapter));
+      return {
+        photoUrl: member.photoUrl,
+        score: (exactName ? 2 : 1) + (chapterOverlap ? 1 : 0),
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score);
+
+  return candidates[0]?.photoUrl || "";
+}
+
+async function enrichPublicUsersWithSitePhotos(users) {
+  const usersList = Array.isArray(users) ? users : [users].filter(Boolean);
+  const needsPhoto = usersList.some((user) => !user.profilePictureUrl);
+  if (!needsPhoto) {
+    return users;
+  }
+
+  const siteMembers = await getPrisma().siteMember.findMany({
+    orderBy: [{ isPublic: "desc" }, { position: "asc" }, { name: "asc" }],
+    select: {
+      chapters: true,
+      name: true,
+      photoUrl: true,
+    },
+    where: {
+      photoUrl: { not: "" },
+    },
+  });
+
+  const enriched = usersList.map((user) => ({
+    ...user,
+    profilePictureUrl: user.profilePictureUrl || photoFromSiteMembers(user, siteMembers),
+  }));
+
+  return Array.isArray(users) ? enriched : enriched[0] || null;
+}
+
 function hashToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
@@ -517,7 +590,7 @@ export async function verifyCredentials(username, password) {
     });
   }
 
-  return publicUser(row);
+  return enrichPublicUsersWithSitePhotos(publicUser(row));
 }
 
 export async function changeOwnPassword(userId, currentPassword, newPassword) {
@@ -550,7 +623,7 @@ export async function listUsers() {
     orderBy: { name: "asc" },
   });
 
-  return users.map(publicUser);
+  return enrichPublicUsersWithSitePhotos(users.map(publicUser));
 }
 
 export async function syncUsersToFirebase() {
@@ -605,8 +678,8 @@ export async function listManageableUsers(user) {
     },
   });
 
-  return users
-    .map(publicUser)
+  const enrichedUsers = await enrichPublicUsersWithSitePhotos(users.map(publicUser));
+  return enrichedUsers
     .map((item) => limitPublicUserToChapters(item, manageableChapters));
 }
 
@@ -689,7 +762,9 @@ export async function listVisibleUsers(user, chapterKey = "") {
     },
   });
 
-  return users.map((row) => publicMemberOption(row, requestedChapters[0] || ""));
+  return enrichPublicUsersWithSitePhotos(
+    users.map((row) => publicMemberOption(row, requestedChapters[0] || "")),
+  );
 }
 
 export async function updateUserManagement(currentUser, targetUserId, payload = {}) {
@@ -788,7 +863,7 @@ export async function updateOwnMobileProfile(currentUser, payload = {}) {
     where: { id: currentUser.id },
   });
 
-  return publicUser(updatedUser);
+  return enrichPublicUsersWithSitePhotos(publicUser(updatedUser));
 }
 
 export async function createSession(userId) {
@@ -876,7 +951,7 @@ export async function getCurrentUser() {
     where: { tokenHash },
   });
 
-  return publicUser(session.user);
+  return enrichPublicUsersWithSitePhotos(publicUser(session.user));
 }
 
 export async function getUserByEmail(email) {
@@ -890,7 +965,7 @@ export async function getUserByEmail(email) {
     where: { email: cleanEmail },
   });
 
-  return publicUser(row);
+  return enrichPublicUsersWithSitePhotos(publicUser(row));
 }
 
 export async function getUserById(id) {
@@ -904,7 +979,7 @@ export async function getUserById(id) {
     where: { id: userId },
   });
 
-  return publicUser(row);
+  return enrichPublicUsersWithSitePhotos(publicUser(row));
 }
 
 export function setSessionCookie(response, token, expiresAt) {
