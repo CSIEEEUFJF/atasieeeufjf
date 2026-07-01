@@ -3,11 +3,13 @@
 import {
   getCurrentUser,
   isSameOriginRequest,
+  listManageableUsers,
   noStoreHeaders,
 } from "../../../../lib/auth";
 import {
   createSiteMember,
   listManagedSiteMembers,
+  syncSiteMembersToUsers,
 } from "../../../../lib/site-members";
 
 export const runtime = "nodejs";
@@ -33,8 +35,12 @@ export async function GET() {
   }
 
   try {
+    const [members, users] = await Promise.all([
+      listManagedSiteMembers(currentUser),
+      listManageableUsers(currentUser),
+    ]);
     return NextResponse.json(
-      { members: await listManagedSiteMembers(currentUser) },
+      { members, users },
       { headers: noStoreHeaders() },
     );
   } catch (error) {
@@ -57,6 +63,13 @@ export async function POST(request) {
 
   try {
     const payload = await request.json();
+    if (payload?.action === "sync-users") {
+      return NextResponse.json(
+        await syncSiteMembersToUsers(currentUser),
+        { headers: noStoreHeaders() },
+      );
+    }
+
     const member = await createSiteMember(currentUser, payload);
     return NextResponse.json(
       { member },

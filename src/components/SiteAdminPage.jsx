@@ -45,6 +45,7 @@ function emptyMemberForm() {
     photoZoom: 100,
     position: 0,
     role: "Membro",
+    userId: "",
   };
 }
 
@@ -202,6 +203,7 @@ export default function SiteAdminPage({ user }) {
   const [theme, setTheme] = useState("light");
   const [activeTab, setActiveTab] = useState("projects");
   const [members, setMembers] = useState([]);
+  const [siteMemberUsers, setSiteMemberUsers] = useState([]);
   const [projects, setProjects] = useState([]);
   const [photos, setPhotos] = useState([]);
   const [historyPhotos, setHistoryPhotos] = useState([]);
@@ -287,6 +289,7 @@ export default function SiteAdminPage({ user }) {
       ]);
 
       setMembers(Array.isArray(membersPayload.members) ? membersPayload.members : []);
+      setSiteMemberUsers(Array.isArray(membersPayload.users) ? membersPayload.users : []);
       setProjects(Array.isArray(projectsPayload.projects) ? projectsPayload.projects : []);
       setPhotos(Array.isArray(photosPayload.photos) ? photosPayload.photos : []);
       setHistoryPhotos(Array.isArray(historyPhotosPayload.photos) ? historyPhotosPayload.photos : []);
@@ -417,6 +420,20 @@ export default function SiteAdminPage({ user }) {
       setStatus({ tone: "success", text: isEditing ? "Membro do site atualizado." : "Membro do site criado." });
     } catch (error) {
       setStatus({ tone: "error", text: error.message || "Nao foi possivel salvar o membro." });
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function syncSiteMemberUsers() {
+    setIsSaving(true);
+    setStatus({ tone: "loading", text: "Relacionando membros do site com usuários internos." });
+    try {
+      const result = await submitJson("/api/site-members/manage", { action: "sync-users" }, "POST");
+      await loadAll();
+      setStatus({ tone: "success", text: `Vínculos atualizados: ${result.linked || 0} de ${result.total || 0}.` });
+    } catch (error) {
+      setStatus({ tone: "error", text: error.message || "Nao foi possivel relacionar membros do site." });
     } finally {
       setIsSaving(false);
     }
@@ -778,6 +795,17 @@ export default function SiteAdminPage({ user }) {
                     <input value={memberForm.photoUrl} onChange={(event) => updateMember("photoUrl", event.target.value)} placeholder="Link publico ou Google Drive" />
                   </label>
                   <label className="field field-span-2">
+                    <span>Usuário interno relacionado</span>
+                    <select value={memberForm.userId || ""} onChange={(event) => updateMember("userId", event.target.value)}>
+                      <option value="">Relacionar automaticamente</option>
+                      {siteMemberUsers.map((user) => (
+                        <option key={user.id} value={user.id}>
+                          {user.name} - {user.email || user.username}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field field-span-2">
                     <span>Biografia</span>
                     <textarea value={memberForm.bio} onChange={(event) => updateMember("bio", event.target.value)} />
                   </label>
@@ -817,6 +845,7 @@ export default function SiteAdminPage({ user }) {
 
                 <div className="site-admin-form-actions">
                   <button className="primary-button" disabled={isSaving}>{memberForm.id ? "Salvar membro" : "Criar membro"}</button>
+                  <button className="soft-button" disabled={isSaving} type="button" onClick={syncSiteMemberUsers}>Relacionar existentes</button>
                   {memberForm.id ? <button className="soft-button" type="button" onClick={() => setMemberForm(emptyMemberForm())}>Cancelar edicao</button> : null}
                 </div>
               </form>

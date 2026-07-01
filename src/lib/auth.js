@@ -1,4 +1,4 @@
-﻿import { cookies } from "next/headers";
+import { cookies } from "next/headers";
 import crypto from "node:crypto";
 
 import {
@@ -28,6 +28,13 @@ const RATE_LIMITS = {
   setup: { limit: 5, windowMs: 60 * 60 * 1000 },
 };
 const CHAPTER_KEYS = Object.keys(SOCIEDADES);
+const USER_PUBLIC_INCLUDE = {
+  chapters: true,
+  siteMembers: {
+    orderBy: [{ isPublic: "desc" }, { position: "asc" }, { name: "asc" }],
+    select: { photoUrl: true },
+  },
+};
 export const MEMBER_ROLE_OPTIONS = [
   "Membro",
   "Presidente",
@@ -260,6 +267,9 @@ function publicUser(row) {
   const effectiveChapters = chapters.includes("RAS") && !chapters.includes("CAS")
     ?[...chapters, "CAS"]
     : chapters;
+  const sitePhotoUrl = Array.isArray(row.siteMembers)
+    ?row.siteMembers.find((member) => member.photoUrl)?.photoUrl || ""
+    : "";
   const user = {
     cargo,
     chapterRoles,
@@ -269,7 +279,7 @@ function publicUser(row) {
     email: row.email || "",
     name: row.name,
     phoneNumber: row.phoneNumber || "",
-    profilePictureUrl: row.profilePictureUrl || "",
+    profilePictureUrl: row.profilePictureUrl || sitePhotoUrl,
     username: row.username,
   };
   const manageableChapters = getManageableChapterKeys(user);
@@ -288,6 +298,9 @@ function publicMemberOption(row, chapterKey = "") {
 
   const roles = normalizeChapterRoles(row.chapterRoles);
   const hasSpecificRoles = Object.keys(roles).length > 0;
+  const sitePhotoUrl = Array.isArray(row.siteMembers)
+    ?row.siteMembers.find((member) => member.photoUrl)?.photoUrl || ""
+    : "";
 
   return {
     cargo: normalizeMemberRole(row.cargo, row.cargo || ""),
@@ -298,6 +311,7 @@ function publicMemberOption(row, chapterKey = "") {
     email: row.email || "",
     id: row.id,
     name: row.name,
+    profilePictureUrl: row.profilePictureUrl || sitePhotoUrl,
     usesChapterRoles: hasSpecificRoles,
   };
 }
@@ -428,7 +442,7 @@ export async function createUser(
       passwordSalt,
       username: cleanUsername,
     },
-    include: { chapters: true },
+    include: USER_PUBLIC_INCLUDE,
   });
 
   try {
@@ -456,7 +470,7 @@ export async function verifyCredentials(username, password) {
   }
 
   const row = await getPrisma().user.findFirst({
-    include: { chapters: true },
+    include: USER_PUBLIC_INCLUDE,
     where: {
       OR: lookupConditions,
     },
@@ -511,7 +525,7 @@ export async function changeOwnPassword(userId, currentPassword, newPassword) {
   validatePasswordPolicy(cleanPassword, "A nova senha");
 
   const user = await getPrisma().user.findUnique({
-    include: { chapters: true },
+    include: USER_PUBLIC_INCLUDE,
     where: { id: userId },
   });
 
@@ -532,7 +546,7 @@ export async function changeOwnPassword(userId, currentPassword, newPassword) {
 
 export async function listUsers() {
   const users = await getPrisma().user.findMany({
-    include: { chapters: true },
+    include: USER_PUBLIC_INCLUDE,
     orderBy: { name: "asc" },
   });
 
@@ -580,7 +594,7 @@ export async function listManageableUsers(user) {
   }
 
   const users = await getPrisma().user.findMany({
-    include: { chapters: true },
+    include: USER_PUBLIC_INCLUDE,
     orderBy: { name: "asc" },
     where: {
       chapters: {
@@ -664,7 +678,7 @@ export async function listVisibleUsers(user, chapterKey = "") {
       : accessibleChapters;
 
   const users = await getPrisma().user.findMany({
-    include: { chapters: true },
+    include: USER_PUBLIC_INCLUDE,
     orderBy: { name: "asc" },
     where: {
       chapters: {
@@ -685,7 +699,7 @@ export async function updateUserManagement(currentUser, targetUserId, payload = 
   }
 
   const targetUser = await getPrisma().user.findUnique({
-    include: { chapters: true },
+    include: USER_PUBLIC_INCLUDE,
     where: { id: targetUserId },
   });
 
@@ -745,7 +759,7 @@ export async function updateUserManagement(currentUser, targetUserId, payload = 
       email: cleanEmail,
       name: cleanName,
     },
-    include: { chapters: true },
+    include: USER_PUBLIC_INCLUDE,
     where: { id: targetUserId },
   });
 
@@ -770,7 +784,7 @@ export async function updateOwnMobileProfile(currentUser, payload = {}) {
       phoneNumber: cleanPhone.slice(0, 40),
       profilePictureUrl: cleanProfilePictureUrl.slice(0, 500),
     },
-    include: { chapters: true },
+    include: USER_PUBLIC_INCLUDE,
     where: { id: currentUser.id },
   });
 
@@ -844,7 +858,7 @@ export async function getCurrentUser() {
   const session = await getPrisma().session.findFirst({
     include: {
       user: {
-        include: { chapters: true },
+        include: USER_PUBLIC_INCLUDE,
       },
     },
     where: {
@@ -872,7 +886,7 @@ export async function getUserByEmail(email) {
   }
 
   const row = await getPrisma().user.findUnique({
-    include: { chapters: true },
+    include: USER_PUBLIC_INCLUDE,
     where: { email: cleanEmail },
   });
 
@@ -886,7 +900,7 @@ export async function getUserById(id) {
   }
 
   const row = await getPrisma().user.findUnique({
-    include: { chapters: true },
+    include: USER_PUBLIC_INCLUDE,
     where: { id: userId },
   });
 

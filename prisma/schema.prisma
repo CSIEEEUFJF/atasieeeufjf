@@ -29,6 +29,7 @@ model User {
   chapters         UserChapter[]
   memberContact    MemberContact?
   doorProfiles     DoorProfile[]
+  siteMembers      SiteMember[]
   internalFiles     InternalFile[]  @relation("InternalFileOwner")
   sessions         Session[]
 
@@ -62,6 +63,7 @@ model UserChapter {
 
 model SiteMember {
   id             Int      @id @default(autoincrement())
+  userId         Int?     @map("user_id")
   name           String
   role           String   @default("Membro")
   chapters       Json     @default("[]")
@@ -75,8 +77,10 @@ model SiteMember {
   position       Int      @default(0)
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
+  user           User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([isPublic, position, name], map: "idx_site_members_public_order")
+  @@index([userId], map: "idx_site_members_user_id")
   @@map("site_members")
 }
 

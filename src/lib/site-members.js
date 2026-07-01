@@ -111,6 +111,67 @@ function normalizeChapters(chapters) {
   return [...new Set(normalized)];
 }
 
+function normalizeMatchText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/\p{Mn}+/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function sanitizeUserId(value) {
+  const userId = Number(value);
+  return Number.isSafeInteger(userId) && userId > 0 ? userId : null;
+}
+
+async function resolveSiteMemberUserId(data) {
+  const explicitUserId = sanitizeUserId(data.userId);
+  if (explicitUserId) {
+    const exists = await getPrisma().user.findUnique({
+      select: { id: true },
+      where: { id: explicitUserId },
+    });
+    return exists?.id || null;
+  }
+
+  const cleanName = normalizeMatchText(data.name);
+  if (!cleanName) {
+    return null;
+  }
+
+  const users = await getPrisma().user.findMany({
+    include: { chapters: true },
+    orderBy: { name: "asc" },
+  });
+  const memberChapters = new Set(normalizeChapters(data.chapters));
+
+  const scoredUsers = users
+    .map((user) => {
+      const userName = normalizeMatchText(user.name);
+      if (!userName) {
+        return null;
+      }
+      const exactName = userName === cleanName;
+      const containsName = userName.includes(cleanName) || cleanName.includes(userName);
+      if (!exactName && !containsName) {
+        return null;
+      }
+
+      const userChapters = new Set(user.chapters.map((chapter) => normalizarSociedadeChave(chapter.chapterKey, "")).filter(Boolean));
+      const chapterOverlap = [...memberChapters].some((chapter) => userChapters.has(chapter));
+      return {
+        id: user.id,
+        score: (exactName ? 2 : 1) + (chapterOverlap ? 1 : 0),
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score);
+
+  return scoredUsers[0]?.id || null;
+}
+
 function publicSiteMember(row) {
   if (!row) {
     return null;
@@ -129,6 +190,7 @@ function publicSiteMember(row) {
     photoZoom: sanitizePhotoZoom(row.photoZoom),
     position: row.position || 0,
     role: normalizeRole(row.role),
+    userId: row.userId || null,
   };
 }
 
@@ -186,6 +248,7 @@ function sanitizeSiteMemberPayload(payload = {}) {
     photoZoom: sanitizePhotoZoom(payload.photoZoom),
     position: Number.isSafeInteger(Number(payload.position)) ?Number(payload.position) : 0,
     role: normalizeRole(payload.role || payload.cargo),
+    userId: sanitizeUserId(payload.userId),
   };
 }
 
@@ -239,6 +302,10 @@ function sanitizePartialSiteMemberPayload(payload = {}) {
     data.role = normalizeRole(payload.role || payload.cargo);
   }
 
+  if (Object.prototype.hasOwnProperty.call(payload, "userId")) {
+    data.userId = sanitizeUserId(payload.userId);
+  }
+
   if (!Object.keys(data).length) {
     throw new Error("Informe pelo menos um campo para atualizar.");
   }
@@ -268,6 +335,7 @@ export async function listManagedSiteMembers(currentUser) {
 export async function createSiteMember(currentUser, payload = {}) {
   requireSiteMemberManagement(currentUser);
   const data = await fillMissingBiographyTranslation(sanitizeSiteMemberPayload(payload));
+  data.userId = await resolveSiteMemberUserId(data);
 
   const row = await getPrisma().siteMember.create({
     data,
@@ -279,6 +347,14 @@ export async function createSiteMember(currentUser, payload = {}) {
 export async function updateSiteMember(currentUser, memberId, payload = {}) {
   requireSiteMemberManagement(currentUser);
   const data = await fillMissingBiographyTranslation(sanitizePartialSiteMemberPayload(payload));
+  if (
+    Object.prototype.hasOwnProperty.call(data, "userId") ||
+    Object.prototype.hasOwnProperty.call(data, "name") ||
+    Object.prototype.hasOwnProperty.call(data, "chapters")
+  ) {
+    const current = await getPrisma().siteMember.findUnique({ where: { id: memberId } });
+    data.userId = await resolveSiteMemberUserId({ ...current, ...data });
+  }
 
   const row = await getPrisma().siteMember.update({
     data,
@@ -296,4 +372,23 @@ export async function deleteSiteMember(currentUser, memberId) {
   });
 
   return { ok: true };
+}
+
+export async function syncSiteMembersToUsers(currentUser) {
+  requireSiteMemberManagement(currentUser);
+  const members = await getPrisma().siteMember.findMany({ orderBy: [{ position: "asc" }, { name: "asc" }] });
+  let linked = 0;
+
+  for (const member of members) {
+    const userId = await resolveSiteMemberUserId(member);
+    if (userId && userId !== member.userId) {
+      await getPrisma().siteMember.update({
+        data: { userId },
+        where: { id: member.id },
+      });
+      linked += 1;
+    }
+  }
+
+  return { linked, total: members.length };
 }
