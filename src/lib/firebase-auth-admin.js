@@ -59,6 +59,7 @@ function customClaimsForUser(user) {
     internalUserId: String(user.id),
     isInternalAdmin: Boolean(user.isAdmin),
     source: "atas",
+    username: user.username || "",
   };
 }
 

@@ -11,7 +11,6 @@ import { getPrisma, nowDate } from "./db";
 import { notifyUserWelcome } from "./email-notifications";
 import {
   syncFirebaseAuthUser,
-  syncFirebaseAuthUsers,
 } from "./firebase-auth-admin";
 import {
   syncInternalUserToFirebase,
@@ -422,8 +421,8 @@ export async function createUser(
   }
 
   const createdUser = publicUser(user);
-  await syncFirebaseAuthUser(createdUser, { password: cleanPassword });
-  await syncInternalUserToFirebase(createdUser);
+  const firebaseUid = await syncFirebaseAuthUser(createdUser, { password: cleanPassword });
+  await syncInternalUserToFirebase({ ...createdUser, firebaseUid: firebaseUid || "" });
   return createdUser;
 }
 
@@ -513,8 +512,12 @@ export async function listUsers() {
 
 export async function syncUsersToFirebase() {
   const users = await listUsers();
-  await syncFirebaseAuthUsers(users);
-  await syncInternalUsersToFirebase(users);
+  const syncedUsers = [];
+  for (const user of users) {
+    const firebaseUid = await syncFirebaseAuthUser(user);
+    syncedUsers.push({ ...user, firebaseUid: firebaseUid || "" });
+  }
+  await syncInternalUsersToFirebase(syncedUsers);
   return users.length;
 }
 
@@ -718,8 +721,8 @@ export async function updateUserManagement(currentUser, targetUserId, payload = 
   });
 
   const publicUpdatedUser = publicUser(updatedUser);
-  await syncFirebaseAuthUser(publicUpdatedUser);
-  await syncInternalUserToFirebase(publicUpdatedUser);
+  const firebaseUid = await syncFirebaseAuthUser(publicUpdatedUser);
+  await syncInternalUserToFirebase({ ...publicUpdatedUser, firebaseUid: firebaseUid || "" });
   return publicUpdatedUser;
 }
 

@@ -1,7 +1,7 @@
 import "dotenv/config";
 
 import { getPrisma } from "../src/lib/db.js";
-import { syncFirebaseAuthUsers } from "../src/lib/firebase-auth-admin.js";
+import { syncFirebaseAuthUser } from "../src/lib/firebase-auth-admin.js";
 import { syncInternalUsersToFirebase } from "../src/lib/firebase-sync.js";
 
 if (
@@ -31,6 +31,7 @@ function publicSyncUser(row) {
     id: row.id,
     isAdmin: Boolean(row.isAdmin),
     name: row.name || "",
+    username: row.username || "",
   };
 }
 
@@ -39,8 +40,13 @@ const rows = await getPrisma().user.findMany({
   orderBy: { name: "asc" },
 });
 const users = rows.map(publicSyncUser);
+const syncedUsers = [];
 
-await syncFirebaseAuthUsers(users);
-await syncInternalUsersToFirebase(users);
+for (const user of users) {
+  const firebaseUid = await syncFirebaseAuthUser(user);
+  syncedUsers.push({ ...user, firebaseUid: firebaseUid || "" });
+}
+
+await syncInternalUsersToFirebase(syncedUsers);
 
 console.log(`Usuários internos sincronizados com Firebase: ${users.length}`);

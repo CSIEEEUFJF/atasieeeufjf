@@ -201,10 +201,12 @@ function internalUserPayload(user) {
   return {
     chapters: Array.isArray(user.chapters) ? user.chapters : [],
     email: user.email || "",
+    firebaseUid: user.firebaseUid || "",
     internalUserId: String(user.id),
     name: user.name || "",
     source: "atas",
     updatedAt: new Date(),
+    username: user.username || "",
   };
 }
 
