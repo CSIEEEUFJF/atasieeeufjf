@@ -5,6 +5,7 @@ import { getFirestore } from "firebase-admin/firestore";
 
 import { getPrisma } from "../../../../../lib/db";
 import { noStoreHeaders, verifyCredentials } from "../../../../../lib/auth";
+import { createFirebaseCustomTokenForUser } from "../../../../../lib/firebase-auth-admin";
 
 export const runtime = "nodejs";
 
@@ -170,8 +171,13 @@ export async function POST(request) {
       );
     }
 
+    const customToken = await createFirebaseCustomTokenForUser(user, { password });
+
     return NextResponse.json(
-      { email: normalizeEmail(user.email) },
+      {
+        customToken: customToken || "",
+        email: normalizeEmail(user.email),
+      },
       { headers: noStoreHeaders() },
     );
   } catch (error) {

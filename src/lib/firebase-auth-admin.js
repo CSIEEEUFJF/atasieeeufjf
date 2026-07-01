@@ -118,6 +118,16 @@ export async function syncFirebaseAuthUser(user, options = {}) {
   return safeFirebaseAuthSync((auth) => upsertFirebaseAuthUser(auth, user, options));
 }
 
+export async function createFirebaseCustomTokenForUser(user, options = {}) {
+  return safeFirebaseAuthSync(async (auth) => {
+    const uid = await upsertFirebaseAuthUser(auth, user, options);
+    if (!uid) {
+      return "";
+    }
+    return auth.createCustomToken(uid, customClaimsForUser(user));
+  });
+}
+
 export async function syncFirebaseAuthUsers(users) {
   return safeFirebaseAuthSync(async (auth) => {
     let synced = 0;
