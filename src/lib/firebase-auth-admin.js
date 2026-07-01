@@ -1,9 +1,6 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 
-import { getApps, initializeApp, cert } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
-
 let firebaseAuthWarningShown = false;
 
 function firebaseAdminEnabled() {
@@ -28,10 +25,13 @@ function readServiceAccount() {
   return null;
 }
 
-function getFirebaseAuth() {
+async function getFirebaseAuth() {
   if (!firebaseAdminEnabled()) {
     return null;
   }
+
+  const { cert, getApps, initializeApp } = await import("firebase-admin/app");
+  const { getAuth } = await import("firebase-admin/auth");
 
   if (!getApps().length) {
     const serviceAccount = readServiceAccount();
@@ -99,7 +99,7 @@ async function upsertFirebaseAuthUser(auth, user, options = {}) {
 
 async function safeFirebaseAuthSync(operation) {
   try {
-    const auth = getFirebaseAuth();
+    const auth = await getFirebaseAuth();
     if (!auth) {
       return null;
     }

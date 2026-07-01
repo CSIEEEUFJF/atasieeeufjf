@@ -36,8 +36,8 @@ export async function POST(request) {
       );
     }
 
-    const { password, username } = await request.json();
-    const user = await verifyCredentials(username, password);
+    const { name, password, username } = await request.json();
+    const user = await verifyCredentials(name || username, password);
 
     if (!user) {
       return NextResponse.json(
