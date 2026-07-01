@@ -3,13 +3,16 @@ import fs from "node:fs";
 
 let firebaseAuthWarningShown = false;
 
+function serviceAccountSource() {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) return "FIREBASE_SERVICE_ACCOUNT_JSON";
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) return "FIREBASE_SERVICE_ACCOUNT_BASE64";
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) return "FIREBASE_SERVICE_ACCOUNT_PATH";
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) return "GOOGLE_APPLICATION_CREDENTIALS";
+  return "";
+}
+
 function firebaseAdminEnabled() {
-  return Boolean(
-    process.env.FIREBASE_SERVICE_ACCOUNT_JSON ||
-      process.env.FIREBASE_SERVICE_ACCOUNT_BASE64 ||
-      process.env.FIREBASE_SERVICE_ACCOUNT_PATH ||
-      process.env.GOOGLE_APPLICATION_CREDENTIALS,
-  );
+  return Boolean(serviceAccountSource());
 }
 
 function normalizeServiceAccount(serviceAccount) {
@@ -31,7 +34,8 @@ function readServiceAccount() {
 
   const rawBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
   if (rawBase64) {
-    return normalizeServiceAccount(JSON.parse(Buffer.from(rawBase64, "base64").toString("utf8")));
+    const cleanBase64 = rawBase64.trim().replace(/\s+/g, "");
+    return normalizeServiceAccount(JSON.parse(Buffer.from(cleanBase64, "base64").toString("utf8")));
   }
 
   const path = process.env.FIREBASE_SERVICE_ACCOUNT_PATH || process.env.GOOGLE_APPLICATION_CREDENTIALS;
@@ -42,8 +46,11 @@ function readServiceAccount() {
   return null;
 }
 
-async function getFirebaseAuth() {
+async function getFirebaseAuth({ strict = false } = {}) {
   if (!firebaseAdminEnabled()) {
+    if (strict) {
+      throw new Error("firebase_admin_missing_credentials");
+    }
     return null;
   }
 
@@ -53,7 +60,7 @@ async function getFirebaseAuth() {
   if (!getApps().length) {
     const serviceAccount = readServiceAccount();
     if (!serviceAccount?.project_id || !serviceAccount?.client_email || !serviceAccount?.private_key) {
-      throw new Error("Service account Firebase inválida.");
+      throw new Error(`firebase_admin_invalid_service_account:${serviceAccountSource()}`);
     }
 
     initializeApp({
@@ -63,6 +70,22 @@ async function getFirebaseAuth() {
   }
 
   return getAuth();
+}
+
+function firebaseAdminErrorMessage(error) {
+  const code = error?.code ? String(error.code) : "";
+  const message = error?.message ? String(error.message) : "unknown_error";
+
+  if (code) {
+    return code;
+  }
+
+  if (message.includes("private_key")) return "invalid_private_key";
+  if (message.includes("DECODER") || message.includes("PEM")) return "invalid_private_key_pem";
+  if (message.includes("JSON")) return "service_account_parse_error";
+  if (message.includes("credential")) return "invalid_credential";
+
+  return message.split("\n")[0].slice(0, 180);
 }
 
 function randomPassword() {
@@ -143,6 +166,19 @@ export async function createFirebaseCustomTokenForUser(user, options = {}) {
     }
     return auth.createCustomToken(uid, customClaimsForUser(user));
   });
+}
+
+export async function createFirebaseCustomTokenForUserStrict(user, options = {}) {
+  try {
+    const auth = await getFirebaseAuth({ strict: true });
+    const uid = await upsertFirebaseAuthUser(auth, user, options);
+    if (!uid) {
+      throw new Error("firebase_admin_user_without_uid");
+    }
+    return await auth.createCustomToken(uid, customClaimsForUser(user));
+  } catch (error) {
+    throw new Error(`firebase_admin_token_error:${firebaseAdminErrorMessage(error)}`);
+  }
 }
 
 export async function syncFirebaseAuthUsers(users) {
