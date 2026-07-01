@@ -155,7 +155,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const { name, password, username } = await request.json();
-    const identifier = String(name || username || "").trim();
+    const identifier = String(username || name || "").trim();
 
     if (!identifier || !password) {
       return NextResponse.json(

@@ -53,7 +53,12 @@ export default function LoginShell({
                   <span>{"Nome de usu\u00e1rio"}</span>
                   <input
                     value={isSetup ?authForm.username : authForm.name}
-                    onChange={(event) => onFieldChange(isSetup ?"username" : "name", event.target.value)}
+                    onChange={(event) => {
+                      onFieldChange(isSetup ?"username" : "name", event.target.value);
+                      if (!isSetup) {
+                        onFieldChange("username", event.target.value);
+                      }
+                    }}
                     autoComplete="username"
                     placeholder={"Digite seu nome de usu\u00e1rio"}
                   />
