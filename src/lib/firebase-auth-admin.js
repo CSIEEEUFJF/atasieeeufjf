@@ -6,20 +6,37 @@ let firebaseAuthWarningShown = false;
 function firebaseAdminEnabled() {
   return Boolean(
     process.env.FIREBASE_SERVICE_ACCOUNT_JSON ||
+      process.env.FIREBASE_SERVICE_ACCOUNT_BASE64 ||
       process.env.FIREBASE_SERVICE_ACCOUNT_PATH ||
       process.env.GOOGLE_APPLICATION_CREDENTIALS,
   );
 }
 
+function normalizeServiceAccount(serviceAccount) {
+  if (!serviceAccount) {
+    return null;
+  }
+
+  return {
+    ...serviceAccount,
+    private_key: String(serviceAccount.private_key || "").replace(/\\n/g, "\n"),
+  };
+}
+
 function readServiceAccount() {
   const rawJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (rawJson) {
-    return JSON.parse(rawJson);
+    return normalizeServiceAccount(JSON.parse(rawJson));
+  }
+
+  const rawBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
+  if (rawBase64) {
+    return normalizeServiceAccount(JSON.parse(Buffer.from(rawBase64, "base64").toString("utf8")));
   }
 
   const path = process.env.FIREBASE_SERVICE_ACCOUNT_PATH || process.env.GOOGLE_APPLICATION_CREDENTIALS;
   if (path) {
-    return JSON.parse(fs.readFileSync(path, "utf8"));
+    return normalizeServiceAccount(JSON.parse(fs.readFileSync(path, "utf8")));
   }
 
   return null;
