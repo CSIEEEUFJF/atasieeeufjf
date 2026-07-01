@@ -70,6 +70,16 @@ function normalizeUsername(username) {
     .replace(/\s+/g, ".");
 }
 
+function usernameLoginCandidates(username) {
+  const normalized = normalizeUsername(username);
+  const compact = normalized.replace(/\./g, "");
+  return [...new Set([normalized, compact].filter(Boolean))];
+}
+
+function normalizeLoginEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
 function getRequestOrigin(request) {
   const url = new URL(request.url);
   const forwardedHost = request.headers.get("x-forwarded-host");
@@ -427,10 +437,16 @@ export async function createUser(
 }
 
 export async function verifyCredentials(username, password) {
-  const cleanUsername = normalizeUsername(username);
-  const row = await getPrisma().user.findUnique({
+  const cleanEmail = normalizeLoginEmail(username);
+  const usernameCandidates = usernameLoginCandidates(username);
+  const row = await getPrisma().user.findFirst({
     include: { chapters: true },
-    where: { username: cleanUsername },
+    where: {
+      OR: [
+        { email: cleanEmail },
+        ...usernameCandidates.map((candidate) => ({ username: candidate })),
+      ],
+    },
   });
 
   if (!row) {
@@ -474,7 +490,12 @@ export async function verifyCredentials(username, password) {
     });
   }
 
-  return publicUser(row);
+  const authenticatedUser = publicUser(row);
+  const firebaseUid = await syncFirebaseAuthUser(authenticatedUser, {
+    password: String(password || ""),
+  });
+  await syncInternalUserToFirebase({ ...authenticatedUser, firebaseUid: firebaseUid || "" });
+  return authenticatedUser;
 }
 
 export async function changeOwnPassword(userId, currentPassword, newPassword) {
