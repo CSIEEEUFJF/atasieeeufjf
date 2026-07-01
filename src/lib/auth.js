@@ -32,7 +32,12 @@ const USER_PUBLIC_INCLUDE = {
   chapters: true,
   siteMembers: {
     orderBy: [{ isPublic: "desc" }, { position: "asc" }, { name: "asc" }],
-    select: { photoUrl: true },
+    select: {
+      photoPositionX: true,
+      photoPositionY: true,
+      photoUrl: true,
+      photoZoom: true,
+    },
   },
 };
 export const MEMBER_ROLE_OPTIONS = [
@@ -267,9 +272,9 @@ function publicUser(row) {
   const effectiveChapters = chapters.includes("RAS") && !chapters.includes("CAS")
     ?[...chapters, "CAS"]
     : chapters;
-  const sitePhotoUrl = Array.isArray(row.siteMembers)
-    ?row.siteMembers.find((member) => member.photoUrl)?.photoUrl || ""
-    : "";
+  const sitePhoto = Array.isArray(row.siteMembers)
+    ?row.siteMembers.find((member) => member.photoUrl)
+    : null;
   const user = {
     cargo,
     chapterRoles,
@@ -278,8 +283,11 @@ function publicUser(row) {
     isAdmin: Boolean(row.isAdmin),
     email: row.email || "",
     name: row.name,
+    photoPositionX: sitePhoto?.photoPositionX ?? 50,
+    photoPositionY: sitePhoto?.photoPositionY ?? 50,
+    photoZoom: sitePhoto?.photoZoom ?? 100,
     phoneNumber: row.phoneNumber || "",
-    profilePictureUrl: row.profilePictureUrl || sitePhotoUrl,
+    profilePictureUrl: row.profilePictureUrl || sitePhoto?.photoUrl || "",
     username: row.username,
   };
   const manageableChapters = getManageableChapterKeys(user);
@@ -298,9 +306,9 @@ function publicMemberOption(row, chapterKey = "") {
 
   const roles = normalizeChapterRoles(row.chapterRoles);
   const hasSpecificRoles = Object.keys(roles).length > 0;
-  const sitePhotoUrl = Array.isArray(row.siteMembers)
-    ?row.siteMembers.find((member) => member.photoUrl)?.photoUrl || ""
-    : "";
+  const sitePhoto = Array.isArray(row.siteMembers)
+    ?row.siteMembers.find((member) => member.photoUrl)
+    : null;
 
   return {
     cargo: normalizeMemberRole(row.cargo, row.cargo || ""),
@@ -311,7 +319,10 @@ function publicMemberOption(row, chapterKey = "") {
     email: row.email || "",
     id: row.id,
     name: row.name,
-    profilePictureUrl: row.profilePictureUrl || sitePhotoUrl,
+    photoPositionX: sitePhoto?.photoPositionX ?? 50,
+    photoPositionY: sitePhoto?.photoPositionY ?? 50,
+    photoZoom: sitePhoto?.photoZoom ?? 100,
+    profilePictureUrl: row.profilePictureUrl || sitePhoto?.photoUrl || "",
     usesChapterRoles: hasSpecificRoles,
   };
 }
@@ -344,7 +355,12 @@ function normalizePhotoMatchText(value) {
 
 function photoFromSiteMembers(user, siteMembers = []) {
   if (user.profilePictureUrl) {
-    return user.profilePictureUrl;
+    return {
+      photoPositionX: user.photoPositionX ?? 50,
+      photoPositionY: user.photoPositionY ?? 50,
+      photoUrl: user.profilePictureUrl,
+      photoZoom: user.photoZoom ?? 100,
+    };
   }
 
   const cleanName = normalizePhotoMatchText(user.name);
@@ -368,14 +384,17 @@ function photoFromSiteMembers(user, siteMembers = []) {
         : [];
       const chapterOverlap = memberChapters.some((chapter) => userChapters.has(chapter));
       return {
+        photoPositionX: member.photoPositionX ?? 50,
+        photoPositionY: member.photoPositionY ?? 50,
         photoUrl: member.photoUrl,
+        photoZoom: member.photoZoom ?? 100,
         score: (exactName ? 2 : 1) + (chapterOverlap ? 1 : 0),
       };
     })
     .filter(Boolean)
     .sort((a, b) => b.score - a.score);
 
-  return candidates[0]?.photoUrl || "";
+  return candidates[0] || null;
 }
 
 async function enrichPublicUsersWithSitePhotos(users) {
@@ -390,17 +409,26 @@ async function enrichPublicUsersWithSitePhotos(users) {
     select: {
       chapters: true,
       name: true,
+      photoPositionX: true,
+      photoPositionY: true,
       photoUrl: true,
+      photoZoom: true,
     },
     where: {
       photoUrl: { not: "" },
     },
   });
 
-  const enriched = usersList.map((user) => ({
-    ...user,
-    profilePictureUrl: user.profilePictureUrl || photoFromSiteMembers(user, siteMembers),
-  }));
+  const enriched = usersList.map((user) => {
+    const sitePhoto = photoFromSiteMembers(user, siteMembers);
+    return {
+      ...user,
+      photoPositionX: sitePhoto?.photoPositionX ?? user.photoPositionX ?? 50,
+      photoPositionY: sitePhoto?.photoPositionY ?? user.photoPositionY ?? 50,
+      photoZoom: sitePhoto?.photoZoom ?? user.photoZoom ?? 100,
+      profilePictureUrl: user.profilePictureUrl || sitePhoto?.photoUrl || "",
+    };
+  });
 
   return Array.isArray(users) ? enriched : enriched[0] || null;
 }

@@ -13,6 +13,9 @@ function absolutizeUserPhoto(user, request) {
   const photoUrl = String(user.profilePictureUrl || "");
   return {
     ...user,
+    photoPositionX: Number(user.photoPositionX || 50),
+    photoPositionY: Number(user.photoPositionY || 50),
+    photoZoom: Number(user.photoZoom || 100),
     profilePictureUrl: photoUrl.startsWith("/")
       ?new URL(photoUrl, request.url).toString()
       : photoUrl,
