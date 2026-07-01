@@ -51,8 +51,12 @@ if (process.env.DATABASE_URL) {
   if (process.env.SITE_PROJECTS_SEED_ON_BUILD !== "false") {
     runNodeScript("scripts/seed-site-chapter-projects.mjs", []);
   }
+
+  if (process.env.FIREBASE_SYNC_USERS_ON_BUILD !== "false") {
+    runNodeScript("scripts/sync-firebase-users.mjs", []);
+  }
 } else {
-  console.warn("DATABASE_URL nao definida; pulando prisma db push e seed de projetos do site.");
+  console.warn("DATABASE_URL nao definida; pulando prisma db push, seed de projetos e sync de usuarios Firebase.");
 }
 
 runNodeScript("node_modules/next/dist/bin/next", ["build"]);
