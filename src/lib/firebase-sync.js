@@ -13,6 +13,7 @@ let syncWarningShown = false;
 function firebaseSyncEnabled() {
   return Boolean(
     process.env.FIREBASE_SERVICE_ACCOUNT_JSON ||
+      process.env.FIREBASE_SERVICE_ACCOUNT_BASE64 ||
       process.env.FIREBASE_SERVICE_ACCOUNT_PATH ||
       process.env.GOOGLE_APPLICATION_CREDENTIALS,
   );
@@ -22,6 +23,12 @@ function readServiceAccount() {
   const rawJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (rawJson) {
     return JSON.parse(rawJson);
+  }
+
+  const rawBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
+  if (rawBase64) {
+    const cleanBase64 = rawBase64.trim().replace(/\s+/g, "");
+    return JSON.parse(Buffer.from(cleanBase64, "base64").toString("utf8"));
   }
 
   const path = process.env.FIREBASE_SERVICE_ACCOUNT_PATH || process.env.GOOGLE_APPLICATION_CREDENTIALS;
