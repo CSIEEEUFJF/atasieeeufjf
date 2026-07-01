@@ -16,6 +16,7 @@
     "db:deploy": "prisma db push",
     "db:studio": "prisma studio",
     "members:import-contacts": "node scripts/import-member-contacts.mjs",
+    "firebase:sync-users": "node scripts/sync-firebase-users.mjs",
     "site-projects:seed-chapters": "node scripts/seed-site-chapter-projects.mjs",
     "vendor:texlive": "node scripts/vendor-texlive.mjs"
   },
@@ -23,6 +24,7 @@
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "dotenv": "^17.4.2",
+    "firebase-admin": "^14.1.0",
     "next": "^16.2.3",
     "pg": "^8.20.0",
     "react": "^19.2.4",

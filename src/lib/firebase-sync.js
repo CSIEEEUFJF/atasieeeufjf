@@ -107,6 +107,14 @@ function firestoreValue(value) {
     return { nullValue: null };
   }
 
+  if (Array.isArray(value)) {
+    return {
+      arrayValue: {
+        values: value.map((item) => firestoreValue(item)),
+      },
+    };
+  }
+
   if (value instanceof Date) {
     return { timestampValue: value.toISOString() };
   }
@@ -136,6 +144,10 @@ function taskDocumentId(task) {
 
 function eventDocumentId(event) {
   return `atas-event-${event.id}`;
+}
+
+function internalUserDocumentId(user) {
+  return `atas-user-${user.id}`;
 }
 
 function taskPayload(task) {
@@ -181,6 +193,17 @@ function eventPayload(event) {
     sourceId: String(event.id),
     startTime: event.startTime instanceof Date ?event.startTime : new Date(event.startTime),
     title: event.title || "",
+    updatedAt: new Date(),
+  };
+}
+
+function internalUserPayload(user) {
+  return {
+    chapters: Array.isArray(user.chapters) ? user.chapters : [],
+    email: user.email || "",
+    internalUserId: String(user.id),
+    name: user.name || "",
+    source: "atas",
     updatedAt: new Date(),
   };
 }
@@ -275,6 +298,22 @@ async function safeFirebaseSync(operation) {
 export async function syncTaskToFirebase(task) {
   await safeFirebaseSync((context) =>
     patchDocument(context, "tasks", taskDocumentId(task), taskPayload(task)),
+  );
+}
+
+export async function syncInternalUserToFirebase(user) {
+  await safeFirebaseSync((context) =>
+    patchDocument(context, "internalUsers", internalUserDocumentId(user), internalUserPayload(user)),
+  );
+}
+
+export async function syncInternalUsersToFirebase(users) {
+  await safeFirebaseSync((context) =>
+    Promise.all(
+      users.map((user) =>
+        patchDocument(context, "internalUsers", internalUserDocumentId(user), internalUserPayload(user)),
+      ),
+    ),
   );
 }
 

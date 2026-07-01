@@ -9,6 +9,14 @@ import {
 } from "./ata";
 import { getPrisma, nowDate } from "./db";
 import { notifyUserWelcome } from "./email-notifications";
+import {
+  syncFirebaseAuthUser,
+  syncFirebaseAuthUsers,
+} from "./firebase-auth-admin";
+import {
+  syncInternalUserToFirebase,
+  syncInternalUsersToFirebase,
+} from "./firebase-sync";
 
 export const SESSION_COOKIE = "atas_ieee_session";
 
@@ -413,7 +421,10 @@ export async function createUser(
     console.error("Falha ao enviar e-mail de boas-vindas.", error);
   }
 
-  return publicUser(user);
+  const createdUser = publicUser(user);
+  await syncFirebaseAuthUser(createdUser, { password: cleanPassword });
+  await syncInternalUserToFirebase(createdUser);
+  return createdUser;
 }
 
 export async function verifyCredentials(username, password) {
@@ -472,6 +483,7 @@ export async function changeOwnPassword(userId, currentPassword, newPassword) {
   validatePasswordPolicy(cleanPassword, "A nova senha");
 
   const user = await getPrisma().user.findUnique({
+    include: { chapters: true },
     where: { id: userId },
   });
 
@@ -487,6 +499,7 @@ export async function changeOwnPassword(userId, currentPassword, newPassword) {
     },
     where: { id: userId },
   });
+  await syncFirebaseAuthUser(publicUser(user), { password: cleanPassword });
 }
 
 export async function listUsers() {
@@ -496,6 +509,13 @@ export async function listUsers() {
   });
 
   return users.map(publicUser);
+}
+
+export async function syncUsersToFirebase() {
+  const users = await listUsers();
+  await syncFirebaseAuthUsers(users);
+  await syncInternalUsersToFirebase(users);
+  return users.length;
 }
 
 function limitPublicUserToChapters(user, chapterKeys) {
@@ -697,7 +717,10 @@ export async function updateUserManagement(currentUser, targetUserId, payload = 
     where: { id: targetUserId },
   });
 
-  return publicUser(updatedUser);
+  const publicUpdatedUser = publicUser(updatedUser);
+  await syncFirebaseAuthUser(publicUpdatedUser);
+  await syncInternalUserToFirebase(publicUpdatedUser);
+  return publicUpdatedUser;
 }
 
 export async function createSession(userId) {
@@ -786,6 +809,20 @@ export async function getCurrentUser() {
   });
 
   return publicUser(session.user);
+}
+
+export async function getUserByEmail(email) {
+  const cleanEmail = normalizeEmail(email, "");
+  if (!cleanEmail) {
+    return null;
+  }
+
+  const row = await getPrisma().user.findUnique({
+    include: { chapters: true },
+    where: { email: cleanEmail },
+  });
+
+  return publicUser(row);
 }
 
 export function setSessionCookie(response, token, expiresAt) {
