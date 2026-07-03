@@ -32,6 +32,11 @@ function sanitizeSocieties(value) {
   return [...new Set(requested.map((item) => sanitizeText(item, 40)).filter((item) => allowed.has(item)))];
 }
 
+function sanitizeVolunteerStatus(value) {
+  const cleanValue = sanitizeText(value, 40);
+  return ["Voluntário", "Inativo", "Sem vínculo"].includes(cleanValue) ? cleanValue : "Voluntário";
+}
+
 function membershipMember(row) {
   return {
     city: row.city || "",
@@ -47,6 +52,7 @@ function membershipMember(row) {
     societies: Array.isArray(row.societies) ? row.societies : [],
     source: row.source || "manual",
     state: row.state || "",
+    volunteerStatus: row.volunteerStatus || "Voluntário",
   };
 }
 
@@ -76,6 +82,7 @@ function sanitizePayload(payload = {}) {
     isDeleted: false,
     source: sanitizeText(payload.source, 40) || "manual",
     state: sanitizeText(payload.state, 120),
+    volunteerStatus: sanitizeVolunteerStatus(payload.volunteerStatus),
   };
 }
 

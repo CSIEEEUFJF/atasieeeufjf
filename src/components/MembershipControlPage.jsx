@@ -7,6 +7,8 @@ import {
   membershipMembers,
 } from "../data/membership-members";
 
+const VOLUNTEER_STATUS_OPTIONS = ["Voluntário", "Inativo", "Sem vínculo"];
+
 function emptyMemberForm() {
   return {
     city: "Juiz de Fora",
@@ -19,6 +21,7 @@ function emptyMemberForm() {
     section: "Minas Gerais Section",
     societies: [],
     state: "Minas Gerais",
+    volunteerStatus: "Voluntário",
   };
 }
 
@@ -62,6 +65,7 @@ export default function MembershipControlPage({ user }) {
   const [query, setQuery] = useState("");
   const [grade, setGrade] = useState("all");
   const [society, setSociety] = useState("all");
+  const [volunteerStatus, setVolunteerStatus] = useState("all");
   const [databaseMembers, setDatabaseMembers] = useState([]);
   const [memberForm, setMemberForm] = useState(emptyMemberForm);
   const [modalMode, setModalMode] = useState(null);
@@ -111,22 +115,24 @@ export default function MembershipControlPage({ user }) {
         member.email,
         member.city,
         member.section,
+        member.volunteerStatus,
         member.societies.join(" "),
         memberSocietyLabels(member).join(" "),
       ].join(" "));
       const matchesSearch = !search || haystack.includes(search);
       const matchesGrade = grade === "all" || member.grade === grade;
       const matchesSociety = society === "all" || member.societies.includes(society);
+      const matchesVolunteerStatus = volunteerStatus === "all" || member.volunteerStatus === volunteerStatus;
 
-      return matchesSearch && matchesGrade && matchesSociety;
+      return matchesSearch && matchesGrade && matchesSociety && matchesVolunteerStatus;
     });
-  }, [grade, members, query, society]);
+  }, [grade, members, query, society, volunteerStatus]);
 
   const stats = [
     ["Membros", members.length],
-    ["Ativos", members.filter((member) => member.ieeeStatus === "Active").length],
-    ["Sociedades", societyOptions.length],
-    ["Salvos", databaseMembers.filter((member) => !member.isDeleted).length],
+    ["Voluntários", members.filter((member) => member.volunteerStatus === "Voluntário").length],
+    ["Inativos", members.filter((member) => member.volunteerStatus === "Inativo").length],
+    ["Sem vínculo", members.filter((member) => member.volunteerStatus === "Sem vínculo").length],
   ];
 
   function updateMemberForm(field, value) {
@@ -309,6 +315,13 @@ export default function MembershipControlPage({ user }) {
               {societyOptions.map((option) => <option key={option} value={option}>{societyLabel(option)}</option>)}
             </select>
           </label>
+          <label className="field">
+            <span>Status</span>
+            <select value={volunteerStatus} onChange={(event) => setVolunteerStatus(event.target.value)}>
+              <option value="all">Todos</option>
+              {VOLUNTEER_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+            </select>
+          </label>
           <div className="membership-create-action">
             <button className="primary-button" type="button" onClick={openCreateModal}>Novo membro</button>
           </div>
@@ -329,6 +342,7 @@ export default function MembershipControlPage({ user }) {
                   <th>E-mail</th>
                   <th>Grau</th>
                   <th>Status</th>
+                  <th>Status IEEE</th>
                   <th>Renovação</th>
                   <th>Local</th>
                   <th>Sociedades</th>
@@ -342,6 +356,7 @@ export default function MembershipControlPage({ user }) {
                     <td><strong>{member.name}</strong></td>
                     <td><a href={`mailto:${member.email}`}>{member.email}</a></td>
                     <td>{member.grade}</td>
+                    <td>{member.volunteerStatus || "Voluntário"}</td>
                     <td>{member.ieeeStatus}</td>
                     <td>{member.renewYear}</td>
                     <td>{[member.city, member.state || member.section].filter(Boolean).join(" / ")}</td>
@@ -409,6 +424,12 @@ export default function MembershipControlPage({ user }) {
               {modalMode === "create" ? (
                 <>
                   <label className="field">
+                    <span>Status</span>
+                    <select value={memberForm.volunteerStatus} onChange={(event) => updateMemberForm("volunteerStatus", event.target.value)}>
+                      {VOLUNTEER_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                  </label>
+                  <label className="field">
                     <span>Renovação</span>
                     <input value={memberForm.renewYear} onChange={(event) => updateMemberForm("renewYear", event.target.value)} />
                   </label>
@@ -416,11 +437,14 @@ export default function MembershipControlPage({ user }) {
                     <span>Cidade</span>
                     <input value={memberForm.city} onChange={(event) => updateMemberForm("city", event.target.value)} />
                   </label>
-                  <label className="field">
-                    <span>Estado</span>
-                    <input value={memberForm.state} onChange={(event) => updateMemberForm("state", event.target.value)} />
-                  </label>
                 </>
+              ) : (
+                <label className="field">
+                  <span>Status</span>
+                  <select value={memberForm.volunteerStatus} onChange={(event) => updateMemberForm("volunteerStatus", event.target.value)}>
+                    {VOLUNTEER_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                  </select>
+                </label>
               ) : null}
 
               <fieldset className="membership-society-picker">

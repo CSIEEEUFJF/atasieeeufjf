@@ -113,6 +113,7 @@ function parseMembershipTsv(value) {
     return {
       ...item,
       societies: item.societies ? item.societies.split(";").filter(Boolean) : [],
+      volunteerStatus: "Voluntário",
     };
   });
 }
