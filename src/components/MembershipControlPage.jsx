@@ -10,6 +10,19 @@ import {
 const VOLUNTEER_STATUS_OPTIONS = ["Voluntário", "Inativo", "Sem vínculo"];
 const CHAPTER_OPTIONS = ["Ramo", "AESS", "APS", "CAS", "CS", "EDSOC", "IAS", "MTTS", "PES", "RAS", "SIGHT", "VTS", "WIE"];
 const ROLE_OPTIONS = ["Membro", "Presidente", "Vice-Presidente", "Tesoureiro", "Secretário", "Webmaster", "Conselheiro"];
+const SORTABLE_COLUMNS = {
+  memberNumber: "Número IEEE",
+  name: "Nome",
+  email: "E-mail",
+  grade: "Grau",
+  volunteerStatus: "Status",
+  mainChapter: "Capítulo principal",
+  role: "Cargo",
+  ieeeStatus: "Status IEEE",
+  renewYear: "Renovação",
+  location: "Local",
+  societyCount: "Sociedades",
+};
 
 function emptyMemberForm() {
   return {
@@ -45,6 +58,18 @@ function memberSocietyLabels(member) {
   return member.societies.map(societyLabel);
 }
 
+function memberSortValue(member, sortBy) {
+  if (sortBy === "location") {
+    return [member.city, member.state || member.section].filter(Boolean).join(" / ");
+  }
+
+  if (sortBy === "societyCount") {
+    return member.societies.length;
+  }
+
+  return member[sortBy];
+}
+
 function mergeMembershipMembers(sheetMembers, databaseMembers) {
   const overridesByNumber = new Map(databaseMembers.map((member) => [member.memberNumber, member]));
   const sheetNumbers = new Set(sheetMembers.map((member) => member.memberNumber));
@@ -70,6 +95,8 @@ export default function MembershipControlPage({ user }) {
   const [grade, setGrade] = useState("all");
   const [society, setSociety] = useState("all");
   const [volunteerStatus, setVolunteerStatus] = useState("all");
+  const [sortBy, setSortBy] = useState("name");
+  const [sortDirection, setSortDirection] = useState("asc");
   const [databaseMembers, setDatabaseMembers] = useState([]);
   const [memberForm, setMemberForm] = useState(emptyMemberForm);
   const [modalMode, setModalMode] = useState(null);
@@ -111,6 +138,8 @@ export default function MembershipControlPage({ user }) {
   );
   const filteredMembers = useMemo(() => {
     const search = normalizeSearch(query);
+    const sortMultiplier = sortDirection === "desc" ? -1 : 1;
+    const collator = new Intl.Collator("pt-BR", { numeric: true, sensitivity: "base" });
 
     return members.filter((member) => {
       const haystack = normalizeSearch([
@@ -131,8 +160,18 @@ export default function MembershipControlPage({ user }) {
       const matchesVolunteerStatus = volunteerStatus === "all" || member.volunteerStatus === volunteerStatus;
 
       return matchesSearch && matchesGrade && matchesSociety && matchesVolunteerStatus;
+    }).sort((left, right) => {
+      const leftValue = memberSortValue(left, sortBy);
+      const rightValue = memberSortValue(right, sortBy);
+      const comparison = collator.compare(String(leftValue || ""), String(rightValue || ""));
+
+      if (comparison !== 0) {
+        return comparison * sortMultiplier;
+      }
+
+      return collator.compare(left.name || "", right.name || "");
     });
-  }, [grade, members, query, society, volunteerStatus]);
+  }, [grade, members, query, society, sortBy, sortDirection, volunteerStatus]);
 
   const stats = [
     ["Membros", members.length],
@@ -156,6 +195,35 @@ export default function MembershipControlPage({ user }) {
 
       return { ...current, societies: [...societies] };
     });
+  }
+
+  function changeSort(column) {
+    setSortBy((currentSort) => {
+      if (currentSort !== column) {
+        setSortDirection("asc");
+        return column;
+      }
+
+      setSortDirection((currentDirection) => currentDirection === "asc" ? "desc" : "asc");
+      return currentSort;
+    });
+  }
+
+  function sortableHeader(column, label = SORTABLE_COLUMNS[column]) {
+    const isActive = sortBy === column;
+    const directionLabel = sortDirection === "asc" ? "crescente" : "decrescente";
+
+    return (
+      <button
+        className={`membership-sort-button${isActive ? " is-active" : ""}`}
+        type="button"
+        onClick={() => changeSort(column)}
+        aria-label={`Ordenar por ${label}${isActive ? `, ${directionLabel}` : ""}`}
+      >
+        <span>{label}</span>
+        {isActive ? <span aria-hidden="true">{sortDirection === "asc" ? "A-Z" : "Z-A"}</span> : null}
+      </button>
+    );
   }
 
   function openCreateModal() {
@@ -343,17 +411,17 @@ export default function MembershipControlPage({ user }) {
             <table className="membership-table">
               <thead>
                 <tr>
-                  <th>Número IEEE</th>
-                  <th>Nome</th>
-                  <th>E-mail</th>
-                  <th>Grau</th>
-                  <th>Status</th>
-                  <th>Capítulo principal</th>
-                  <th>Cargo</th>
-                  <th>Status IEEE</th>
-                  <th>Renovação</th>
-                  <th>Local</th>
-                  <th>Sociedades</th>
+                  <th>{sortableHeader("memberNumber")}</th>
+                  <th>{sortableHeader("name")}</th>
+                  <th>{sortableHeader("email")}</th>
+                  <th>{sortableHeader("grade")}</th>
+                  <th>{sortableHeader("volunteerStatus")}</th>
+                  <th>{sortableHeader("mainChapter")}</th>
+                  <th>{sortableHeader("role")}</th>
+                  <th>{sortableHeader("ieeeStatus")}</th>
+                  <th>{sortableHeader("renewYear")}</th>
+                  <th>{sortableHeader("location")}</th>
+                  <th>{sortableHeader("societyCount")}</th>
                   <th>Ações</th>
                 </tr>
               </thead>

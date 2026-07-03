@@ -2688,6 +2688,28 @@ html[data-theme="dark"] .site-admin-row {
   text-transform: uppercase;
 }
 
+.membership-sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  letter-spacing: inherit;
+  text-align: left;
+  text-transform: inherit;
+}
+
+.membership-sort-button:hover,
+.membership-sort-button.is-active {
+  color: var(--ieee-blue);
+}
+
 .membership-table td {
   font-size: 0.9rem;
 }
