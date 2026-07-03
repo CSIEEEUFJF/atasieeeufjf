@@ -158,6 +158,26 @@ model MemberContact {
   @@map("member_contacts")
 }
 
+model MembershipMember {
+  id           Int      @id @default(autoincrement())
+  memberNumber String   @unique @map("member_number")
+  name         String
+  email        String
+  grade        String   @default("Student Member")
+  ieeeStatus   String   @default("Active") @map("ieee_status")
+  renewYear    String   @default("") @map("renew_year")
+  section      String   @default("")
+  city         String   @default("")
+  state        String   @default("")
+  societies    Json     @default("[]")
+  source       String   @default("manual")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([grade, ieeeStatus], map: "idx_membership_members_grade_status")
+  @@map("membership_members")
+}
+
 model DoorProfile {
   id                     Int      @id @default(autoincrement())
   userId                 Int?     @map("user_id")

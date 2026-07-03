@@ -2604,6 +2604,51 @@ html[data-theme="dark"] .site-admin-row {
   gap: 16px;
 }
 
+.membership-add-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.membership-society-picker {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+}
+
+.membership-society-picker legend {
+  padding: 0 8px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.membership-society-picker label {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.membership-society-picker input {
+  margin-top: 2px;
+  accent-color: var(--ieee-blue);
+}
+
+.membership-add-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+}
+
 .membership-table-panel {
   overflow: hidden;
 }
@@ -2642,6 +2687,24 @@ html[data-theme="dark"] .site-admin-row {
   overflow-wrap: anywhere;
 }
 
+.membership-society-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.membership-society-chips span {
+  display: inline-flex;
+  min-height: 26px;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: 8px;
+  background: rgba(0, 98, 155, 0.08);
+  color: var(--ieee-blue);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
 @media (max-width: 980px) {
   .site-admin-layout {
     grid-template-columns: 1fr;
@@ -2652,6 +2715,11 @@ html[data-theme="dark"] .site-admin-row {
   }
 
   .membership-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .membership-add-form,
+  .membership-society-picker {
     grid-template-columns: 1fr;
   }
 }

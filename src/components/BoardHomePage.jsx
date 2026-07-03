@@ -212,7 +212,7 @@ export default function BoardHomePage({ demoMode = false } = {}) {
             <a className="board-action-card" href="/diretoria/membresias">
               <span>IEEE</span>
               <strong>Controle de membresias</strong>
-              <p>Acompanhe membros IEEE filtrados por Região 9 e categoria Student Member.</p>
+              <p>Controle de membros do Ramo</p>
             </a>
           ) : null}
 

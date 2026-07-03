@@ -6,6 +6,28 @@ export const membershipSource = {
   validMembers: 77,
 };
 
+export const ieeeSocietyMemberships = {
+  MEMAES010: { chapter: "AESS", name: "Aerospace and Electronic Systems Society" },
+  MEMAP003: { chapter: "APS", name: "Antennas and Propagation Society" },
+  MEMBT002: { chapter: "BTS", name: "Broadcast Technology Society" },
+  MEMCAS004: { chapter: "CAS", name: "Circuits and Systems Society" },
+  MEMC016: { chapter: "CS", name: "Computer Society" },
+  MEMCIS011: { chapter: "CIS", name: "Computational Intelligence Society" },
+  MEMCOM019: { chapter: "ComSoc", name: "Communications Society" },
+  MEME025: { chapter: "EDS", name: "Electron Devices Society" },
+  MEMED015: { chapter: "EdSoc", name: "Education Society" },
+  MEMEMB018: { chapter: "EMBS", name: "Engineering in Medicine and Biology Society" },
+  MEMEP021: { chapter: "EPS", name: "Electronics Packaging Society" },
+  MEMIA034: { chapter: "IAS", name: "Industry Applications Society" },
+  MEMIE013: { chapter: "IES", name: "Industrial Electronics Society" },
+  MEMMTT017: { chapter: "MTTS", name: "Microwave Theory and Technology Society" },
+  MEMNPS005: { chapter: "NPSS", name: "Nuclear and Plasma Sciences Society" },
+  MEMPE031: { chapter: "PES", name: "Power & Energy Society" },
+  MEMRA024: { chapter: "RAS", name: "Robotics and Automation Society" },
+  MEMSSC037: { chapter: "SSCS", name: "Solid-State Circuits Society" },
+  MEMVT006: { chapter: "VTS", name: "Vehicular Technology Society" },
+};
+
 const membershipTsv = `memberNumber	name	email	grade	ieeeStatus	renewYear	section	city	state	societies
 96679384	Lucas Galdino	lucas_galdino_r@hotmail.com	Student Member	Active	2026	Minas Gerais Section	Juiz de Fora	Minas Gerais	MEMPE031
 98631381	Fabricio Prata Rodrigues	fabriciopratar.10@gmail.com	Student Member	Active	2026	Minas Gerais Section	Juiz de Fora	Minas Gerais	MEMC016;MEMCOM019;MEME025;MEMED015;MEMEP021;MEMIA034;MEMPE031;MEMRA024;MEMVT006
