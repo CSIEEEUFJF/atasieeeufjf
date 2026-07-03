@@ -2600,8 +2600,14 @@ html[data-theme="dark"] .site-admin-row {
 
 .membership-controls {
   display: grid;
-  grid-template-columns: minmax(240px, 2fr) minmax(180px, 1fr) minmax(180px, 1fr);
+  grid-template-columns: minmax(240px, 2fr) minmax(180px, 1fr) minmax(180px, 1fr) auto;
   gap: 16px;
+  align-items: end;
+}
+
+.membership-create-action {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .membership-add-form {
@@ -2647,6 +2653,7 @@ html[data-theme="dark"] .site-admin-row {
   grid-column: 1 / -1;
   display: flex;
   justify-content: flex-end;
+  gap: 10px;
 }
 
 .membership-table-panel {
@@ -2705,6 +2712,33 @@ html[data-theme="dark"] .site-admin-row {
   font-weight: 700;
 }
 
+.membership-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(4, 12, 24, 0.56);
+}
+
+.membership-modal {
+  width: min(980px, 100%);
+  max-height: min(86vh, 920px);
+  overflow: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow-strong);
+  padding: 28px;
+}
+
 @media (max-width: 980px) {
   .site-admin-layout {
     grid-template-columns: 1fr;
@@ -2716,6 +2750,14 @@ html[data-theme="dark"] .site-admin-row {
 
   .membership-controls {
     grid-template-columns: 1fr;
+  }
+
+  .membership-create-action {
+    justify-content: stretch;
+  }
+
+  .membership-create-action .primary-button {
+    width: 100%;
   }
 
   .membership-add-form,

@@ -35,11 +35,39 @@ export async function DELETE(request, context) {
   }
 
   const params = await context.params;
-  const id = Number.parseInt(params.id, 10);
-  if (!Number.isSafeInteger(id) || id <= 0) {
+  const rawId = decodeURIComponent(String(params.id || "")).trim();
+  if (!rawId) {
     return NextResponse.json({ detail: "Membresia inválida." }, { status: 400 });
   }
 
-  await getPrisma().membershipMember.delete({ where: { id } });
+  if (rawId.startsWith("db-")) {
+    const id = Number.parseInt(rawId.slice(3), 10);
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      return NextResponse.json({ detail: "Membresia inválida." }, { status: 400 });
+    }
+
+    await getPrisma().membershipMember.update({
+      data: { isDeleted: true },
+      where: { id },
+    });
+    return NextResponse.json({ ok: true });
+  }
+
+  const memberNumber = rawId.startsWith("member-") ? rawId.slice(7) : rawId;
+  await getPrisma().membershipMember.upsert({
+    create: {
+      email: `${memberNumber}@deleted.local`,
+      isDeleted: true,
+      memberNumber,
+      name: "Membro removido",
+      source: "deleted",
+    },
+    update: {
+      isDeleted: true,
+      source: "deleted",
+    },
+    where: { memberNumber },
+  });
+
   return NextResponse.json({ ok: true });
 }

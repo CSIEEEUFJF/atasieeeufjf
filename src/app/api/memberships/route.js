@@ -39,6 +39,7 @@ function membershipMember(row) {
     grade: row.grade || "Student Member",
     id: row.id,
     ieeeStatus: row.ieeeStatus || "Active",
+    isDeleted: Boolean(row.isDeleted),
     memberNumber: row.memberNumber,
     name: row.name,
     renewYear: row.renewYear || "",
@@ -72,7 +73,8 @@ function sanitizePayload(payload = {}) {
     renewYear: sanitizeText(payload.renewYear, 20),
     section: sanitizeText(payload.section, 120),
     societies: sanitizeSocieties(payload.societies),
-    source: "manual",
+    isDeleted: false,
+    source: sanitizeText(payload.source, 40) || "manual",
     state: sanitizeText(payload.state, 120),
   };
 }
@@ -110,8 +112,11 @@ export async function POST(request) {
 
   try {
     const payload = await request.json();
-    const row = await getPrisma().membershipMember.create({
-      data: sanitizePayload(payload),
+    const data = sanitizePayload(payload);
+    const row = await getPrisma().membershipMember.upsert({
+      create: data,
+      update: data,
+      where: { memberNumber: data.memberNumber },
     });
 
     return NextResponse.json({ member: membershipMember(row) }, { status: 201 });
