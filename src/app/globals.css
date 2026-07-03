@@ -2600,7 +2600,7 @@ html[data-theme="dark"] .site-admin-row {
 
 .membership-controls {
   display: grid;
-  grid-template-columns: minmax(240px, 2fr) minmax(180px, 1fr) minmax(180px, 1fr) auto;
+  grid-template-columns: minmax(240px, 2fr) minmax(160px, 1fr) minmax(180px, 1fr) minmax(160px, 1fr) auto;
   gap: 16px;
   align-items: end;
 }
@@ -2666,7 +2666,7 @@ html[data-theme="dark"] .site-admin-row {
 
 .membership-table {
   border-collapse: collapse;
-  min-width: 1120px;
+  min-width: 1240px;
   width: 100%;
 }
 
