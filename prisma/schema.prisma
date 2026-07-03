@@ -170,6 +170,8 @@ model MembershipMember {
   city         String   @default("")
   state        String   @default("")
   societies    Json     @default("[]")
+  mainChapter  String   @default("Ramo") @map("main_chapter")
+  role         String   @default("Membro")
   volunteerStatus String @default("Voluntário") @map("volunteer_status")
   source       String   @default("manual")
   isDeleted    Boolean  @default(false) @map("is_deleted")

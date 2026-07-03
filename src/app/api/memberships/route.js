@@ -10,6 +10,9 @@ import { getPrisma } from "../../../lib/db";
 
 export const runtime = "nodejs";
 
+const CHAPTER_OPTIONS = ["Ramo", "AESS", "APS", "CAS", "CS", "EdSoc", "IAS", "MTTS", "PES", "RAS", "SIGHT", "VTS", "WIE"];
+const ROLE_OPTIONS = ["Membro", "Presidente", "Vice-Presidente", "Tesoureiro", "Secretário", "Webmaster", "Conselheiro"];
+
 function unauthorized() {
   return NextResponse.json({ detail: "Autenticação necessária." }, { status: 401 });
 }
@@ -37,6 +40,16 @@ function sanitizeVolunteerStatus(value) {
   return ["Voluntário", "Inativo", "Sem vínculo"].includes(cleanValue) ? cleanValue : "Voluntário";
 }
 
+function sanitizeMainChapter(value) {
+  const cleanValue = sanitizeText(value, 40);
+  return CHAPTER_OPTIONS.includes(cleanValue) ? cleanValue : "Ramo";
+}
+
+function sanitizeRole(value) {
+  const cleanValue = sanitizeText(value, 80);
+  return ROLE_OPTIONS.includes(cleanValue) ? cleanValue : "Membro";
+}
+
 function membershipMember(row) {
   return {
     city: row.city || "",
@@ -45,11 +58,13 @@ function membershipMember(row) {
     id: row.id,
     ieeeStatus: row.ieeeStatus || "Active",
     isDeleted: Boolean(row.isDeleted),
+    mainChapter: row.mainChapter || "Ramo",
     memberNumber: row.memberNumber,
     name: row.name,
     renewYear: row.renewYear || "",
     section: row.section || "",
     societies: Array.isArray(row.societies) ? row.societies : [],
+    role: row.role || "Membro",
     source: row.source || "manual",
     state: row.state || "",
     volunteerStatus: row.volunteerStatus || "Voluntário",
@@ -74,11 +89,13 @@ function sanitizePayload(payload = {}) {
     email,
     grade: sanitizeText(payload.grade, 80) || "Student Member",
     ieeeStatus: sanitizeText(payload.ieeeStatus, 80) || "Active",
+    mainChapter: sanitizeMainChapter(payload.mainChapter),
     memberNumber,
     name,
     renewYear: sanitizeText(payload.renewYear, 20),
     section: sanitizeText(payload.section, 120),
     societies: sanitizeSocieties(payload.societies),
+    role: sanitizeRole(payload.role),
     isDeleted: false,
     source: sanitizeText(payload.source, 40) || "manual",
     state: sanitizeText(payload.state, 120),

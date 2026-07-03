@@ -2564,6 +2564,9 @@ html[data-theme="dark"] .site-admin-row {
 
 .membership-page {
   gap: 24px;
+  width: 100%;
+  margin: 0;
+  padding: 96px 32px 44px;
 }
 
 .membership-hero {
@@ -2666,7 +2669,7 @@ html[data-theme="dark"] .site-admin-row {
 
 .membership-table {
   border-collapse: collapse;
-  min-width: 1240px;
+  min-width: 1440px;
   width: 100%;
 }
 

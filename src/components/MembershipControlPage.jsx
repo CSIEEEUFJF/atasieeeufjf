@@ -8,6 +8,8 @@ import {
 } from "../data/membership-members";
 
 const VOLUNTEER_STATUS_OPTIONS = ["Voluntário", "Inativo", "Sem vínculo"];
+const CHAPTER_OPTIONS = ["Ramo", "AESS", "APS", "CAS", "CS", "EdSoc", "IAS", "MTTS", "PES", "RAS", "SIGHT", "VTS", "WIE"];
+const ROLE_OPTIONS = ["Membro", "Presidente", "Vice-Presidente", "Tesoureiro", "Secretário", "Webmaster", "Conselheiro"];
 
 function emptyMemberForm() {
   return {
@@ -15,9 +17,11 @@ function emptyMemberForm() {
     email: "",
     grade: "Student Member",
     ieeeStatus: "Active",
+    mainChapter: "Ramo",
     memberNumber: "",
     name: "",
     renewYear: String(new Date().getFullYear()),
+    role: "Membro",
     section: "Minas Gerais Section",
     societies: [],
     state: "Minas Gerais",
@@ -115,6 +119,8 @@ export default function MembershipControlPage({ user }) {
         member.email,
         member.city,
         member.section,
+        member.mainChapter,
+        member.role,
         member.volunteerStatus,
         member.societies.join(" "),
         memberSocietyLabels(member).join(" "),
@@ -342,6 +348,8 @@ export default function MembershipControlPage({ user }) {
                   <th>E-mail</th>
                   <th>Grau</th>
                   <th>Status</th>
+                  <th>Capítulo principal</th>
+                  <th>Cargo</th>
                   <th>Status IEEE</th>
                   <th>Renovação</th>
                   <th>Local</th>
@@ -357,6 +365,8 @@ export default function MembershipControlPage({ user }) {
                     <td><a href={`mailto:${member.email}`}>{member.email}</a></td>
                     <td>{member.grade}</td>
                     <td>{member.volunteerStatus || "Voluntário"}</td>
+                    <td>{member.mainChapter || "Ramo"}</td>
+                    <td>{member.role || "Membro"}</td>
                     <td>{member.ieeeStatus}</td>
                     <td>{member.renewYear}</td>
                     <td>{[member.city, member.state || member.section].filter(Boolean).join(" / ")}</td>
@@ -430,6 +440,18 @@ export default function MembershipControlPage({ user }) {
                     </select>
                   </label>
                   <label className="field">
+                    <span>Capítulo principal</span>
+                    <select value={memberForm.mainChapter} onChange={(event) => updateMemberForm("mainChapter", event.target.value)}>
+                      {CHAPTER_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>Cargo</span>
+                    <select value={memberForm.role} onChange={(event) => updateMemberForm("role", event.target.value)}>
+                      {ROLE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                  </label>
+                  <label className="field">
                     <span>Renovação</span>
                     <input value={memberForm.renewYear} onChange={(event) => updateMemberForm("renewYear", event.target.value)} />
                   </label>
@@ -443,12 +465,26 @@ export default function MembershipControlPage({ user }) {
                   </label>
                 </>
               ) : (
-                <label className="field">
-                  <span>Status</span>
-                  <select value={memberForm.volunteerStatus} onChange={(event) => updateMemberForm("volunteerStatus", event.target.value)}>
-                    {VOLUNTEER_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-                  </select>
-                </label>
+                <>
+                  <label className="field">
+                    <span>Status</span>
+                    <select value={memberForm.volunteerStatus} onChange={(event) => updateMemberForm("volunteerStatus", event.target.value)}>
+                      {VOLUNTEER_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>Capítulo principal</span>
+                    <select value={memberForm.mainChapter} onChange={(event) => updateMemberForm("mainChapter", event.target.value)}>
+                      {CHAPTER_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>Cargo</span>
+                    <select value={memberForm.role} onChange={(event) => updateMemberForm("role", event.target.value)}>
+                      {ROLE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                  </label>
+                </>
               )}
 
               <fieldset className="membership-society-picker">

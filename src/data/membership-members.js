@@ -112,6 +112,8 @@ function parseMembershipTsv(value) {
     const item = Object.fromEntries(headers.map((header, index) => [header, columns[index] || ""]));
     return {
       ...item,
+      mainChapter: "Ramo",
+      role: "Membro",
       societies: item.societies ? item.societies.split(";").filter(Boolean) : [],
       volunteerStatus: "Voluntário",
     };
