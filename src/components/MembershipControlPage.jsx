@@ -437,6 +437,10 @@ export default function MembershipControlPage({ user }) {
                     <span>Cidade</span>
                     <input value={memberForm.city} onChange={(event) => updateMemberForm("city", event.target.value)} />
                   </label>
+                  <label className="field">
+                    <span>Estado</span>
+                    <input value={memberForm.state} onChange={(event) => updateMemberForm("state", event.target.value)} />
+                  </label>
                 </>
               ) : (
                 <label className="field">
@@ -445,7 +449,7 @@ export default function MembershipControlPage({ user }) {
                     {VOLUNTEER_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
                   </select>
                 </label>
-              ) : null}
+              )}
 
               <fieldset className="membership-society-picker">
                 <legend>Sociedades IEEE</legend>
