@@ -439,6 +439,36 @@ export default function SiteAdminPage({ user }) {
     }
   }
 
+  async function moveSiteMember(memberId, direction) {
+    const currentIndex = members.findIndex((member) => member.id === memberId);
+    const targetIndex = currentIndex + direction;
+
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= members.length) {
+      return;
+    }
+
+    const reorderedMembers = [...members];
+    const [movedMember] = reorderedMembers.splice(currentIndex, 1);
+    reorderedMembers.splice(targetIndex, 0, movedMember);
+
+    setIsSaving(true);
+    setStatus({ tone: "loading", text: "Atualizando ordem dos membros do site." });
+
+    try {
+      await Promise.all(
+        reorderedMembers.map((member, position) =>
+          submitJson(`/api/site-members/manage/${member.id}`, { position }, "PATCH"),
+        ),
+      );
+      await loadAll();
+      setStatus({ tone: "success", text: "Ordem dos membros atualizada." });
+    } catch (error) {
+      setStatus({ tone: "error", text: error.message || "Nao foi possivel alterar a ordem dos membros." });
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   async function saveProject(event) {
     event.preventDefault();
     const isEditing = Boolean(projectForm.id);
@@ -790,6 +820,15 @@ export default function SiteAdminPage({ user }) {
                       {MEMBER_ROLES.map((role) => <option key={role} value={role}>{role}</option>)}
                     </select>
                   </label>
+                  <label className="field">
+                    <span>Ordem</span>
+                    <input
+                      min="0"
+                      type="number"
+                      value={memberForm.position}
+                      onChange={(event) => updateMember("position", Number(event.target.value))}
+                    />
+                  </label>
                   <label className="field field-span-2">
                     <span>Foto</span>
                     <input value={memberForm.photoUrl} onChange={(event) => updateMember("photoUrl", event.target.value)} placeholder="Link publico ou Google Drive" />
@@ -854,15 +893,17 @@ export default function SiteAdminPage({ user }) {
             <AdminList
               emptyText="Nenhum membro cadastrado."
               items={members}
-              renderItem={(member) => (
+              renderItem={(member, index) => (
                 <article className="site-admin-row" key={member.id}>
                   <div className="site-admin-row-thumb site-admin-row-thumb--square">{member.photoUrl ? <img src={member.photoUrl} alt="" style={photoFrameStyle(member)} /> : null}</div>
                   <div>
                     <span>{member.role}</span>
                     <strong>{member.name}</strong>
-                    <p>{member.chapters?.join(", ") || "Sem capitulo"}</p>
+                    <p>#{Number(member.position) || 0} · {member.chapters?.join(", ") || "Sem capitulo"}</p>
                   </div>
                   <div className="site-admin-row-actions">
+                    <button className="text-button" disabled={isSaving || index === 0} type="button" onClick={() => moveSiteMember(member.id, -1)}>Subir</button>
+                    <button className="text-button" disabled={isSaving || index === members.length - 1} type="button" onClick={() => moveSiteMember(member.id, 1)}>Descer</button>
                     <button className="text-button" type="button" onClick={() => editMember(member)}>Editar</button>
                     <button className="text-button danger" type="button" onClick={() => removeItem("member", member.id)}>Remover</button>
                   </div>

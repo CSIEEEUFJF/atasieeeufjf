@@ -209,6 +209,14 @@ export default function BoardHomePage({ demoMode = false } = {}) {
           </a>
 
           {!demoMode ?(
+            <a className="board-action-card" href="/diretoria/membresias">
+              <span>IEEE</span>
+              <strong>Controle de membresias</strong>
+              <p>Acompanhe membros IEEE filtrados por Região 9 e categoria Student Member.</p>
+            </a>
+          ) : null}
+
+          {!demoMode ?(
             <a className="board-action-card" href="/diretoria/site">
               <span>Site</span>
               <strong>Site do Ramo</strong>
