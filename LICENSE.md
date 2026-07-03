@@ -1,4 +1,4 @@
-# Licenca de Uso Interno e Codigo Proprietario
+# Licença de Uso Interno e Código Proprietário
 
 Copyright (c) 2026 Ramo Estudantil IEEE UFJF.
 
@@ -6,84 +6,83 @@ Todos os direitos reservados.
 
 ## 1. Titularidade
 
-Este software, incluindo seu codigo-fonte, interfaces, documentacao, templates,
-scripts, configuracoes, fluxos de negocio e demais artefatos associados, e de
+Este software, incluindo seu código-fonte, interfaces, documentação, templates,
+scripts, configurações, fluxos de negócio e demais artefatos associados, é de
 titularidade do Ramo Estudantil IEEE UFJF, salvo componentes de terceiros que
-possuam licencas proprias.
+possuam licenças próprias.
 
-## 2. Permissao de uso interno
+## 2. Permissão de uso interno
 
-O uso deste software e permitido exclusivamente para fins internos do Ramo
-Estudantil IEEE UFJF, seus capitulos, grupos autorizados e pessoas designadas
-para administracao, manutencao, desenvolvimento, auditoria ou operacao do
+O uso deste software é permitido exclusivamente para fins internos do Ramo
+Estudantil IEEE UFJF, seus capítulos, grupos autorizados e pessoas designadas
+para administração, manutenção, desenvolvimento, auditoria ou operação do
 sistema.
 
 Pessoas autorizadas podem:
 
-- executar o sistema em ambientes internos, de teste, homologacao ou producao;
-- modificar o codigo-fonte para manutencao, correcao de falhas e melhoria do
+- executar o sistema em ambientes internos, de teste, homologação ou produção;
+- modificar o código-fonte para manutenção, correção de falhas e melhoria do
   sistema;
-- criar copias de seguranca e ambientes de desenvolvimento;
-- consultar e adaptar a documentacao interna para operacao do projeto.
+- criar cópias de segurança e ambientes de desenvolvimento;
+- consultar e adaptar a documentação interna para operação do projeto.
 
-## 3. Restricoes
+## 3. Restrições
 
-Sem autorizacao previa e expressa do Ramo Estudantil IEEE UFJF, e proibido:
+Sem autorização prévia e expressa do Ramo Estudantil IEEE UFJF, é proibido:
 
 - copiar, distribuir, sublicenciar, vender, alugar, publicar ou disponibilizar
   este software, no todo ou em parte, para terceiros;
 - utilizar este software para fins comerciais externos ao Ramo Estudantil IEEE
   UFJF;
-- remover avisos de titularidade, autoria ou restricao de uso;
-- publicar o codigo-fonte em repositorios publicos ou privados nao autorizados;
+- remover avisos de titularidade, autoria ou restrição de uso;
+- publicar o código-fonte em repositórios públicos ou privados não autorizados;
 - conceder acesso administrativo, credenciais, chaves, tokens, bancos de dados
-  ou ambientes de producao a pessoas nao autorizadas;
-- utilizar dados reais do sistema fora dos ambientes e finalidades autorizados.
+  ou ambientes de produção a pessoas não autorizadas;
+- utilizar dados reais do sistema fora dos ambientes e finalidades autorizadas.
 
 ## 4. Dados e confidencialidade
 
-Dados pessoais, atas, arquivos, credenciais, tokens, configuracoes de ambiente,
-informacoes internas e registros operacionais tratados por este software devem
+Dados pessoais, atas, arquivos, credenciais, tokens, configurações de ambiente,
+informações internas e registros operacionais tratados por este software devem
 ser mantidos em sigilo e utilizados apenas para as finalidades institucionais
 autorizadas.
 
-O acesso ao sistema deve observar as permissoes definidas pelos administradores
-responsaveis e as politicas internas aplicaveis.
+O acesso ao sistema deve observar as permissões definidas pelos administradores
+responsáveis e as políticas internas aplicáveis.
 
 ## 5. Componentes de terceiros
 
-Este software pode depender de bibliotecas, ferramentas, frameworks, servicos e
-arquivos de terceiros, incluindo, mas nao se limitando a, Next.js, React, Prisma,
-PostgreSQL, LaTeX, SwiftLaTeX, TeX Live e outras dependencias listadas no
+Este software pode depender de bibliotecas, ferramentas, frameworks, serviços e
+arquivos de terceiros, incluindo, mas não se limitando a, Next.js, React, Prisma,
+PostgreSQL, LaTeX, SwiftLaTeX, TeX Live e outras dependências listadas no
 projeto.
 
-Cada componente de terceiro permanece sujeito aos seus proprios termos de
-licenca. Esta licenca nao altera, substitui nem restringe direitos concedidos
-pelas licencas desses componentes.
+Cada componente de terceiro permanece sujeito aos seus próprios termos de
+licença. Esta licença não altera, substitui nem restringe direitos concedidos
+pelas licenças desses componentes.
 
 ## 6. Ausencia de garantias
 
-Este software e fornecido "como esta", sem garantias de qualquer natureza,
-expressas ou implicitas, incluindo garantias de disponibilidade, adequacao a
-finalidade especifica, ausencia de erros, seguranca absoluta ou compatibilidade
+Este software é fornecido "como está", sem garantias de qualquer natureza,
+expressas ou implícitas, incluindo garantias de disponibilidade, adequação à
+finalidade específica, ausência de erros, segurança absoluta ou compatibilidade
 com ambientes futuros.
 
-## 7. Limitacao de responsabilidade
+## 7. Limitação de responsabilidade
 
-Na maxima extensao permitida pela legislacao aplicavel, o Ramo Estudantil IEEE
-UFJF e seus colaboradores nao serao responsaveis por danos diretos, indiretos,
-incidentais, especiais, consequenciais, perdas de dados, interrupcoes de servico
-ou quaisquer prejuizos decorrentes do uso, manutencao, modificacao ou
+Na máxima extensão permitida pela legislação aplicável, o Ramo Estudantil IEEE
+UFJF e seus colaboradores não serão responsáveis por danos diretos, indiretos,
+incidentais, especiais, consequenciais, perdas de dados, interrupções de serviço
+ou quaisquer prejuízos decorrentes do uso, manutenção, modificação ou
 indisponibilidade deste software.
 
-## 8. Autorizacoes excepcionais
+## 8. Autorizações excepcionais
 
-Qualquer uso fora do escopo desta licenca depende de autorizacao previa,
+Qualquer uso fora do escopo desta licença depende de autorização prévia,
 expressa e documentada do Ramo Estudantil IEEE UFJF.
 
-## 9. Vigencia
+## 9. Vigência
 
-Esta licenca permanece vigente enquanto o software, suas copias, modificacoes ou
+Esta licença permanece vigente enquanto o software, suas cópias, modificações ou
 derivados forem utilizados, mantidos ou armazenados por qualquer pessoa ou
 entidade.
-
