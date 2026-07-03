@@ -86,3 +86,91 @@ expressa e documentada do Ramo Estudantil IEEE UFJF.
 Esta licença permanece vigente enquanto o software, suas cópias, modificações ou
 derivados forem utilizados, mantidos ou armazenados por qualquer pessoa ou
 entidade.
+
+---
+
+# Internal Use and Proprietary Software License
+
+Copyright (c) 2026 IEEE UFJF Student Branch.
+
+All rights reserved.
+
+## 1. Ownership
+
+This software, including its source code, interfaces, documentation, templates,
+scripts, configurations, business workflows and other associated artifacts, is
+owned by the IEEE UFJF Student Branch, except for third-party components that
+are subject to their own licenses.
+
+## 2. Internal use permission
+
+Use of this software is permitted exclusively for internal purposes of the IEEE
+UFJF Student Branch, its chapters, authorized groups and people designated for
+system administration, maintenance, development, auditing or operation.
+
+Authorized people may:
+
+- run the system in internal, testing, staging or production environments;
+- modify the source code for maintenance, bug fixes and system improvements;
+- create backups and development environments;
+- consult and adapt the internal documentation for project operation.
+
+## 3. Restrictions
+
+Without prior and express authorization from the IEEE UFJF Student Branch, it is
+prohibited to:
+
+- copy, distribute, sublicense, sell, rent, publish or make this software
+  available, in whole or in part, to third parties;
+- use this software for commercial purposes outside the IEEE UFJF Student
+  Branch;
+- remove ownership, authorship or usage restriction notices;
+- publish the source code in unauthorized public or private repositories;
+- grant administrative access, credentials, keys, tokens, databases or
+  production environments to unauthorized people;
+- use real system data outside authorized environments and purposes.
+
+## 4. Data and confidentiality
+
+Personal data, meeting minutes, files, credentials, tokens, environment
+configurations, internal information and operational records processed by this
+software must be kept confidential and used only for authorized institutional
+purposes.
+
+Access to the system must follow the permissions defined by the responsible
+administrators and the applicable internal policies.
+
+## 5. Third-party components
+
+This software may depend on third-party libraries, tools, frameworks, services
+and files, including but not limited to Next.js, React, Prisma, PostgreSQL,
+LaTeX, SwiftLaTeX, TeX Live and other dependencies listed in the project.
+
+Each third-party component remains subject to its own license terms. This
+license does not change, replace or restrict rights granted by the licenses of
+those components.
+
+## 6. No warranties
+
+This software is provided "as is", without warranties of any kind, express or
+implied, including warranties of availability, fitness for a particular
+purpose, absence of errors, absolute security or compatibility with future
+environments.
+
+## 7. Limitation of liability
+
+To the maximum extent permitted by applicable law, the IEEE UFJF Student Branch
+and its collaborators shall not be liable for direct, indirect, incidental,
+special, consequential damages, data loss, service interruptions or any losses
+arising from the use, maintenance, modification or unavailability of this
+software.
+
+## 8. Exceptional authorizations
+
+Any use outside the scope of this license depends on prior, express and
+documented authorization from the IEEE UFJF Student Branch.
+
+## 9. Term
+
+This license remains in effect while the software, its copies, modifications or
+derivatives are used, maintained or stored by any person or entity.
