@@ -8,7 +8,7 @@ import {
 } from "../data/membership-members";
 
 const VOLUNTEER_STATUS_OPTIONS = ["Voluntário", "Inativo", "Sem vínculo"];
-const CHAPTER_OPTIONS = ["Ramo", "AESS", "APS", "CAS", "CS", "EdSoc", "IAS", "MTTS", "PES", "RAS", "SIGHT", "VTS", "WIE"];
+const CHAPTER_OPTIONS = ["Ramo", "AESS", "APS", "CAS", "CS", "EDSOC", "IAS", "MTTS", "PES", "RAS", "SIGHT", "VTS", "WIE"];
 const ROLE_OPTIONS = ["Membro", "Presidente", "Vice-Presidente", "Tesoureiro", "Secretário", "Webmaster", "Conselheiro"];
 
 function emptyMemberForm() {

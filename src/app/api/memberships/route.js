@@ -10,7 +10,7 @@ import { getPrisma } from "../../../lib/db";
 
 export const runtime = "nodejs";
 
-const CHAPTER_OPTIONS = ["Ramo", "AESS", "APS", "CAS", "CS", "EdSoc", "IAS", "MTTS", "PES", "RAS", "SIGHT", "VTS", "WIE"];
+const CHAPTER_OPTIONS = ["Ramo", "AESS", "APS", "CAS", "CS", "EDSOC", "IAS", "MTTS", "PES", "RAS", "SIGHT", "VTS", "WIE"];
 const ROLE_OPTIONS = ["Membro", "Presidente", "Vice-Presidente", "Tesoureiro", "Secretário", "Webmaster", "Conselheiro"];
 
 function unauthorized() {
@@ -42,7 +42,8 @@ function sanitizeVolunteerStatus(value) {
 
 function sanitizeMainChapter(value) {
   const cleanValue = sanitizeText(value, 40);
-  return CHAPTER_OPTIONS.includes(cleanValue) ? cleanValue : "Ramo";
+  const normalizedValue = cleanValue === "EdSoc" ? "EDSOC" : cleanValue;
+  return CHAPTER_OPTIONS.includes(normalizedValue) ? normalizedValue : "Ramo";
 }
 
 function sanitizeRole(value) {
