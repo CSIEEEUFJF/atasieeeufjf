@@ -187,9 +187,9 @@ export default function BoardHomePage({ demoMode = false } = {}) {
         <section className="hero-panel internal-hero internal-hero--simple">
           <div>
             <p className="panel-kicker">Diretoria</p>
-            <h1>Area da diretoria</h1>
+            <h1>Área da diretoria</h1>
             <p>
-              Acesse os paineis restritos para acompanhar desempenho de tarefas e cadastrar
+              Acesse os paineis para acompanhar desempenho de tarefas e cadastrar
               novos membros do Ramo e dos capítulos.
             </p>
           </div>
@@ -212,7 +212,7 @@ export default function BoardHomePage({ demoMode = false } = {}) {
             <a className="board-action-card" href="/diretoria/membresias">
               <span>IEEE</span>
               <strong>Controle de membresias</strong>
-              <p>Controle de membros do Ramo</p>
+              <p>Controle de membros do Ramo.</p>
             </a>
           ) : null}
 
