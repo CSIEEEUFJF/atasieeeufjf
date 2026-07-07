@@ -53,6 +53,7 @@ function emptyProjectForm() {
   return {
     chapter: "Ramo",
     description: "",
+    descriptionEn: "",
     driveFolderUrl: "",
     galleryImagesText: "",
     id: null,
@@ -66,7 +67,9 @@ function emptyProjectForm() {
     showOnChapter: true,
     showOnHome: true,
     subtitle: "",
+    subtitleEn: "",
     title: "",
+    titleEn: "",
   };
 }
 
@@ -711,6 +714,10 @@ export default function SiteAdminPage({ user }) {
                     <input value={projectForm.title} onChange={(event) => updateProject("title", event.target.value)} required />
                   </label>
                   <label className="field">
+                    <span>Titulo em ingles</span>
+                    <input value={projectForm.titleEn} onChange={(event) => updateProject("titleEn", event.target.value)} />
+                  </label>
+                  <label className="field">
                     <span>Capitulo</span>
                     <select value={projectForm.chapter} onChange={(event) => updateProject("chapter", event.target.value)}>
                       {CHAPTERS.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
@@ -721,8 +728,16 @@ export default function SiteAdminPage({ user }) {
                     <input value={projectForm.subtitle} onChange={(event) => updateProject("subtitle", event.target.value)} />
                   </label>
                   <label className="field field-span-2">
+                    <span>Subtitulo em ingles</span>
+                    <input value={projectForm.subtitleEn} onChange={(event) => updateProject("subtitleEn", event.target.value)} />
+                  </label>
+                  <label className="field field-span-2">
                     <span>Descricao do popup</span>
                     <textarea value={projectForm.description} onChange={(event) => updateProject("description", event.target.value)} />
+                  </label>
+                  <label className="field field-span-2">
+                    <span>Descricao do popup em ingles</span>
+                    <textarea value={projectForm.descriptionEn} onChange={(event) => updateProject("descriptionEn", event.target.value)} />
                   </label>
                   <label className="field field-span-2">
                     <span>Imagem principal</span>

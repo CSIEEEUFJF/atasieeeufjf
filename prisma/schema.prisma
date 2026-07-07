@@ -87,8 +87,11 @@ model SiteMember {
 model SiteProject {
   id             Int      @id @default(autoincrement())
   title          String
+  titleEn        String   @default("") @map("title_en")
   subtitle       String   @default("")
+  subtitleEn     String   @default("") @map("subtitle_en")
   description    String   @default("")
+  descriptionEn  String   @default("") @map("description_en")
   chapter        String   @default("Ramo")
   imageUrl       String   @default("") @map("image_url")
   linkUrl        String   @default("") @map("link_url")

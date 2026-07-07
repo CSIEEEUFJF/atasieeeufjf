@@ -62,3 +62,29 @@ export async function fillMissingBiographyTranslation(data) {
 
   return nextData;
 }
+
+async function fillMissingTranslatedField(nextData, sourceKey, targetKey, sourceLang, targetLang) {
+  if (nextData[sourceKey] && !nextData[targetKey]) {
+    nextData[targetKey] = await translateTextWithDeepL(nextData[sourceKey], {
+      sourceLang,
+      targetLang,
+    });
+  }
+}
+
+export async function fillMissingProjectTranslation(data) {
+  const nextData = { ...data };
+
+  try {
+    await fillMissingTranslatedField(nextData, "title", "titleEn", "PT", "EN-US");
+    await fillMissingTranslatedField(nextData, "subtitle", "subtitleEn", "PT", "EN-US");
+    await fillMissingTranslatedField(nextData, "description", "descriptionEn", "PT", "EN-US");
+    await fillMissingTranslatedField(nextData, "titleEn", "title", "EN", "PT-BR");
+    await fillMissingTranslatedField(nextData, "subtitleEn", "subtitle", "EN", "PT-BR");
+    await fillMissingTranslatedField(nextData, "descriptionEn", "description", "EN", "PT-BR");
+  } catch (error) {
+    console.warn("Nao foi possivel traduzir o projeto com DeepL.", error);
+  }
+
+  return nextData;
+}

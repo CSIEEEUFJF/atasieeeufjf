@@ -1,6 +1,7 @@
 import { normalizarSociedadeChave, SOCIEDADES } from "./ata";
 import { canManageMembers } from "./auth";
 import { getPrisma } from "./db";
+import { fillMissingProjectTranslation } from "./deepl-translation";
 
 const CHAPTER_KEYS = Object.keys(SOCIEDADES);
 const SITE_PROJECT_CHAPTER_KEYS = new Set([...CHAPTER_KEYS, "SIGHT", "WIE"]);
@@ -230,6 +231,7 @@ function publicSiteProject(row) {
   return {
     chapter: normalizeChapter(row.chapter),
     description: row.description || "",
+    descriptionEn: row.descriptionEn || "",
     driveFolderUrl: sanitizeDriveFolderUrl(row.driveFolderUrl),
     galleryImages: sanitizeGalleryImages(row.galleryImages),
     id: row.id,
@@ -243,8 +245,56 @@ function publicSiteProject(row) {
     showOnChapter: typeof row.showOnChapter === "boolean" ? row.showOnChapter : true,
     showOnHome: typeof row.showOnHome === "boolean" ? row.showOnHome : true,
     subtitle: row.subtitle || "",
+    subtitleEn: row.subtitleEn || "",
     title: row.title,
+    titleEn: row.titleEn || "",
   };
+}
+
+async function fillAndPersistMissingProjectTranslation(row) {
+  const hasMissingPair = (ptValue, enValue) => Boolean((ptValue && !enValue) || (enValue && !ptValue));
+  if (!row || !(
+    hasMissingPair(row.title, row.titleEn) ||
+    hasMissingPair(row.subtitle, row.subtitleEn) ||
+    hasMissingPair(row.description, row.descriptionEn)
+  )) {
+    return row;
+  }
+
+  const translatedData = await fillMissingProjectTranslation({
+    description: row.description || "",
+    descriptionEn: row.descriptionEn || "",
+    subtitle: row.subtitle || "",
+    subtitleEn: row.subtitleEn || "",
+    title: row.title || "",
+    titleEn: row.titleEn || "",
+  });
+
+  if (
+    translatedData.description === row.description &&
+    translatedData.descriptionEn === row.descriptionEn &&
+    translatedData.subtitle === row.subtitle &&
+    translatedData.subtitleEn === row.subtitleEn &&
+    translatedData.title === row.title &&
+    translatedData.titleEn === row.titleEn
+  ) {
+    return row;
+  }
+
+  try {
+    return await getPrisma().siteProject.update({
+      data: translatedData,
+      where: { id: row.id },
+    });
+  } catch (error) {
+    console.warn("Nao foi possivel salvar a traducao do projeto do site.", error);
+    return row;
+  }
+}
+
+async function publicSiteProjects(rows) {
+  const translatedRows = await Promise.all(rows.map(fillAndPersistMissingProjectTranslation));
+  return translatedRows.map(publicSiteProject).filter(Boolean);
 }
 
 function requireSiteProjectManagement(user) {
@@ -264,6 +314,7 @@ async function sanitizeSiteProjectPayload(payload = {}) {
   return {
     chapter: normalizeChapter(payload.chapter),
     description: sanitizeText(payload.description, 900),
+    descriptionEn: sanitizeText(payload.descriptionEn, 900),
     driveFolderUrl,
     galleryImages: await resolveGalleryImages({ ...payload, driveFolderUrl }),
     imageUrl: sanitizeUrl(payload.imageUrl),
@@ -276,7 +327,9 @@ async function sanitizeSiteProjectPayload(payload = {}) {
     showOnChapter: typeof payload.showOnChapter === "boolean" ? Boolean(payload.showOnChapter) : true,
     showOnHome: typeof payload.showOnHome === "boolean" ? Boolean(payload.showOnHome) : true,
     subtitle: sanitizeText(payload.subtitle, 260),
+    subtitleEn: sanitizeText(payload.subtitleEn, 260),
     title,
+    titleEn: sanitizeText(payload.titleEn, 160),
   };
 }
 
@@ -294,8 +347,20 @@ async function sanitizePartialSiteProjectPayload(payload = {}) {
     data.subtitle = sanitizeText(payload.subtitle, 260);
   }
 
+  if (Object.prototype.hasOwnProperty.call(payload, "subtitleEn")) {
+    data.subtitleEn = sanitizeText(payload.subtitleEn, 260);
+  }
+
   if (Object.prototype.hasOwnProperty.call(payload, "description")) {
     data.description = sanitizeText(payload.description, 900);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, "descriptionEn")) {
+    data.descriptionEn = sanitizeText(payload.descriptionEn, 900);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, "titleEn")) {
+    data.titleEn = sanitizeText(payload.titleEn, 160);
   }
 
   if (Object.prototype.hasOwnProperty.call(payload, "chapter")) {
@@ -364,7 +429,7 @@ export async function listPublicSiteProjects() {
     where: { isPublic: true },
   });
 
-  return rows.map(publicSiteProject).filter(Boolean);
+  return publicSiteProjects(rows);
 }
 
 export async function listManagedSiteProjects(currentUser) {
@@ -374,14 +439,14 @@ export async function listManagedSiteProjects(currentUser) {
     orderBy: [{ position: "asc" }, { title: "asc" }],
   });
 
-  return rows.map(publicSiteProject).filter(Boolean);
+  return publicSiteProjects(rows);
 }
 
 export async function createSiteProject(currentUser, payload = {}) {
   requireSiteProjectManagement(currentUser);
 
   const row = await getPrisma().siteProject.create({
-    data: await sanitizeSiteProjectPayload(payload),
+    data: await fillMissingProjectTranslation(await sanitizeSiteProjectPayload(payload)),
   });
 
   return publicSiteProject(row);
@@ -391,7 +456,7 @@ export async function updateSiteProject(currentUser, projectId, payload = {}) {
   requireSiteProjectManagement(currentUser);
 
   const row = await getPrisma().siteProject.update({
-    data: await sanitizePartialSiteProjectPayload(payload),
+    data: await fillMissingProjectTranslation(await sanitizePartialSiteProjectPayload(payload)),
     where: { id: projectId },
   });
 
