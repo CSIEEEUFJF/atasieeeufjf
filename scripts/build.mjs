@@ -2,8 +2,12 @@ import { spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
-function runNodeScript(scriptPath, args) {
+function runNodeScript(scriptPath, args, options = {}) {
   const result = spawnSync(process.execPath, [scriptPath, ...args], {
+    env: {
+      ...process.env,
+      ...(options.env || {}),
+    },
     stdio: "inherit",
   });
 
@@ -45,18 +49,28 @@ function copyPdftexMapToPublic() {
 runNodeScript("node_modules/prisma/build/index.js", ["generate"]);
 copyPdftexMapToPublic();
 
-if (process.env.DATABASE_URL) {
-  runNodeScript("node_modules/prisma/build/index.js", ["db", "push", "--accept-data-loss"]);
+const migrationDatabaseUrl = process.env.PRISMA_DATABASE_URL || process.env.DATABASE_URL;
+
+if (migrationDatabaseUrl) {
+  runNodeScript(
+    "node_modules/prisma/build/index.js",
+    ["db", "push", "--accept-data-loss"],
+    { env: { DATABASE_URL: migrationDatabaseUrl } },
+  );
 
   if (process.env.SITE_PROJECTS_SEED_ON_BUILD !== "false") {
-    runNodeScript("scripts/seed-site-chapter-projects.mjs", []);
+    runNodeScript("scripts/seed-site-chapter-projects.mjs", [], {
+      env: { DATABASE_URL: migrationDatabaseUrl },
+    });
   }
 
   if (process.env.FIREBASE_SYNC_USERS_ON_BUILD !== "false") {
-    runNodeScript("scripts/sync-firebase-users.mjs", []);
+    runNodeScript("scripts/sync-firebase-users.mjs", [], {
+      env: { DATABASE_URL: migrationDatabaseUrl },
+    });
   }
 } else {
-  console.warn("DATABASE_URL nao definida; pulando prisma db push, seed de projetos e sync de usuarios Firebase.");
+  console.warn("PRISMA_DATABASE_URL/DATABASE_URL nao definida; pulando prisma db push, seed de projetos e sync de usuarios Firebase.");
 }
 
 runNodeScript("node_modules/next/dist/bin/next", ["build"]);

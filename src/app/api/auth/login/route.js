@@ -66,7 +66,7 @@ export async function POST(request) {
     }
 
     const message = error.message || "Não foi possível entrar.";
-    const status = message.includes("DATABASE_URL") ? 503 : 400;
+    const status = message.includes("DATABASE_URL") || message.includes("Banco") ? 503 : 400;
     return NextResponse.json(
       { detail: message },
       { headers: noStoreHeaders(), status },

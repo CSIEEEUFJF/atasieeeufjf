@@ -27,7 +27,7 @@ export async function GET() {
     return NextResponse.json(
       {
         detail:
-          "Banco de dados indisponivel. Configure DATABASE_URL na Vercel e sincronize o schema com Prisma db push.",
+          "Banco de dados indisponivel. Configure APP_DATABASE_URL ou POSTGRES_URL na Vercel e sincronize o schema com PRISMA_DATABASE_URL.",
       },
       { headers: noStoreHeaders(), status: 503 },
     );
