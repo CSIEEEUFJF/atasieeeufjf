@@ -9,6 +9,7 @@ const MAX_EMAIL_RECIPIENTS = 200;
 const RESEND_EMAILS_PER_SECOND = 10;
 const EMAIL_BATCH_DELAY_MS = 1000;
 const SYSTEM_BASE_URL = "https://interno.ieeeufjf.com.br";
+const BRANCH_CONTACT_EMAIL = "ramo.ieeeufjf@gmail.com";
 
 let resendClient = null;
 
@@ -511,9 +512,6 @@ export async function notifyUserWelcome({ initialPassword, user }) {
 }
 
 export async function notifyBranchAboutSiteInterest({ email, interest, language, message, name }) {
-  const recipientEmail = String(
-    process.env.SITE_INTEREST_RECIPIENT || "ramo.ieeeufjf@gmail.com",
-  ).trim().toLowerCase();
   const interestData = { email, interest, language, message, name };
 
   return sendSingleEmail({
@@ -522,7 +520,7 @@ export async function notifyBranchAboutSiteInterest({ email, interest, language,
     subject: `[Site IEEE UFJF] Novo interesse: ${name}`,
     text: siteInterestEmailText(interestData),
     to: {
-      email: recipientEmail,
+      email: BRANCH_CONTACT_EMAIL,
       name: "Ramo Estudantil IEEE UFJF",
     },
   });

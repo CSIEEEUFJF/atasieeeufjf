@@ -3,6 +3,12 @@ import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { notifyBranchAboutSiteInterest } from "../../../lib/email-notifications";
+import {
+  DuplicateSiteInterestError,
+  markSiteInterestSent,
+  releasePendingSiteInterest,
+  reserveSiteInterest,
+} from "../../../lib/site-interests";
 
 export const runtime = "nodejs";
 
@@ -147,13 +153,46 @@ export async function POST(request) {
       return NextResponse.json({ ok: true }, { headers: responseHeaders() });
     }
 
-    const notification = await notifyBranchAboutSiteInterest(payload);
+    let reservation;
+    try {
+      reservation = await reserveSiteInterest(payload);
+    } catch (error) {
+      if (error instanceof DuplicateSiteInterestError) {
+        return NextResponse.json(
+          {
+            code: "email_already_used",
+            detail: error.message,
+          },
+          { headers: responseHeaders(), status: 409 },
+        );
+      }
+
+      throw error;
+    }
+
+    let notification;
+    try {
+      notification = await notifyBranchAboutSiteInterest(payload);
+    } catch (error) {
+      await releasePendingSiteInterest(reservation.id).catch((releaseError) => {
+        console.error("Falha ao liberar interesse após erro de e-mail.", releaseError);
+      });
+      throw error;
+    }
+
     if (!notification.enabled || notification.sent !== 1) {
+      await releasePendingSiteInterest(reservation.id).catch((releaseError) => {
+        console.error("Falha ao liberar interesse sem envio de e-mail.", releaseError);
+      });
       return NextResponse.json(
         { detail: "O envio de e-mail está temporariamente indisponível." },
         { headers: responseHeaders(), status: 503 },
       );
     }
+
+    await markSiteInterestSent(reservation.id).catch((error) => {
+      console.error("E-mail enviado, mas o interesse não foi marcado como concluído.", error);
+    });
 
     return NextResponse.json({ ok: true }, { headers: responseHeaders() });
   } catch (error) {
