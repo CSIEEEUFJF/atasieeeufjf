@@ -413,7 +413,44 @@ function eventEmailText({ creator, event }) {
   ].filter(Boolean).join("\n");
 }
 
-async function sendSingleEmail({ html, subject, text, to }) {
+function siteInterestEmailHtml({ email, interest, language, message, name }) {
+  const languageLabel = language === "en" ? "English" : "Português";
+  const safeMessage = escapeHtml(message || "Sem mensagem adicional.").replaceAll("\n", "<br>");
+
+  return emailShell({
+    eyebrow: "Site IEEE UFJF",
+    preview: `${name} enviou um interesse em participar do Ramo.`,
+    title: "Novo interesse em participar",
+    children: `
+      ${detailTable([
+        ["Nome", name],
+        ["E-mail", email],
+        ["Área de interesse", interest],
+        ["Idioma do formulário", languageLabel],
+      ])}
+      <div style="margin-top:18px;">
+        <div style="color:#42526a; font-family:Formata,Arial,sans-serif; font-size:13px; font-weight:700; margin-bottom:6px;">Mensagem</div>
+        <div style="padding:14px 16px; border:1px solid #d7e5f0; border-radius:12px; background:#f8fbfd; color:#17233c; font-family:Formata,Arial,sans-serif; font-size:14px;">${safeMessage}</div>
+      </div>
+      ${actionButton({ href: `mailto:${email}`, label: "Responder ao estudante" })}
+    `,
+  });
+}
+
+function siteInterestEmailText({ email, interest, language, message, name }) {
+  return [
+    "Novo interesse enviado pelo site IEEE UFJF.",
+    "",
+    `Nome: ${name}`,
+    `E-mail: ${email}`,
+    `Área de interesse: ${interest}`,
+    `Idioma do formulário: ${language === "en" ? "English" : "Português"}`,
+    "",
+    `Mensagem: ${message || "Sem mensagem adicional."}`,
+  ].join("\n");
+}
+
+async function sendSingleEmail({ html, replyTo, subject, text, to }) {
   const enabled = emailNotificationsEnabled();
   if (!enabled || !isDeliverableEmail(to?.email)) {
     return { enabled, sent: 0 };
@@ -422,6 +459,7 @@ async function sendSingleEmail({ html, subject, text, to }) {
   await getResendClient().emails.send({
     from: process.env.EMAIL_FROM,
     html,
+    ...(replyTo ? { replyTo } : {}),
     subject,
     text,
     to: `${to.name || to.email} <${to.email}>`,
@@ -472,6 +510,24 @@ export async function notifyUserWelcome({ initialPassword, user }) {
   });
 }
 
+export async function notifyBranchAboutSiteInterest({ email, interest, language, message, name }) {
+  const recipientEmail = String(
+    process.env.SITE_INTEREST_RECIPIENT || "ramo.ieeeufjf@gmail.com",
+  ).trim().toLowerCase();
+  const interestData = { email, interest, language, message, name };
+
+  return sendSingleEmail({
+    html: siteInterestEmailHtml(interestData),
+    replyTo: email,
+    subject: `[Site IEEE UFJF] Novo interesse: ${name}`,
+    text: siteInterestEmailText(interestData),
+    to: {
+      email: recipientEmail,
+      name: "Ramo Estudantil IEEE UFJF",
+    },
+  });
+}
+
 export async function notifyMembersAboutCreatedEvent({ creator, events }) {
   const eventList = Array.isArray(events) ?events : [events].filter(Boolean);
   const firstEvent = eventList[0];
@@ -501,4 +557,3 @@ export async function notifyMembersAboutCreatedEvent({ creator, events }) {
 
   return sentStats(await sendEmailBatches(messages));
 }
-

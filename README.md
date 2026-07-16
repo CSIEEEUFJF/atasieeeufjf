@@ -628,7 +628,14 @@ E-mail:
 EMAIL_NOTIFICATIONS_ENABLED=true
 RESEND_API_KEY=
 EMAIL_FROM=
+SITE_INTEREST_RECIPIENT=ramo.ieeeufjf@gmail.com
+SITE_INTEREST_API_TOKEN=
 ```
+
+`POST /api/site-interest` recebe manifestações de interesse do site público e envia a
+mensagem ao endereço configurado em `SITE_INTEREST_RECIPIENT`. O token é opcional,
+mas, quando definido, deve ser enviado pelo proxy do site como `Bearer` e mantido
+com o mesmo valor nos dois projetos.
 
 Firebase:
 
