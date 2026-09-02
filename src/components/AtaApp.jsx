@@ -35,9 +35,9 @@ const FALLBACK_SOCIETIES = [
 const MAX_ATTACHMENTS = 5;
 const MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024;
 const ALLOWED_ATTACHMENT_TYPES = new Set([
+  "application/pdf",
   "image/jpeg",
   "image/png",
-  "image/webp",
 ]);
 
 function hojeFormatado() {
@@ -561,7 +561,7 @@ function baixarArquivo(blob, fileName) {
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
 function App({ demoMode = false } = {}) {
@@ -726,9 +726,15 @@ function App({ demoMode = false } = {}) {
   }, [form.sociedade]);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requestedAtaId = params.get("ata") || "";
+
     if (demoMode) {
       setActiveAtaId(null);
       setMemberOptions(DEMO_MEMBERS);
+      if (requestedAtaId) {
+        handleLoadSavedAta(requestedAtaId, { replaceUrl: true });
+      }
       return;
     }
 
@@ -738,8 +744,7 @@ function App({ demoMode = false } = {}) {
       return;
     }
 
-    const params = new URLSearchParams(window.location.search);
-    const ataId = Number.parseInt(params.get("ata") || "", 10);
+    const ataId = Number.parseInt(requestedAtaId, 10);
     if (Number.isSafeInteger(ataId) && ataId > 0 && activeAtaId !== ataId) {
       handleLoadSavedAta(ataId, { replaceUrl: true });
     }
@@ -1010,7 +1015,7 @@ function App({ demoMode = false } = {}) {
         }));
         setStatus({
           tone: "error",
-          text: "Use anexos em PNG, JPG ou WebP.",
+          text: "Use anexos em PNG, JPG ou PDF.",
         });
         return;
       }
@@ -1426,12 +1431,13 @@ function App({ demoMode = false } = {}) {
         outputName,
       });
 
+      const pdfFileName = buildPdfFileNameFromTitle(ataTitle, result.fileName);
+      baixarArquivo(result.pdf, pdfFileName);
       setStatus({
         tone: "loading",
-        text: "PDF gerado. Enviando ao servidor JS.",
+        text: "PDF gerado e download iniciado. Enviando uma cópia ao servidor JS.",
       });
 
-      const pdfFileName = buildPdfFileNameFromTitle(ataTitle, result.fileName);
       let forwardMessage = "PDF enviado ao servidor JS.";
       let forwardTone = "success";
       try {
@@ -1456,7 +1462,6 @@ function App({ demoMode = false } = {}) {
           forwardError.message || "Não foi possível enviar o PDF ao servidor JS.";
       }
 
-      baixarArquivo(result.pdf, pdfFileName);
       setStatus({
         tone: forwardTone,
         text: `Ata salva com sucesso. PDF gerado no navegador e download iniciado. ${forwardMessage}`,
@@ -1915,7 +1920,7 @@ function App({ demoMode = false } = {}) {
                 <span>Arquivo</span>
                 <input
                   type="file"
-                  accept="image/png,image/jpeg,image/webp"
+                  accept="image/png,image/jpeg,application/pdf"
                   onChange={(event) =>
                     handleAttachmentFile(event.target.files?.[0] || null)
                   }

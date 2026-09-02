@@ -7,6 +7,11 @@ let formatBytesPromise;
 let pdftexMapBytesPromise;
 const societyBundleCache = new Map();
 const SWIFTLATEX_CACHE_BUSTER = Date.now().toString(36);
+const ATTACHMENT_EXTENSION_BY_MIME = {
+  "application/pdf": ".pdf",
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+};
 
 function splitLines(value) {
   return String(value || "")
@@ -31,12 +36,17 @@ function normalizarNomeSaida(nome) {
   return nomeLimpo;
 }
 
-function normalizarNomeArquivo(nome) {
+function normalizarNomeArquivo(nome, mimeType = "") {
   const partes = String(nome || "").match(/^(.*?)(\.[^.]+)?$/);
   const stem = (partes?.[1] || "anexo")
     .replace(/[^0-9A-Za-z-]+/g, "-")
     .replace(/^-+|-+$/g, "");
-  const suffix = (partes?.[2] || ".bin").toLowerCase().replace(/[^.0-9A-Za-z]+/g, "");
+  const normalizedMimeType = String(mimeType || "").trim().toLowerCase();
+  const suffix = (
+    ATTACHMENT_EXTENSION_BY_MIME[normalizedMimeType]
+    || partes?.[2]
+    || ".bin"
+  ).toLowerCase().replace(/[^.0-9A-Za-z]+/g, "");
   return `${stem || "anexo"}${suffix || ".bin"}`;
 }
 
@@ -52,6 +62,8 @@ function escaparLatex(textoBruto) {
     "}": "\\}",
     "~": "\\textasciitilde{}",
     "^": "\\textasciicircum{}",
+    "ª": "\\textsuperscript{a}",
+    "º": "\\textsuperscript{o}",
   };
 
   return String(textoBruto ?? "")
@@ -469,7 +481,15 @@ async function prepararArquivosDeAnexo(anexos, outputName) {
   const arquivos = [];
 
   for (const [indice, anexo] of anexos.entries()) {
-    const nomeArquivo = normalizarNomeArquivo(anexo.fileName || anexo.file?.name || "anexo");
+    const mimeType = String(anexo.file?.type || anexo.mimeType || "").trim().toLowerCase();
+    if (mimeType && !ATTACHMENT_EXTENSION_BY_MIME[mimeType]) {
+      throw new Error("Use anexos em PNG, JPG ou PDF.");
+    }
+
+    const nomeArquivo = normalizarNomeArquivo(
+      anexo.fileName || anexo.file?.name || "anexo",
+      mimeType,
+    );
     const caminho = `anexos_gerados/${nomeBase}-${String(indice + 1).padStart(2, "0")}-${nomeArquivo}`;
     const buffer = await anexo.file.arrayBuffer();
 

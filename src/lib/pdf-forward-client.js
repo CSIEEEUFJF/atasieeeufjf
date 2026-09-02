@@ -6,15 +6,49 @@
   }
 }
 
+const FORWARD_SESSION_TIMEOUT_MS = 15_000;
+const FORWARD_UPLOAD_TIMEOUT_MS = 120_000;
+
+async function fetchJsonWithTimeout(url, options, timeoutMs, timeoutMessage) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    const payload = await readJson(response);
+
+    if (controller.signal.aborted) {
+      throw new Error(timeoutMessage);
+    }
+
+    return { payload, response };
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error(timeoutMessage);
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 async function createForwardSession(metadata) {
-  const response = await fetch("/api/pdf-forward/session", {
-    body: JSON.stringify({ metadata }),
-    headers: {
-      "Content-Type": "application/json",
+  const { payload, response } = await fetchJsonWithTimeout(
+    "/api/pdf-forward/session",
+    {
+      body: JSON.stringify({ metadata }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+      method: "POST",
     },
-    method: "POST",
-  });
-  const payload = await readJson(response);
+    FORWARD_SESSION_TIMEOUT_MS,
+    "O servidor demorou mais de 15 segundos para preparar o envio do PDF.",
+  );
 
   if (!response.ok) {
     throw new Error(payload.detail || "Não foi possível preparar o envio ao servidor JS.");
@@ -69,12 +103,16 @@ export async function forwardGeneratedPdf({ fileName, metadata = {}, pdf }) {
       }
     : undefined;
 
-  const response = await fetch(session.uploadUrl, {
-    body: formData,
-    headers,
-    method: "POST",
-  });
-  const payload = await readJson(response);
+  const { payload, response } = await fetchJsonWithTimeout(
+    session.uploadUrl,
+    {
+      body: formData,
+      headers,
+      method: "POST",
+    },
+    FORWARD_UPLOAD_TIMEOUT_MS,
+    "O envio do PDF excedeu o limite de 2 minutos e foi cancelado.",
+  );
 
   if (!response.ok) {
     throw new Error(payload.detail || "Não foi possível enviar o PDF ao servidor JS.");

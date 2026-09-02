@@ -93,7 +93,7 @@ function baixarArquivo(blob, fileName) {
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
 function validateSavedAtaForm(form) {
@@ -435,13 +435,14 @@ function SavedAtasPage({ demoMode = false } = {}) {
         outputName: payload.ata.outputName || payload.ata.title || "ata_preenchida",
       });
 
-      setStatus({
-        tone: "loading",
-        text: "PDF gerado. Enviando ao servidor JS.",
-      });
-
       const ataTitle = payload.ata.title || form.titulo || payload.ata.outputName || "ata_preenchida";
       const pdfFileName = buildPdfFileNameFromTitle(ataTitle, result.fileName);
+      baixarArquivo(result.pdf, pdfFileName);
+      setStatus({
+        tone: "loading",
+        text: "PDF gerado e download iniciado. Enviando uma cópia ao servidor JS.",
+      });
+
       let forwardMessage = "PDF enviado ao servidor JS.";
       let forwardTone = "success";
       try {
@@ -466,7 +467,6 @@ function SavedAtasPage({ demoMode = false } = {}) {
           forwardError.message || "Não foi possível enviar o PDF ao servidor JS.";
       }
 
-      baixarArquivo(result.pdf, pdfFileName);
       setStatus({
         tone: forwardTone,
         text: `PDF gerado a partir da ata salva. O download foi iniciado. ${forwardMessage}`,
@@ -684,7 +684,7 @@ function SavedAtasPage({ demoMode = false } = {}) {
                             </button>
                             <a
                               className="text-button standalone-link"
-                              href={demoMode ?`/demo/atas/nova?ata=${ata.id}` : `/?ata=${ata.id}`}
+                              href={demoMode ?`/demo/atas/nova?ata=${ata.id}` : `/atas/nova?ata=${ata.id}`}
                               onClick={(event) => event.stopPropagation()}
                             >
                               Abrir no gerador

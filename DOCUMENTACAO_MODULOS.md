@@ -582,7 +582,7 @@ Cuidados:
 
 - sempre escapar texto enviado ao LaTeX;
 - limitar anexos;
-- aceitar apenas imagens permitidas como anexos na UI;
+- aceitar apenas PNG, JPG ou PDF como anexos na UI;
 - nao depender de `pdflatex` no servidor para o fluxo principal.
 
 ## 19. APIs publicas para o site
